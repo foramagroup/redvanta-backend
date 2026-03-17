@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  db:
+    image: mariadb:10.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-krootal}
+      MYSQL_USER: ${MYSQL_USER:-krootal}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-krootal}
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  backend:
+    build: .
+    env_file: .env
+    ports:
+      - "4000:4000"
+    depends_on:
+      - db
+    volumes:
+      - ./:/usr/src/app
+
+volumes:
+  db_data:
