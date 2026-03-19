@@ -1,12 +1,46 @@
 import prisma from '../../config/database.js';
 
+const SETTINGS_MODULE = "sms_api_settings";
+const defaultSettings = {
+    enableFailover: false,
+    failoverProviderId: "",
+    retryAttempts: 3,
+    maxPerMinute: 100,
+    maxPerDay: 5000,
+    globalDailyLimit: 100000,
+};
 
- const list = async (req, res) => {
+const parseSettings = (raw) => {
+    if (!raw) return defaultSettings;
+
+    try {
+        return {
+            ...defaultSettings,
+            ...JSON.parse(raw),
+        };
+    } catch {
+        return defaultSettings;
+    }
+};
+
+const saveSettings = async (settings) => prisma.superAdminSetting.upsert({
+    where: { module: SETTINGS_MODULE },
+    update: {
+        settings: JSON.stringify(settings),
+    },
+    create: {
+        module: SETTINGS_MODULE,
+        settings: JSON.stringify(settings),
+    },
+});
+
+
+const list = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
-        const [data, total, suppliers, regions] = await Promise.all([
+        const [data, total, suppliers, regions, settingsRecord] = await Promise.all([
             prisma.smsSetting.findMany({
                 skip,
                 take: limit,
@@ -20,11 +54,15 @@ import prisma from '../../config/database.js';
             }),
             prisma.smsSetting.count(),
             prisma.smsSupplier.findMany({ select: { id: true, name: true } }),
-            prisma.smsRegion.findMany({ select: { id: true, name: true } })
+            prisma.smsRegion.findMany({ select: { id: true, name: true } }),
+            prisma.superAdminSetting.findUnique({
+                where: { module: SETTINGS_MODULE }
+            })
         ]);
 
         res.json({
             data,
+            settings: parseSettings(settingsRecord?.settings),
             meta: {
                 total,
                 page,
@@ -40,6 +78,25 @@ import prisma from '../../config/database.js';
         res.status(500).json({ message: error.message });
     }
 };
+
+const updateGlobalSettings = async (req, res) => {
+    try {
+        const nextSettings = {
+            ...defaultSettings,
+            ...req.body,
+        };
+
+        await saveSettings(nextSettings);
+
+        res.json({
+            message: "SMS global settings updated",
+            data: nextSettings,
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 
 
  const create = async (req, res) => {
@@ -149,5 +206,7 @@ export default {
   list,
   create,
   update,
-  deleteSetting
+  deleteSetting,
+  updateGlobalSettings
 };
+

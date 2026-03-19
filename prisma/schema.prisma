@@ -478,6 +478,33 @@ model SmsSetting {
   @@map("sms_settings")
 }
 
+
+model SuperAdminSetting {
+  id        Int      @id @default(autoincrement())
+  module    String   @unique @db.VarChar(100)
+  settings  String?  @db.LongText
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("super_admin_settings")
+}
+
+
+model EmailServerConfig {
+  id        String   @id @db.VarChar(191)
+  name      String   @db.VarChar(150)
+  value     String   @db.VarChar(100)
+  sid       String   @db.VarChar(30)
+  region    String?  @db.VarChar(100)
+  status    String   @default("Active") @db.VarChar(30)
+  isDefault Boolean  @default(false)
+  config    String?  @db.LongText
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("email_server_config")
+}
+
 model stripeproduct {
   id             String   @id
   stripeId       String   @unique(map: "StripeProduct_stripeId_key")

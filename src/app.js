@@ -43,6 +43,8 @@ import productAdminRoutes from "./routes/superadmin/productRoutes.js";
 import cardTypeAdminRoutes from "./routes/superadmin/cardTypeRoutes.js";
 import companyRoutes from "./routes/superadmin/companyRoutes.js";
 import authSuperAdminRoutes from "./routes/superadmin/authRoutes.js";
+import emailServerConfigRoutes from "./routes/superadmin/emailServerConfigRoutes.js";
+import statusRoutes from "./routes/superadmin/statusRoutes.js";
 
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
@@ -181,6 +183,8 @@ app.use("/api/customization", customizationRoutes);
   app.use('/api/superadmin/sms-templates', smsTemplateRoutes);
   app.use('/api/superadmin/email-templates', emailTemplateRoutes);
   app.use('/api/superadmin/webhooks-settings', webhooksSettingRoutes);
+  app.use('/api/superadmin/email-server-config', emailServerConfigRoutes);
+  app.use('/api/superadmin/status-settings', statusRoutes);
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
     // app.use("/uploads", express.static(uploadDir));

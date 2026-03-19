@@ -7,8 +7,11 @@ router.get("/", smsSettingsController.list);
 
 router.post("/", smsSettingsController.create);
 
+router.put("/global-settings", smsSettingsController.updateGlobalSettings);
+
 router.put("/:id", smsSettingsController.update);
 
 router.delete("/:id", smsSettingsController.deleteSetting);
 
 export default router;
+

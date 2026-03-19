@@ -1,5 +1,4 @@
 import express from "express";
-import { Router } from "express";
 import { authenticateSuperAdmin, requireSuperAdmin } from "../../middleware/auth.middleware.js";
 import { login, me, logout, check } from "../../controllers/superadmin/authController.js";
 
