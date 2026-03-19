@@ -1,91 +1,113 @@
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-import prisma from "../../config/prisma.js";
+// src/controllers/superadmin/authController.js
 
-const JWT_SECRET = process.env.JWT_SECRET || "change_me";
-const TOKEN_EXP = "7d";
-const LEGACY_SUPERADMIN_ROLES = new Set(["admin", "owner"]);
+import prisma  from "../../config/database.js";
+import bcrypt  from "bcryptjs";
+import { generateToken, getCookieOptions, blacklistToken } from "../../services/token.service.js";
+import { loadUserByEmail, loadUserForAuth, formatSuperAdmin } from "../../services/superadmin/auth.service.js";
 
-export async function login(req, res) {
+
+async function logActivity(userId, name, ip, userAgent, status) {
+  await prisma.loginActivity.create({
+    data: { userId: userId ?? null, admin_name: name ?? null, ip, userAgent, status },
+  }).catch(console.error);
+}
+
+function getIp(req) {
+  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim()
+    || req.socket?.remoteAddress
+    || "unknown";
+}
+
+// ─── POST /api/superadmin/auth/login ─────────────────────────
+export const login = async (req, res, next) => {
+  const ip        = getIp(req);
+  const userAgent = req.headers["user-agent"] ?? null;
+
   try {
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    const password = String(req.body?.password || "");
+    const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: "Email & password required" });
+      return res.status(422).json({ success: false, error: "Email et mot de passe requis" });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    // Charger l'utilisateur
+    const user = await loadUserByEmail(email, "superadmin");
 
-    const ok = await bcrypt.compare(password, user.password || "");
-    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
-
-    const role = String(user.role || "").toLowerCase();
-    const isSuperadmin = Boolean(user.isSuperadmin) || role === "superadmin" || LEGACY_SUPERADMIN_ROLES.has(role);
-    if (!isSuperadmin) {
-      return res.status(403).json({ error: "Forbidden: superadmin only" });
+    // Vérifier que c'est un superadmin
+    if (!user || !user.isSuperadmin) {
+      await logActivity(null, email, ip, userAgent, "failed");
+      return res.status(401).json({ success: false, error: "Identifiants invalides" });
     }
 
-    const token = jwt.sign(
-      { id: user.id, role: user.role, email: user.email, scope: "superadmin" },
-      JWT_SECRET,
-      { expiresIn: TOKEN_EXP }
-    );
+    // Vérifier le mot de passe
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      await logActivity(user.id, user.name, ip, userAgent, "failed");
+      return res.status(401).json({ success: false, error: "Identifiants invalides" });
+    }
 
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 3600 * 1000,
-      path: "/",
+    // Générer le JWT
+    const token = generateToken({
+      userId:       user.id,
+      email:        user.email,
+      isSuperadmin: true,
+      isAdmin:      false,
     });
 
+    // Mettre à jour lastLogin
+    await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+
+    // Logger la connexion
+    await logActivity(user.id, user.name, ip, userAgent, "success");
+
+    // ── Stocker le JWT dans un cookie HttpOnly ──────────────
+    res.cookie("sa_token", token, getCookieOptions("sa_token"));
+
+    // Retourner les infos user (PAS le token — il est dans le cookie)
     return res.json({
-      ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        isSuperadmin: Boolean(user.isSuperadmin),
-      },
+      success: true,
+      message: "Connexion réussie",
+      user:    formatSuperAdmin(user),
     });
-  } catch (err) {
-    console.error("superadmin login error", err);
-    return res.status(500).json({ error: "Internal error" });
+  } catch (e) {
+    await logActivity(null, req.body?.email, ip, userAgent, "failed");
+    next(e);
   }
-}
+};
 
-export async function me(req, res) {
+// ─── GET /api/superadmin/auth/me ─────────────────────────────
+export const me = async (req, res, next) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    const user = await loadUserForAuth(req.user.userId, "superadmin");
+    if (!user || !user.isSuperadmin) {
+      return res.status(403).json({ success: false, error: "Accès refusé" });
+    }
+    return res.json({ success: true, user: formatSuperAdmin(user) });
+  } catch (e) { next(e); }
+};
 
-    const role = String(user.role || "").toLowerCase();
-    const isSuperadmin = Boolean(user.isSuperadmin) || role === "superadmin" || LEGACY_SUPERADMIN_ROLES.has(role);
-    if (!isSuperadmin) {
-      return res.status(403).json({ error: "Forbidden: superadmin only" });
+// ─── POST /api/superadmin/auth/logout ────────────────────────
+export const logout = async (req, res, next) => {
+  try {
+    // Blacklister le token courant pour l'invalider immédiatement
+    if (req.token) {
+      await blacklistToken(req.token);
     }
 
-    return res.json({
-      ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        isSuperadmin: Boolean(user.isSuperadmin),
-        superadminLastAt: user.superadminLastAt,
-      },
-    });
-  } catch (err) {
-    console.error("superadmin me error", err);
-    return res.status(500).json({ error: "Internal error" });
-  }
-}
+    // Logger la déconnexion
+    if (req.user?.userId) {
+      await logActivity(req.user.userId, null, getIp(req), req.headers["user-agent"], "logout");
+    }
 
-export function logout(req, res) {
-  res.clearCookie("token", { path: "/" });
-  return res.json({ ok: true });
-}
+    // Effacer le cookie
+    res.clearCookie("sa_token", { path: "/" });
+
+    return res.json({ success: true, message: "Déconnecté avec succès" });
+  } catch (e) { next(e); }
+};
+
+// ─── GET /api/superadmin/auth/check ──────────────────────────
+// Vérifier si la session est toujours valide (ping silencieux du frontend)
+export const check = async (req, res) => {
+  return res.json({ success: true, authenticated: true });
+};

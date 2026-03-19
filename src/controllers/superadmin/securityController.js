@@ -1,89 +1,168 @@
 import prisma from "../../config/database.js";
-import bcrypt from 'bcryptjs';
-export const getAdmins = async (req, res) => {
+import bcrypt from "bcryptjs";
 
-    const admins = await prisma.user.findMany({
-        where: {
-        roleId: {
-            not: null
-        }
-        },
-        include: {
-        role: true
-        },
-        orderBy: {
-            createdAt: "desc"
-        }
-    });
+const userModel = prisma.user;
+const roleModel = prisma.role;
+const loginActivityModel = prisma.loginActivity;
+const securityPolicyModel = prisma.securitypolicie;
 
-    const formattedAdmins = admins.map(a => ({
-        id: a.id,
-        name: a.name,
-        email: a.email,
-        role: a.role?.name,
-        twoFa: a.twoFa,
-        lastLogin: a.lastLogin
-    }));
-    
-    const loginActivity = await prisma.loginActivity.findMany({
-        orderBy: {
-        createdAt: "desc"
-        },
-        take: 10
-    });
-    const formattedActivity = loginActivity.map(a => ({
-        admin: a.adminName,
-        ip: a.ip,
-        time: a.createdAt,
-        status: a.status
-    }));
+const parseId = (value) => Number.parseInt(value, 10);
 
-   res.json({
-      formattedAdmins,
-      formattedActivity
+export const getSecuritySettings = async (req, res) => {
+  try {
+    const [securityPolicy, roles] = await Promise.all([
+      securityPolicyModel.findFirst(),
+      roleModel.findMany({
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    res.json({
+      policy: securityPolicy || {
+        enforce2FA: false,
+        ipRestriction: "",
+      },
+      roles,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
+export const updateSecuritySettings = async (req, res) => {
+  try {
+    const { enforce2FA, ipRestriction } = req.body;
+
+    const existingPolicy = await securityPolicyModel.findFirst();
+
+    const data = {
+      enforce2FA: Boolean(enforce2FA),
+      ipRestriction: ipRestriction || "",
+      updatedAt: new Date(),
+    };
+
+    const policy = existingPolicy
+      ? await securityPolicyModel.update({
+          where: { id: existingPolicy.id },
+          data,
+        })
+      : await securityPolicyModel.create({
+          data,
+        });
+
+    res.json(policy);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+export const getAdmins = async (req, res) => {
+  try {
+    const admins = await userModel.findMany({
+      where: {
+        roleId: {
+          not: null,
+        },
+      },
+      include: {
+        role: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    const formattedAdmins = admins.map((admin) => ({
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      roleId: admin.roleId,
+      role: admin.role?.name || "",
+      twoFa: Boolean(admin.twoFa),
+      lastLogin: admin.lastLogin,
+    }));
+
+    const loginActivity = await loginActivityModel.findMany({
+      orderBy: {
+        createdAt: "desc",
+      },
+      take: 10,
+    });
+
+    const formattedActivity = loginActivity.map((activity) => ({
+      admin: activity.admin_name,
+      ip: activity.ip,
+      time: activity.createdAt,
+      status: activity.status,
+    }));
+
+    res.json({
+      admins: formattedAdmins,
+      loginActivity: formattedActivity,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 export const createAdmin = async (req, res) => {
-
-  const { name, email, roleId } = req.body;
+  try {
+    const { name, email, roleId } = req.body;
     const hashedPassword = await bcrypt.hash("admin123", 10);
-  const admin = await prisma.user.create({
-    data: {
-      name,
-      email,
-     password: hashedPassword,
-      roleId
-    }
-  });
 
-  res.json(admin);
+    const admin = await userModel.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        roleId: parseId(roleId),
+      },
+      include: {
+        role: true,
+      },
+    });
+
+    res.json({
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      roleId: admin.roleId,
+      role: admin.role?.name || "",
+      twoFa: Boolean(admin.twoFa),
+      lastLogin: admin.lastLogin,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
-
-// await prisma.loginActivity.create({
-//   data: {
-//     userId: user.id,
-//     adminName: user.name,
-//     ip: req.ip,
-//     status: "Success"
-//   }
-// });
-
 export const updateAdmin = async (req, res) => {
+  try {
+    const id = parseId(req.params.id);
+    const { name, email, roleId } = req.body;
 
-  const { id } = req.params;
-  const { name, email, roleId } = req.body;
+    const admin = await userModel.update({
+      where: { id },
+      data: {
+        name,
+        email,
+        roleId: parseId(roleId),
+      },
+      include: {
+        role: true,
+      },
+    });
 
-  const admin = await prisma.user.update({
-    where: { id: Number(id) },
-    data: {
-      name,
-      email,
-      roleId
-    }
-  });
-
-  res.json(admin);
+    res.json({
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      roleId: admin.roleId,
+      role: admin.role?.name || "",
+      twoFa: Boolean(admin.twoFa),
+      lastLogin: admin.lastLogin,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };

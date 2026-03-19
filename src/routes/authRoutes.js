@@ -1,27 +1,19 @@
-// backend/src/routes/authRoutes.js
 
-import express from "express";
+import { Router } from "express";
+import { authenticateAdmin, requireAdmin } from "../middleware/auth.middleware.js";
+import { login, me, logout, check, switchCompany } from "../controllers/authController.js";
 
-import {
-  login,
-  logout,
-  me,
-  registerUser
-} from "../controllers/authController.js";
-import { requireAuth } from "../middleware/auth.js";
+const router = Router();
 
-const router = express.Router();   // only one declaration
+router.post("/login",          login);
+router.get ("/me",             authenticateAdmin, requireAdmin, me);
 
-// POST /api/auth/login
-router.post("/login", login);
+// GET  /api/admin/auth/check          — vérification silencieuse session
+router.get ("/check",          authenticateAdmin, requireAdmin, check);
 
-// POST /api/auth/register
-router.post("/register", registerUser);
+// POST /api/admin/auth/switch-company — changer de company active
+router.post("/switch-company", authenticateAdmin, requireAdmin, switchCompany);
 
-// GET /api/auth/me - protected route
-router.get("/me", requireAuth, me);
-
-// POST /api/auth/logout
-router.post("/logout", logout);
+router.post("/logout",         authenticateAdmin, logout);
 
 export default router;

@@ -13,13 +13,15 @@ model Role {
   createdAt      DateTime         @default(now()) @db.DateTime(0)
   updatedAt      DateTime         @default(now()) @db.DateTime(0)
   users       User[] 
-  rolepermission rolepermission[]
+  companies       UserCompany[] 
+  rolepermission rolePermission[]
 }
 
 model User {
   id               Int             @id @default(autoincrement()) @db.UnsignedInt
   email            String          @unique
   password         String
+  companyId        Int?     @db.UnsignedInt
   name             String?
   phone            String?
   createdAt        DateTime        @default(now())
@@ -31,15 +33,49 @@ model User {
   roleId           Int?
   twoFa            Boolean?        @default(false)
   lastLogin        DateTime?       @db.DateTime(0)
+  welcomeToken     String?         @unique @db.VarChar(255)
+  welcomeTokenExp  DateTime?
   affiliates       Affiliate?
   design           design[]
   locations        Location[]      @relation("OwnerLocations")
   logins           LoginActivity[]
   role             Role?       @relation(fields: [roleId], references: [id])
+  companies        UserCompany[] 
+  refreshTokens RefreshToken[]
   auditLogs AuditLog[] @relation("AdminLogs")
-
   @@index([email])
   @@map("users")
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique @db.VarChar(500)
+  userId    Int      @db.UnsignedInt
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model UserCompany {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @db.UnsignedInt
+  companyId Int
+  roleId    Int?                    // rôle dans CETTE company (peut differ du rôle global)
+  isOwner   Boolean  @default(true) // true = admin principal de la company
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId],    references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role      Role?    @relation(fields: [roleId],    references: [id], onDelete: SetNull)
+
+  @@unique([userId, companyId])   // un user ne peut être lié qu'une fois à une company
+  @@index([companyId])
+  @@index([userId])
+  @@map("user_companies")
 }
 
 model PlatformSetting {
@@ -52,7 +88,6 @@ model PlatformSetting {
   createdAt            DateTime    @default(now()) @db.Timestamp(0)
   updatedAt            DateTime    @default(now()) @db.Timestamp(0)
   smsSetting           SmsSetting? @relation(fields: [sms_setting_id], references: [id])
-
   @@index([sms_setting_id])
   @@map("platform_settings")
 }
@@ -486,6 +521,7 @@ model LoginActivity {
   id         Int       @id @default(autoincrement())
   userId     Int?      @db.UnsignedInt
   admin_name String?
+  userAgent String? @db.VarChar(500)
   ip         String?
   status     String?   @db.VarChar(50)
   createdAt  DateTime? @default(now()) @db.DateTime(0)
@@ -495,7 +531,15 @@ model LoginActivity {
   @@map("login_activities")
 }
 
-model addonsetting {
+model TokenBlacklist {
+  id        Int      @id @default(autoincrement())
+  token     String   @db.Text   
+  expiresAt DateTime                
+  createdAt DateTime @default(now())
+  @@map("token_blacklist")
+}
+
+model AddonSetting {
   id          Int      @id @default(autoincrement())
   name        String
   type        String
@@ -504,10 +548,12 @@ model addonsetting {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now())
+
+  @@map("addonsetting")
 }
 
 
-model featureflag {
+model FeatureFlag {
   id          Int      @id @default(autoincrement())
   name        String   @unique(map: "feature_flags_name_unique")
   description String?  @db.Text
@@ -515,22 +561,23 @@ model featureflag {
   enabled     Boolean  @default(false)
   createdAt   DateTime @default(now()) @db.DateTime(0)
   updatedAt   DateTime @default(now()) @db.DateTime(0)
+  @@map("featureflag")
 }
 
 model module {
   id             Int              @id @default(autoincrement())
   name           String           @unique(map: "name") @db.VarChar(255)
   createdAt      DateTime         @default(now()) @db.DateTime(0)
-  rolepermission rolepermission[]
+  rolepermission rolePermission[]
 }
 
 model permission {
   id             Int              @id @default(autoincrement())
   name           String           @unique(map: "name") @db.VarChar(255)
-  rolepermission rolepermission[]
+  rolepermission rolePermission[]
 }
 
-model plansetting {
+model PlanSetting {
   id            Int      @id @default(autoincrement())
   name          String
   price         Int
@@ -544,10 +591,12 @@ model plansetting {
   status        String   @default("Active")
   createdAt     DateTime @default(now())
   updatedAt     DateTime
+
+  @@map("plansetting")
 }
 
 
-model rolepermission {
+model rolePermission {
   id           Int        @id @default(autoincrement())
   roleId       Int
   moduleId     Int
@@ -593,6 +642,7 @@ model Language {
   translations Translation[]
   translationEmails EmailTemplateTranslation[]
   prodTranslations ProductTranslation[]
+  companies Company[]
   @@map("languages")
 }
 
@@ -704,21 +754,27 @@ model PaymentSettings {
 
 model SmsTemplate {
   id           Int      @id @default(autoincrement())
-  name         String
-  slug         String   @unique
+  name         String   @db.VarChar(150)
+  slug         String   @unique @db.VarChar(150)
   category     SmsCategory @default(Notification)
   active       Boolean  @default(true)
   translations SmsTemplateTranslation[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime? @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt    DateTime? @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  @@map("sms_templates")
 }
 
 model SmsTemplateTranslation {
-  id         Int    @id @default(autoincrement())
-  templateId Int
-  language   String
-  body       String
-  template SmsTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id         Int        @id @default(autoincrement())
+  templateId Int        @map("template_id")
+  language   String     @db.VarChar(5)
+  body       String     @db.Text
+  createdAt  DateTime?  @default(now()) @map("created_at") @db.DateTime(0)
+  template   SmsTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, language])
+
+  @@map("sms_template_translations")
 }
 
 
@@ -770,16 +826,18 @@ model Webhook {
 model Company {
   id             Int      @id @default(autoincrement())
   name           String
+  logo        String?
+  logoScale      Int      @default(100)
   vatNumber      String?
   tradeNumber    String?
   email          String   @unique
   phone          String?
   country        String?
   address        String?  @db.Text
-  type            String   @default("direct") // direct or agency
-  plan            String   @default("starter")
-  logoUrl        String?
-  logoScale      Int      @default(100)
+  type              CompanyType     @default(direct)
+  planId           Int?   
+  status            CompanyStatus   @default(active)
+  defaultLanguageId Int?  
   primaryColor   String   @default("#E10600")
   
   captchaEnabled Boolean  @default(false)
@@ -792,24 +850,51 @@ model Company {
   facebookLink   String?
   yelpLink       String?
   tripadvisorLink String?
-  
-  subscription   Subscription?
+
+  billingAmount     String?
+  billingDate       DateTime?
+  billingNextDate   DateTime?
+
+  mrr               Int             @default(0)
+  apiUsageCount     Int             @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  package           planSetting?    @relation(fields: [planId], references: [id], onDelete: SetNull, map: "companies_planId_foreign")
+  defaulLanguage    Language?       @relation(fields: [defaultLanguageId], references: [id], onDelete: SetNull, map: "companies_defaultLanguageId_foreign")
+  members           UserCompany[]
+  settings          CompanySettings?
+  subscription      Subscription?
   @@map("companies")
 }
 
+
+model CompanySettings {
+  id                Int      @id @default(autoincrement())
+  companyId         Int?      @unique
+  timezone          String   @default("UTC")
+  currency          String   @default("USD")
+  notificationEmail Boolean  @default(true)
+  maxLocations      Int      @default(1)
+  maxApiCalls       Int      @default(1000)
+  maxSmsCalls       Int      @default(100)
+  allowCustomColor  Boolean  @default(false)
+  company           Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  @@map("company_settings")
+}
+
+
 model Subscription {
   id           Int      @id @default(autoincrement())
-  companyId    Int      @unique
-  company      Company  @relation(fields: [companyId], references: [id])
+  companyId    Int?      @unique
+  
   planName     String   @default("Starter")
   status       String   @default("active") // active, trialing, canceled
   amount       Float
   Interval     String   @default("monthly") // monthly, yearly
   nextBilling  DateTime
   createdAt    DateTime @default(now())
+  company      Company?  @relation(fields: [companyId], references: [id])
   @@map("subscriptions")
 }
 
@@ -995,4 +1080,23 @@ enum Gateway {
   paypal
   mollie
   manual
+}
+
+enum CompanyStatus {
+  active
+  trial
+  suspended
+  cancelled
+}
+
+enum CompanyType {
+  direct
+  agency
+}
+
+enum AccountStatus {
+  active
+  trial
+  suspended
+  cancelled
 }

@@ -1,95 +1,116 @@
-import prisma from '../../config/database.js';
+import prisma from "../../config/database.js";
 
+const roleModel = prisma.role;
+const moduleModel = prisma.module;
+const permissionModel = prisma.permission;
+const rolePermissionModel = prisma.rolePermission;
 
+const parseId = (value) => Number.parseInt(value, 10);
 
 export const getRoles = async (req, res) => {
   try {
+    const [roles, modules, permissions] = await Promise.all([
+      roleModel.findMany({
+        include: {
+          rolePermissions: {
+            include: {
+              module: true,
+              permission: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      moduleModel.findMany({
+        orderBy: { name: "asc" },
+      }),
+      permissionModel.findMany({
+        orderBy: { name: "asc" },
+      }),
+    ]);
 
-    const roles = await prisma.role.findMany({
-      include: {
-        permissions: {
-          include: {
-            module: true,
-            permission: true
-          }
-        }
-      }
+    res.json({
+      roles,
+      modules,
+      permissions,
     });
-
-    res.json(roles);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
 
 export const createRole = async (req, res) => {
   try {
+    const { name, permissions = [] } = req.body;
 
-    const { name, permissions } = req.body;
-
-    const role = await prisma.role.create({
-      data: { name }
+    const role = await roleModel.create({
+      data: {
+        name,
+        updatedAt: new Date(),
+      },
     });
 
-    if (permissions && permissions.length > 0) {
-
-      const rolePermissions = permissions.map(p => ({
+    if (permissions.length > 0) {
+      const rolePermissions = permissions.map((item) => ({
         roleId: role.id,
-        moduleId: p.moduleId,
-        permissionId: p.permissionId
+        moduleId: Number(item.moduleId),
+        permissionId: Number(item.permissionId),
       }));
 
-      await prisma.rolePermission.createMany({
+      await rolePermissionModel.createMany({
         data: rolePermissions,
-         skipDuplicates: true
+        skipDuplicates: true,
       });
-
     }
 
-    const result = await prisma.role.findUnique({
+    const result = await roleModel.findUnique({
       where: { id: role.id },
       include: {
-        permissions: {
+        rolePermissions: {
           include: {
             module: true,
-            permission: true
-          }
-        }
-      }
+            permission: true,
+          },
+        },
+      },
     });
 
     res.json(result);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-
 export const updatePermissions = async (req, res) => {
-
   try {
+    const { roleId, permissions = [] } = req.body;
+    const parsedRoleId = parseId(roleId);
 
-    const { roleId, permissions } = req.body;
-
-    await prisma.rolePermission.deleteMany({
-      where: { roleId }
+    await rolePermissionModel.deleteMany({
+      where: { roleId: parsedRoleId },
     });
 
-    const data = permissions.map(p => ({
-      roleId,
-      moduleId: p.moduleId,
-      permissionId: p.permissionId
-    }));
+    if (permissions.length > 0) {
+      const data = permissions.map((item) => ({
+        roleId: parsedRoleId,
+        moduleId: Number(item.moduleId),
+        permissionId: Number(item.permissionId),
+      }));
 
-    await prisma.rolePermission.createMany({
-      data
+      await rolePermissionModel.createMany({
+        data,
+        skipDuplicates: true,
+      });
+    }
+
+    await roleModel.update({
+      where: { id: parsedRoleId },
+      data: {
+        updatedAt: new Date(),
+      },
     });
 
     res.json({ message: "Permissions updated" });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

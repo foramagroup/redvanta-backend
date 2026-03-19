@@ -1,8 +1,12 @@
 import prisma from "../../config/database.js";
 
+const addonSettingModel = prisma.addonSetting;
+
+const parseId = (value) => Number.parseInt(value, 10);
+
 export const getAddons = async (req, res) => {
   try {
-    const addons = await prisma.addonSetting.findMany({
+    const addons = await addonSettingModel.findMany({
       orderBy: { createdAt: "desc" },
     });
     res.json(addons);
@@ -15,13 +19,14 @@ export const createAddon = async (req, res) => {
   try {
     const { name, type, price, description, active } = req.body;
 
-    const addon = await prisma.addonSetting.create({
+    const addon = await addonSettingModel.create({
       data: {
         name,
         type,
         price,
         description,
         active,
+        updatedAt: new Date(),
       },
     });
 
@@ -33,17 +38,18 @@ export const createAddon = async (req, res) => {
 
 export const updateAddon = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = parseId(req.params.id);
     const { name, type, price, description, active } = req.body;
 
-    const addon = await prisma.addonSetting.update({
-      where: { id: Number(id) },
+    const addon = await addonSettingModel.update({
+      where: { id },
       data: {
         name,
         type,
         price,
         description,
         active,
+        updatedAt: new Date(),
       },
     });
 
@@ -55,16 +61,17 @@ export const updateAddon = async (req, res) => {
 
 export const toggleAddon = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = parseId(req.params.id);
 
-    const addon = await prisma.addonSetting.findUnique({
-      where: { id: Number(id) },
+    const addon = await addonSettingModel.findUnique({
+      where: { id },
     });
 
-    const updated = await prisma.addonSetting.update({
-      where: { id: Number(id) },
+    const updated = await addonSettingModel.update({
+      where: { id },
       data: {
         active: !addon.active,
+        updatedAt: new Date(),
       },
     });
 

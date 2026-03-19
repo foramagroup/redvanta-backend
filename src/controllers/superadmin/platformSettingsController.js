@@ -22,6 +22,7 @@ export const getSettings = async (req, res) => {
 };
 
 export const updateSettings = async (req, res) => {
+
     try {
         const {
             platform_name,
@@ -30,33 +31,34 @@ export const updateSettings = async (req, res) => {
             rate_limit,
             is_maintenance
         } = req.body;
+        const data = {
+            platform_name,
+            default_email_sender,
+            rate_limit,
+            is_maIntenance: Boolean(is_maintenance),
+            smsSetting: sms_setting_id
+                ? { connect: { id: Number(sms_setting_id) } }
+                : { disconnect: true }
+        };
 
         const existing = await prisma.platformSetting.findFirst();
 
         let settings;
 
         if (existing) {
+
             settings = await prisma.platformSetting.update({
                 where: { id: existing.id },
-                data: {
-                    platform_name,
-                    default_email_sender,
-                    sms_setting_id,
-                    rate_limit,
-                    is_maintenance
-                }
+                data
             });
+
         } else {
+
             settings = await prisma.platformSetting.create({
-                data: {
-                    platform_name,
-                    default_email_sender,
-                    sms_setting_id,
-                    rate_limit,
-                    is_maintenance
-                }
+                data
             });
         }
+
 
         res.json({
             message: "Platform settings updated",
@@ -67,3 +69,4 @@ export const updateSettings = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+

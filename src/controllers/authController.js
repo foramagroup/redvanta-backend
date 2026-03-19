@@ -1,86 +1,165 @@
-// backend/src/controllers/authController.js
-import prisma from "../config/prisma.js";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "change_me";
-const TOKEN_EXP = "7d";
+import prisma  from "../config/database.js";
+import bcrypt  from "bcryptjs";
+import { generateToken, getCookieOptions, blacklistToken } from "../services/token.service.js";
+import { loadUserByEmail, loadUserForAuth, formatAdmin } from "../services/superadmin/auth.service.js";
 
-// LOGIN
-export async function login(req, res) {
+
+async function logActivity(userId, name, ip, userAgent, status) {
+  await prisma.loginActivity.create({
+    data: { userId: userId ?? null, admin_name: name ?? null, ip, userAgent, status },
+  }).catch(console.error);
+}
+
+function getIp(req) {
+  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim()
+    || req.socket?.remoteAddress
+    || "unknown";
+}
+
+// ─── POST /api/admin/auth/login ───────────────────────────────
+export const login = async (req, res, next) => {
+  const ip        = getIp(req);
+  const userAgent = req.headers["user-agent"] ?? null;
+
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: "Email & password required" });
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    if (!email || !password) {
+      return res.status(422).json({ success: false, error: "Email et mot de passe requis" });
+    }
 
-    const ok = await bcrypt.compare(password, user.password || "");
-    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+    // Charger le user avec toutes ses companies
+    const user = await loadUserByEmail(email, "admin");
 
-    const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: TOKEN_EXP });
+    // Vérifier que c'est un admin actif
+    if (!user || !user.isAdmin) {
+      await logActivity(null, email, ip, userAgent, "failed");
+      return res.status(401).json({ success: false, error: "Identifiants invalides ou accès non autorisé" });
+    }
 
-    // Set cookie for credentials
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 3600 * 1000,
-      path: "/",
+    // Bloquer les superadmins purs sur cette route
+    if (user.isSuperadmin && !user.isAdmin) {
+      await logActivity(user.id, user.name, ip, userAgent, "failed");
+      return res.status(401).json({ success: false, error: "Utilisez le portail SuperAdmin" });
+    }
+
+    // Vérifier le mot de passe
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      await logActivity(user.id, user.name, ip, userAgent, "failed");
+      return res.status(401).json({ success: false, error: "Identifiants invalides" });
+    }
+
+    // Vérifier qu'il a au moins une company active
+    const activeLink = user.companies?.find(
+      (uc) => ["active", "trial"].includes(uc.company?.status)
+    );
+    if (!activeLink) {
+      await logActivity(user.id, user.name, ip, userAgent, "failed");
+      return res.status(403).json({ success: false, error: "Aucune entreprise active associée à ce compte" });
+    }
+
+    // Company par défaut = la company dont il est owner et active
+    const defaultLink = user.companies?.find(
+      (uc) => uc.isOwner && ["active", "trial"].includes(uc.company?.status)
+    ) ?? activeLink;
+
+    // Générer le JWT avec la company active encodée dedans
+    const token = generateToken({
+      userId:       user.id,
+      email:        user.email,
+      isAdmin:      true,
+      isSuperadmin: false,
+      companyId:    defaultLink.company.id,
     });
 
-    const safeUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-    return res.json({ ok: true, token, user: safeUser });
-  } catch (err) {
-    console.error("login error", err);
-    return res.status(500).json({ error: "Internal error" });
+    // Mettre à jour lastLogin
+    await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+
+    // Logger
+    await logActivity(user.id, user.name, ip, userAgent, "success");
+
+    // ── Cookie HttpOnly ────────────────────────────────────
+    res.cookie("admin_token", token, getCookieOptions("admin_token"));
+
+    // Réponse complète (sans le token)
+    return res.json({
+      success: true,
+      message: "Connexion réussie",
+      user:    formatAdmin(user),
+    });
+  } catch (e) {
+    await logActivity(null, req.body?.email, ip, userAgent, "failed");
+    next(e);
   }
-}
+};
 
-// REGISTER
-export async function registerUser(req, res) {
+// ─── GET /api/admin/auth/me ───────────────────────────────────
+export const me = async (req, res, next) => {
   try {
-    const { email, password, name } = req.body;
-    if (!email || !password) return res.status(400).json({ error: "Email & password required" });
+    const user = await loadUserForAuth(req.user.userId, "admin");
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ success: false, error: "Accès refusé" });
+    }
+    return res.json({ success: true, user: formatAdmin(user) });
+  } catch (e) { next(e); }
+};
 
-    const exists = await prisma.user.findUnique({ where: { email } });
-    if (exists) return res.status(400).json({ error: "Email already used" });
+// ─── POST /api/admin/auth/switch-company ─────────────────────
+// Changer de company active → génère un nouveau cookie avec le nouveau companyId
+export const switchCompany = async (req, res, next) => {
+  try {
+    const { companyId } = req.body;
+    if (!companyId) return res.status(422).json({ success: false, error: "companyId requis" });
 
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({ data: { email, password: hashed, name } });
-
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: TOKEN_EXP });
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 3600 * 1000,
-      path: "/",
+    // Vérifier que cet admin est lié à cette company
+    const link = await prisma.userCompany.findUnique({
+      where:   { userId_companyId: { userId: req.user.userId, companyId: parseInt(companyId) } },
+      include: { company: true },
     });
 
-    res.json({ ok: true, token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
-  } catch (err) {
-    console.error("register error", err);
-    res.status(500).json({ error: "Internal error" });
-  }
-}
+    if (!link) return res.status(403).json({ success: false, error: "Accès à cette entreprise refusé" });
+    if (!["active", "trial"].includes(link.company.status)) {
+      return res.status(403).json({ success: false, error: "Cette entreprise est suspendue" });
+    }
 
-// GET /me
-export async function me(req, res) {
+    // Blacklister l'ancien token
+    if (req.token) await blacklistToken(req.token);
+
+    // Nouveau token avec le nouveau companyId
+    const newToken = generateToken({
+      userId:       req.user.userId,
+      email:        req.user.email,
+      isAdmin:      true,
+      isSuperadmin: false,
+      companyId:    parseInt(companyId),
+    });
+
+    // Nouveau cookie
+    res.cookie("admin_token", newToken, getCookieOptions("admin_token"));
+
+    return res.json({
+      success:       true,
+      message:       `Basculé vers "${link.company.name}"`,
+      activeCompany: { id: link.company.id, name: link.company.name, status: link.company.status },
+    });
+  } catch (e) { next(e); }
+};
+
+// ─── POST /api/admin/auth/logout ─────────────────────────────
+export const logout = async (req, res, next) => {
   try {
-    if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-    const u = await prisma.user.findUnique({ where: { id: req.user.id } });
-    if (!u) return res.status(404).json({ error: "User not found" });
-    return res.json({ ok: true, user: { id: u.id, email: u.email, name: u.name, role: u.role } });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Internal error" });
-  }
-}
+    if (req.token) await blacklistToken(req.token);
+    if (req.user?.userId) {
+      await logActivity(req.user.userId, null, getIp(req), req.headers["user-agent"], "logout");
+    }
+    res.clearCookie("admin_token", { path: "/" });
+    return res.json({ success: true, message: "Déconnecté avec succès" });
+  } catch (e) { next(e); }
+};
 
-// LOGOUT
-export async function logout(req, res) {
-  res.clearCookie("token", { path: "/" });
-  res.json({ ok: true });
-}
+// ─── GET /api/admin/auth/check ───────────────────────────────
+export const check = async (req, res) => {
+  return res.json({ success: true, authenticated: true });
+};

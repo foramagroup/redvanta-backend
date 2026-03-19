@@ -1,39 +1,50 @@
 import prisma from "../../config/database.js";
 
- const listPlans = async (req, res) => {
+const planSettingModel = prisma.planSetting;
+
+const parseId = (value) => Number.parseInt(value, 10);
+
+const listPlans = async (req, res) => {
   try {
-    const plans = await prisma.planSetting.findMany({ orderBy: { createdAt: 'desc' } });
+    const plans = await planSettingModel.findMany({ orderBy: { createdAt: "desc" } });
     res.json(plans);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
- const getPlan = async (req, res) => {
+
+const getPlan = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const plan = await prisma.planSetting.findUnique({ where: { id } });
+    const id = parseId(req.params.id);
+    const plan = await planSettingModel.findUnique({ where: { id } });
     res.json(plan);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
- const createPlan = async (req, res) => {
+const createPlan = async (req, res) => {
   try {
-    const data = req.body;
-    const plan = await prisma.planSetting.create({ data });
+    const data = {
+      ...req.body,
+      updatedAt: new Date(),
+    };
+    const plan = await planSettingModel.create({ data });
     res.status(201).json(plan);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
- const updatePlan = async (req, res) => {
+const updatePlan = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const data = req.body;
-    const plan = await prisma.planSetting.update({ where: { id }, data });
+    const id = parseId(req.params.id);
+    const data = {
+      ...req.body,
+      updatedAt: new Date(),
+    };
+    const plan = await planSettingModel.update({ where: { id }, data });
     res.json(plan);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -42,8 +53,8 @@ import prisma from "../../config/database.js";
 
 const deletePlan = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    await prisma.planSetting.delete({ where: { id } });
+    const id = parseId(req.params.id);
+    await planSettingModel.delete({ where: { id } });
     res.json({ message: "Plan deleted" });
   } catch (error) {
     res.status(500).json({ message: error.message });

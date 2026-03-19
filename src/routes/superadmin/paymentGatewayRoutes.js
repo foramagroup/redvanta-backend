@@ -6,6 +6,8 @@ import {
  deleteGateway, 
  getManualMethods,
  createManualMethod,
+ updateManualMethod,
+ deleteManualMethod,
  getPaymentSettings,
  updatePaymentSettings
  } 
@@ -24,6 +26,10 @@ router.delete("/payment-gateways/:id",deleteGateway)
 router.get("/manual-payment-methods",getManualMethods)
 
 router.post("/manual-payment-methods",createManualMethod)
+
+router.put("/manual-payment-methods/:id",updateManualMethod)
+
+router.delete("/manual-payment-methods/:id",deleteManualMethod)
 
 router.get("/payment-settings",getPaymentSettings)
 
