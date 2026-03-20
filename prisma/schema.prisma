@@ -30,6 +30,9 @@ model User {
   isAdmin     Boolean         @default(false)
   superadminSince  DateTime?
   superadminLastAt DateTime?
+  emailVerifiedAt  DateTime?
+  emailVerifyToken String?         @unique @db.VarChar(255)
+  emailVerifyExp   DateTime?
   roleId           Int?
   twoFa            Boolean?        @default(false)
   lastLogin        DateTime?       @db.DateTime(0)
@@ -91,8 +94,6 @@ model PlatformSetting {
   @@index([sms_setting_id])
   @@map("platform_settings")
 }
-
-
 
 
 
@@ -618,7 +619,7 @@ model PlanSetting {
   status        String   @default("Active")
   createdAt     DateTime @default(now())
   updatedAt     DateTime
-
+  companies     Company[]
   @@map("plansetting")
 }
 
@@ -887,7 +888,7 @@ model Company {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  package           planSetting?    @relation(fields: [planId], references: [id], onDelete: SetNull, map: "companies_planId_foreign")
+  package           PlanSetting?    @relation(fields: [planId], references: [id], onDelete: SetNull, map: "companies_planId_foreign")
   defaulLanguage    Language?       @relation(fields: [defaultLanguageId], references: [id], onDelete: SetNull, map: "companies_defaultLanguageId_foreign")
   members           UserCompany[]
   settings          CompanySettings?

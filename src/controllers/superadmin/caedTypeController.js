@@ -89,7 +89,10 @@ export const deleteCardType = async (req, res, next) => {
     if (!existing) return res.status(404).json({ success: false, message: "Type de carte introuvable" });
  
     deleteLocalFile(existing.image);   // supprimer le fichier disque
-    await prisma.cardType.delete({ where: { id: req.params.id } });
+      await prisma.$transaction([
+        prisma.cardTypePrice.deleteMany({ where: { cardTypeId: req.params.id } }),
+        prisma.cardType.delete({ where: { id: req.params.id } }),
+      ]);
     res.json({ success: true, message: "Type de carte supprimé" });
   } catch (e) { next(e); }
 };

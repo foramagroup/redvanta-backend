@@ -1,0 +1,44 @@
+
+
+import { Router } from "express";
+import { authenticateAdmin, requireAdmin, validate } from "../../middleware/auth.middleware.js";
+import {
+  signup,
+  login,
+  verifyEmail,
+  resendVerification,
+  me,
+  switchCompany,
+  logout,
+} from "../../controllers/client/clientAuthController.js";
+import { signupSchema, loginSchema } from "../../validators/client/clientauth.validator.js";
+
+const router = Router();
+
+// ─── Routes publiques ─────────────────────────────────────────
+
+// POST /api/auth/signup  — inscription + création company + connexion auto
+router.post("/signup", validate(signupSchema), signup);
+
+// POST /api/auth/login   — connexion admin client
+router.post("/login",  validate(loginSchema),  login);
+
+// GET  /api/auth/verify-email?token=xxx  — confirmation email (lien du mail)
+router.get("/verify-email", verifyEmail);
+
+// POST /api/auth/resend-verification  — renvoyer le mail de confirmation
+router.post("/resend-verification", resendVerification);
+
+
+// ─── Routes protégées (cookie admin_token requis) ─────────────
+
+// GET  /api/auth/me
+router.get("/me", authenticateAdmin, requireAdmin, me);
+
+// POST /api/auth/switch-company
+router.post("/switch-company", authenticateAdmin, requireAdmin, switchCompany);
+
+// POST /api/auth/logout
+router.post("/logout", authenticateAdmin, logout);
+
+export default router;

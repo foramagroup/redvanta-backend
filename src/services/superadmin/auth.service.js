@@ -88,10 +88,7 @@ export function formatSuperAdmin(user) {
 
 // ─── Formater le user admin pour la réponse ──────────────────
 export function formatAdmin(user) {
-  // Permissions du rôle global
   const globalPermissions = formatPermissions(user.role?.rolepermission ?? []);
-
-  // Formatter les companies avec leurs permissions spécifiques
   const companies = (user.companies ?? []).map((uc) => {
     const companyPermissions = formatPermissions(uc.role?.rolepermission ?? []);
     return {

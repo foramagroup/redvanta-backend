@@ -46,6 +46,11 @@ import authSuperAdminRoutes from "./routes/superadmin/authRoutes.js";
 import emailServerConfigRoutes from "./routes/superadmin/emailServerConfigRoutes.js";
 import statusRoutes from "./routes/superadmin/statusRoutes.js";
 
+//routes client
+import productViewRoutes from "./routes/client/productViewRoutes.js";
+import settingClientRoutes from "./routes/client/settingClientRoutes.js";
+import clientAuthRoutes from "./routes/client/clientAuthRoutes.js";
+
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
 import reviewsPublicController from "./controllers/reviewsController.js";
@@ -55,6 +60,12 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
 import { requireSuperadmin } from "./middleware/requireSuperadmin.js";
+
+
+//----jobs----
+import { startSuspendUnverifiedJob } from "./jobs/client/suspendUnverified.job.js";
+
+
 
 // --- Cron / Background ---
 import "./config/payoutCron.js";
@@ -121,7 +132,14 @@ app.use(cookieParser());
 // --------------------
 // STATIC FILES
 // --------------------
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  express.static(path.join(__dirname, "..", "uploads"))
+);
 app.use("/download", express.static(path.join(process.cwd(), "downloads")));
 
 // --------------------
@@ -155,6 +173,17 @@ app.use("/api/webhooks", webhookRoutes);
 // Customization routes
 app.use("/api/customization", customizationRoutes);
 
+
+// *************Ges Routes client***************
+  //view client-------Product view shop
+  app.use("/api/client", productViewRoutes);
+  app.use("/api/client/settings", settingClientRoutes);
+  app.use("/api/client/auth", clientAuthRoutes);
+  startSuspendUnverifiedJob();
+
+
+
+
 // *************Ges Routes Admin***************
   //auth admin
   app.use("/api/admin/auth", authAdminRoutes);
@@ -166,7 +195,7 @@ app.use("/api/customization", customizationRoutes);
 
 // ************* Ges Routes SuperAdmin ***************
 
-  //auth admin
+  //auth superadmin
    app.use("/api/superadmin/auth", authSuperAdminRoutes);
   //setting-superAdmin
   app.use("/api/superadmin/sms-settings", smsSettingsRoutes);

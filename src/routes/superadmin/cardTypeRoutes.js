@@ -35,8 +35,9 @@ router.post("/", validate(createCardTypeSchema), createCardType);
 
 router.put("/:id", validate(updateCardTypeSchema), updateCardType);
 
-router.patch(":id/toggle", toggleCardType);
+router.patch("/:id/toggle", toggleCardType);
 
-router.delete(":id", deleteCardType);
+router.delete("/:id", deleteCardType);
 
 export default router;
+

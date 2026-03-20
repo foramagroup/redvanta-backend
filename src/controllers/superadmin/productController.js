@@ -23,7 +23,7 @@ function format(p) {
     slug[code]      = t.slug;
     seoTitle[code]  = t.seoTitle        ?? "";
     metaDesc[code]  = t.metaDescription ?? "";
-    metaImage[code] = t.metaImage    ?? "/placeholder.svg";
+    metaImage[code] = t.metaImage       ?? "/placeholder.svg";
   }
   return {
     id: p.id, price: Number(p.price), active: p.active,
@@ -114,7 +114,7 @@ export const createProduct = async (req, res, next) => {
             };
           }),
         },
-        galleryItems:   { create: gallery.map((g) => ({ url: g.url, type: g.type, poster: g.poster ?? null, position: g.position })) },
+        galleryItems:   { create: gallery.map((g) => ({ url: g.url, type: g.type, poster: g.posterUrl ?? null, position: g.position })) },
         packageTiers:   { create: body.packageTiers },
         cardTypePrices: { create: body.cardTypePrices.map((c) => ({ cardTypeId: c.cardTypeId, price: c.price })) },
       },
@@ -186,7 +186,7 @@ export const updateProduct = async (req, res, next) => {
         existing.galleryItems.forEach((g) => { if (g.type !== "youtube") deleteLocalFile(g.url); deleteLocalFile(g.poster); });
         await tx.productGalleryItem.deleteMany({ where: { productId: id } });
         await tx.productGalleryItem.createMany({
-          data: gallery.map((g) => ({ productId: id, url: g.url, type: g.type, poster: g.poster ?? null, position: g.position })),
+          data: gallery.map((g) => ({ productId: id, url: g.url, type: g.type, poster: g.posterUrl ?? null, position: g.position })),
         });
       }
  
