@@ -58,19 +58,34 @@ export const updateSecuritySettings = async (req, res) => {
 
 export const getAdmins = async (req, res) => {
   try {
-    const admins = await userModel.findMany({
-      where: {
-        roleId: {
-          not: null,
-        },
-      },
+    const admins = await prisma.user.findMany({
+  where: {
+    roleId: { not: null },
+    isSuperadmin: false, 
+  },
+  select: {
+    id: true,
+    name: true,
+    email: true,
+    phone: true,
+    createdAt: true,
+    isAdmin: true,
+    role: {
       include: {
-        role: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        rolepermission: {
+          include: {
+            module: true,
+            permission: true
+          }
+        }
+      }
+    },
+   
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+});
 
     const formattedAdmins = admins.map((admin) => ({
       id: admin.id,

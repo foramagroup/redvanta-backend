@@ -1,7 +1,7 @@
 // src/templates/confirmEmail.template.js
 
 export function buildConfirmEmailTemplate({ name, companyName, confirmUrl, expiresHours = 48, primaryColor = "#E10600" }) {
-  return {
+return {
     subject: `Confirmez votre adresse email — ${companyName}`,
     html: `
 <!DOCTYPE html>

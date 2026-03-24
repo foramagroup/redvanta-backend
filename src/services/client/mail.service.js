@@ -1,21 +1,21 @@
-// src/services/mail.service.js
-// Envoi d'emails via Nodemailer
-// Charge le contenu depuis la DB (EmailTemplate + EmailTemplateTranslation)
-// Fallback sur le template hardcodé si absent en DB
 
 import nodemailer from "nodemailer";
 import prisma     from "../../config/database.js";
 
-// ─── Transporter Nodemailer ───────────────────────────────────
 
 function createTransporter() {
+  const encryption = (process.env.SMTP_SECURE || process.env.MAIL_SECURE || process.env.MAIL_ENCRYPTION || "").toLowerCase();
+  const host = process.env.MAIL_HOST || process.env.SMTP_HOST || "sandbox.smtp.mailtrap.io";
+  const port = parseInt(process.env.MAIL_PORT || process.env.SMTP_PORT || "2525");
+  const user = process.env.MAIL_USERNAME || process.env.MAIL_USER || process.env.SMTP_USER;
+  const pass = process.env.MAIL_PASSWORD || process.env.MAIL_PASS || process.env.SMTP_PASS;
   return nodemailer.createTransport({
-    host:   process.env.MAIL_HOST    || "sandbox.smtp.mailtrap.io",
-    port:   parseInt(process.env.MAIL_PORT || "2525"),
-    secure: process.env.MAIL_SECURE  === "true",
+    host,
+    port,
+    secure: encryption === "true" || encryption === "ssl",
     auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.MAIL_PASS,
+      user,
+      pass,
     },
   });
 }
@@ -25,7 +25,7 @@ function createTransporter() {
 export async function sendMail({ to, subject, html, text }) {
   const transporter = createTransporter();
   const info = await transporter.sendMail({
-    from: `"${process.env.MAIL_FROM_NAME || "REDVANTA"}" <${process.env.MAIL_FROM_ADDRESS || "no-reply@redvanta.com"}>`,
+    from: `"${process.env.MAIL_FROM_NAME || "REDVANTA"}" <${process.env.MAIL_FROM_ADDRESS || process.env.MAIL_FROM || "no-reply@redvanta.com"}>`,
     to,
     subject,
     html,

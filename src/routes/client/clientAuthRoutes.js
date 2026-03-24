@@ -3,6 +3,12 @@
 import { Router } from "express";
 import { authenticateAdmin, requireAdmin, validate } from "../../middleware/auth.middleware.js";
 import {
+  authLoginLimiter,
+  authResendLimiter,
+  authSignupLimiter,
+  authVerifyLimiter,
+} from "../../middleware/rateLimit.js";
+import {
   signup,
   login,
   verifyEmail,
@@ -17,17 +23,19 @@ const router = Router();
 
 // ─── Routes publiques ─────────────────────────────────────────
 
+
+
 // POST /api/auth/signup  — inscription + création company + connexion auto
-router.post("/signup", validate(signupSchema), signup);
+router.post("/signup", authSignupLimiter, validate(signupSchema), signup);
 
 // POST /api/auth/login   — connexion admin client
-router.post("/login",  validate(loginSchema),  login);
+router.post("/login", authLoginLimiter, validate(loginSchema), login);
 
 // GET  /api/auth/verify-email?token=xxx  — confirmation email (lien du mail)
-router.get("/verify-email", verifyEmail);
+router.get("/verify-email", authVerifyLimiter, verifyEmail);
 
 // POST /api/auth/resend-verification  — renvoyer le mail de confirmation
-router.post("/resend-verification", resendVerification);
+router.post("/resend-verification", authResendLimiter, resendVerification);
 
 
 // ─── Routes protégées (cookie admin_token requis) ─────────────

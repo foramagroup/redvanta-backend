@@ -204,7 +204,9 @@ app.use("/api/customization", customizationRoutes);
   app.use('/api/superadmin/addon-settings', addonSettingRoutes);
   app.use('/api/superadmin/role-settings', roleRoutes);
   app.use('/api/superadmin/feature-flags-settings', featureFlagRoutes);
+
   app.use('/api/superadmin/security-settings', securityRoutes);
+  
   app.use('/api/superadmin/audit-log-settings', auditLogRoutes);
   app.use('/api/superadmin/language-settings', languageSettingRoutes);
   app.use('/api/superadmin/currency-settings', globalCurrencyRoutes);

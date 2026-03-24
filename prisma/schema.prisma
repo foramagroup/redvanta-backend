@@ -39,7 +39,7 @@ model User {
   welcomeToken     String?         @unique @db.VarChar(255)
   welcomeTokenExp  DateTime?
   affiliates       Affiliate?
-  design           design[]
+  design           Design[]
   locations        Location[]      @relation("OwnerLocations")
   logins           LoginActivity[]
   role             Role?       @relation(fields: [roleId], references: [id])
@@ -121,6 +121,8 @@ model Location {
   @@map("locations")
 }
 
+
+
 model Conversion {
   id          String    @id @default(uuid())
   orderId     String
@@ -187,30 +189,39 @@ model Review {
 }
 
 model Order {
-  id                String              @id @default(uuid()) @db.Char(36)
-  orderNumber       String              @unique
-  userId            String?
-  locationId        String?
-  total             Float
-  currency          String              @default("EUR")
-  status            OrderStatus         @default(pending)
-  stripeSession     String?
-  stripePaymentId   String?
-  userEmail         String?
-  affiliateId       String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  affiliateTracking AffiliateTracking[]
-  conversions       Conversion[]
-  customization     customization?
-  orderitem         orderitem[]
-  affiliate         Affiliate?          @relation(fields: [affiliateId], references: [id])
-  location          Location?           @relation(fields: [locationId], references: [id])
+ id            Int         @id @default(autoincrement())
+  userId        Int         @db.UnsignedInt
+  companyId     Int                          // ← company concernée
+  orderNumber   String      @unique
+  status        OrderStatus @default(pending)
 
-  @@index([affiliateId], map: "orders_affiliateId_fkey")
-  @@index([locationId], map: "orders_locationId_fkey")
-  @@index([userId], map: "orders_userId_fkey")
-  @@map("orders")
+  subtotal      Float
+  shippingCost  Float       @default(0)
+  total         Float
+
+  shippingFullName  String?
+  shippingAddress   String?
+  shippingCity      String?
+  shippingState     String?
+  shippingZip       String?
+  shippingCountry   String?  @default("United States")
+  shippingMethod    ShippingMethod @default(standard)
+
+  stripePaymentIntentId String? @unique
+  stripeClientSecret    String?
+  paidAt                DateTime?
+  confirmationEmailSentAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User      @relation(fields: [userId],    references: [id], onDelete: Cascade)
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items       OrderItem[]
+
+  @@index([userId, companyId])
+  @@index([status])
+  @@map("order")
 }
 
 model Affiliate {
@@ -322,27 +333,92 @@ model dashboardstat {
   updatedAt DateTime
 }
 
-model design {
-  id               String          @id @db.Char(36)
-  title            String?
-  user_id          Int?            @db.UnsignedInt
-  jsonFront        String?         @db.Text
-  jsonBack         String?         @db.Text
-  frontFile        String?
-  backFile         String?
-  thumbnail        String?
-  costCents        Int?            @default(0)
-  upsellEnabled    Boolean         @default(false)
-  upsellPriceCents Int?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @default(now())
-  users            User?           @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "Design_user_id_foreign")
-  nfctag           nfctag[]
+model Design {
+  id          Int             @id @default(autoincrement())
+  userId      Int             @db.UnsignedInt
+  companyId   Int                              // ← company active
+  productId   Int
+  status      DesignStatus    @default(draft)
 
-  @@index([user_id], map: "Design_user_id_foreign")
+  // Step 1: Business
+  businessName    String?
+  slogan          String?
+  callToAction    String?  @default("Powered by RedVanta")
+  googlePlaceId   String?
+  googleReviewUrl String?
+
+  // Step 2: Design
+  orientation          DesignOrientation @default(landscape)
+  logoUrl              String?
+  colorMode            String?  @default("single")
+  bgColor              String?  @default("#0B0D0F")
+  textColor            String?  @default("#FFFFFF")
+  accentColor          String?  @default("#E10600")
+  starColor            String?  @default("#F59E0B")
+  templateName         String?
+  businessFont         String?  @default("Space Grotesk")
+  businessFontSize     Int?     @default(16)
+  businessFontWeight   String?  @default("Bold")
+  businessFontSpacing  String?  @default("Normal")
+  businessLineHeight   String?  @default("1.4")
+  businessAlign        String?  @default("Left")
+  sloganFont           String?  @default("Inter")
+  sloganFontSize       Int?     @default(12)
+  sloganFontWeight     String?  @default("Regular")
+  sloganFontSpacing    String?  @default("Normal")
+  sloganLineHeight     String?  @default("1.4")
+  sloganAlign          String?  @default("Left")
+  textShadow           String?  @default("None")
+  frontInstruction1    String?  @default("Approach the phone to the card")
+  frontInstruction2    String?  @default("Tap to leave a review")
+  backInstruction1     String?
+  backInstruction2     String?
+  instrFont            String?  @default("Space Grotesk")
+  instrFontSize        Int?     @default(10)
+  instrFontWeight      String?  @default("Regular")
+  instrFontSpacing     String?  @default("Normal")
+  instrLineHeight      String?  @default("1.4")
+  instrAlign           String?  @default("Left")
+  instrCheckboxStyle   String?  @default("checkmark")
+  qrCodeStyle          String?  @default("Left")
+  qrCodeSize           Int?     @default(60)
+  nfcIconSize          Int?     @default(16)
+  googleLogoSize       Int?     @default(20)
+  cardModel            CardModel @default(classic)
+
+  // Step 3
+  version       Int      @default(1)
+  lastAutoSave  DateTime?
+  validatedAt   DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User        @relation(fields: [userId],    references: [id], onDelete: Cascade)
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItem    CartItem?
+  orderItem   OrderItem?
+  versions    DesignVersion[]
+
+  @@index([userId, companyId])   // designs d'une company
+  @@index([status])
+  @@map("designs")
 }
 
-model emailqueue {
+model DesignVersion {
+  id        Int      @id @default(autoincrement())
+  designId  Int
+  version   Int
+  snapshot  Json
+  savedAt   DateTime @default(now())
+  design    Design   @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@index([designId])
+  @@map("design_versions")
+}
+
+model emailQueue {
   id          String    @id
   to          String
   subject     String
@@ -353,6 +429,7 @@ model emailqueue {
   lastError   String?
   createdAt   DateTime  @default(now())
   processedAt DateTime?
+  @@map("emailqueue")
 }
 
 model nfctag {
@@ -369,7 +446,7 @@ model nfctag {
   designId   String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @default(now())
-  design     design?   @relation(fields: [designId], references: [id], map: "NFCTag_designId_fkey")
+  design     Design?   @relation(fields: [designId], references: [id], map: "NFCTag_designId_fkey")
   locations  Location? @relation(fields: [locationId], references: [id], map: "NFCTag_locationId_fkey")
   product    Product?  @relation(fields: [productId], references: [id], map: "NFCTag_productId_fkey")
   scanlog    scanlog[]
@@ -380,18 +457,23 @@ model nfctag {
   @@index([userId], map: "NFCTag_userId_fkey")
 }
 
-model orderitem {
-  id        String   @id
-  orderId   String
-  productId Int
-  quantity  Int
-  unitCents Int
-  createdAt DateTime @default(now())
-  orders    Order    @relation(fields: [orderId], references: [id], map: "OrderItem_orderId_fkey")
-  product   Product  @relation(fields: [productId], references: [id], map: "OrderItem_productId_fkey")
+model OrderItem {
+ id          Int      @id @default(autoincrement())
+  orderId     Int
+  productId   Int
+  designId    Int?     @unique
+  cardTypeId  String?
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
 
-  @@index([orderId], map: "OrderItem_orderId_fkey")
-  @@index([productId], map: "OrderItem_productId_fkey")
+  order       Order    @relation(fields: [orderId],    references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId],  references: [id], onDelete: Restrict)
+  design      Design?  @relation(fields: [designId],   references: [id], onDelete: SetNull)
+  cardType    CardType? @relation(fields: [cardTypeId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@map("order_items")
 }
 
 model payoutrequest {
@@ -410,6 +492,18 @@ model payoutrequest {
   affiliates       Affiliate @relation(fields: [affiliateId], references: [id], map: "PayoutRequest_affiliateId_fkey")
 
   @@index([affiliateId], map: "PayoutRequest_affiliateId_fkey")
+}
+
+model ShippingRate {
+  id          Int            @id @default(autoincrement())
+  method      ShippingMethod @unique
+  label       String
+  description String?
+  price       Float
+  active      Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  @@map("shipping_rates")
 }
 
 
@@ -893,6 +987,9 @@ model Company {
   members           UserCompany[]
   settings          CompanySettings?
   subscription      Subscription?
+  cartItems  CartItem[]
+  designs    Design[]
+  orders     Order[]
   @@map("companies")
 }
 
@@ -954,7 +1051,7 @@ model Product {
 
   locations       Location[]           // Pour l'erreur sur Location
   bundleProducts  bundleproduct[]      // Pour l'erreur sur bundleproduct
-  orderItems      orderitem[]          // Pour l'erreur sur orderitem
+  orderItems      OrderItem[]          // Pour l'erreur sur orderitem
   upsells         upsell[]
 
   nfctags  nfctag[]
@@ -1008,6 +1105,33 @@ model ProductPackageTier {
   @@unique([productId, qty])
   @@map("product_package_tier")
 }
+
+model CartItem {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @db.UnsignedInt
+  companyId   Int                          // ← company active au moment de l'ajout
+  productId   Int
+  quantity    Int      @default(1)
+  unitPrice   Float
+  cardTypeId  String?
+  designId    Int?     @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User        @relation(fields: [userId],    references: [id], onDelete: Cascade)
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  design      Design?     @relation(fields: [designId],  references: [id], onDelete: SetNull)
+  cardType    CardType?   @relation(fields: [cardTypeId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, companyId, productId, designId])  // évite les doublons
+  @@index([userId, companyId])                        // filtre panier par company
+  @@index([productId])
+  @@map("cart_items")
+}
+
+
+
 
 model CardTypePrice {
   id         Int    @id @default(autoincrement())
@@ -1128,3 +1252,34 @@ enum AccountStatus {
   suspended
   cancelled
 }
+
+enum DesignOrientation {
+  landscape
+  portrait
+}
+
+enum CardModel {
+  classic
+  premium
+  metal
+  transparent
+}
+
+enum OrderStatus {
+  pending
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+  refunded
+}
+
+enum ShippingMethod {
+  standard    // 5-7 jours
+  express     // 2-3 jours
+  international // 10-14 jours
+}
+
+
+

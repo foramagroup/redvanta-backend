@@ -27,3 +27,36 @@ export const scanLimiter = rateLimit({
     res.status(429).json({ ok: false, error: "Too many scans from your IP for this tag" });
   }
 });
+
+export const authSignupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Trop de tentatives d'inscription. Reessayez plus tard." },
+});
+
+export const authLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { success: false, error: "Trop de tentatives de connexion. Reessayez plus tard." },
+});
+
+export const authVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Trop de tentatives de verification. Reessayez plus tard." },
+});
+
+export const authResendLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Trop de demandes de renvoi. Reessayez plus tard." },
+});

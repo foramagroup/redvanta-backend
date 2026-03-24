@@ -26,7 +26,7 @@ const getOverallStatus = (services) => {
 export const getSystemStatus = async (req, res) => {
   try {
     const [pendingEmails, pendingWebhooks, failedWebhooks, recentWebhook] = await Promise.all([
-      prisma.emailqueue.count({ where: { processed: false } }),
+      prisma.emailQueue.count({ where: { processed: false } }),
       prisma.webhooklog.count({ where: { status: "pending" } }),
       prisma.webhooklog.count({ where: { status: "failed" } }),
       prisma.webhook.findFirst({

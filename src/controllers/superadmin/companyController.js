@@ -148,7 +148,7 @@ export const createCompany = async (req, res, next) => {
     const logoResult = await processLogo(body.logo);
 
     // 4. Plan et calculs billing
-    const plan          = body.planId ? await prisma.plansetting.findUnique({ where: { id: body.planId } }) : null;
+    const plan          = body.planId ? await prisma.planSetting.findUnique({ where: { id: body.planId } }) : null;
     const mrr           = plan?.price ?? 0;
     const billingAmount = plan ? `$${plan.price}` : null;
 
@@ -311,7 +311,7 @@ export const updateCompany = async (req, res, next) => {
 
     let mrr = undefined, billingAmount = undefined;
     if (body.planId !== undefined) {
-      const plan = body.planId ? await prisma.plansetting.findUnique({ where: { id: body.planId } }) : null;
+      const plan = body.planId ? await prisma.planSetting.findUnique({ where: { id: body.planId } }) : null;
       mrr = plan?.price ?? 0;
       billingAmount = plan ? `$${plan.price}` : null;
       if (plan) {
@@ -540,6 +540,7 @@ export const addMember = async (req, res, next) => {
 
 // ─── REMOVE ADMIN FROM COMPANY ────────────────────────────────
 // DELETE /api/admin/companies/:id/members/:userId
+
 export const removeMember = async (req, res, next) => {
   try {
     const companyId = parseInt(req.params.id);
@@ -617,3 +618,4 @@ export const getStats = async (req, res, next) => {
     });
   } catch (e) { next(e); }
 };
+

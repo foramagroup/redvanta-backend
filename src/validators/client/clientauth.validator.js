@@ -4,6 +4,7 @@ import { z } from "zod";
 
 export const signupSchema = z.object({
   // Champs obligatoires (vue AccountRequired)
+  name:        z.string().min(1, "Le nom est requis").optional(),
   email:       z.string().email("Email invalide"),
   password:    z.string().min(8, "Minimum 8 caractères")
                  .regex(/[A-Z]/,       "Au moins une majuscule")

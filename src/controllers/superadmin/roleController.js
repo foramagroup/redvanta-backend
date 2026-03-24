@@ -12,7 +12,7 @@ export const getRoles = async (req, res) => {
     const [roles, modules, permissions] = await Promise.all([
       roleModel.findMany({
         include: {
-          rolePermissions: {
+          rolepermission: {
             include: {
               module: true,
               permission: true,
@@ -66,7 +66,7 @@ export const createRole = async (req, res) => {
     const result = await roleModel.findUnique({
       where: { id: role.id },
       include: {
-        rolePermissions: {
+        rolepermission: {
           include: {
             module: true,
             permission: true,
