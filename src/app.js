@@ -48,8 +48,10 @@ import statusRoutes from "./routes/superadmin/statusRoutes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
+import shopRoutes from "./routes/client/Shop.routes.js";
 import settingClientRoutes from "./routes/client/settingClientRoutes.js";
 import clientAuthRoutes from "./routes/client/clientAuthRoutes.js";
+import placesRoutes from "./routes/client/Googleplaces.routes.js";
 
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
@@ -177,8 +179,10 @@ app.use("/api/customization", customizationRoutes);
 // *************Ges Routes client***************
   //view client-------Product view shop
   app.use("/api/client", productViewRoutes);
+  app.use("/api/client/shop", shopRoutes);
   app.use("/api/client/settings", settingClientRoutes);
   app.use("/api/client/auth", clientAuthRoutes);
+  app.use("/api/client/places", placesRoutes);
   startSuspendUnverifiedJob();
 
 

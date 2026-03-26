@@ -5,7 +5,7 @@ const router = express.Router();
 
 router.get("/admins", getAdmins);
 router.get("/", getSecuritySettings);
-router.put("/:id", updateSecuritySettings);
+router.put("/", updateSecuritySettings);
 router.post("/admins", createAdmin);
 router.put("/admins/:id", updateAdmin);
 

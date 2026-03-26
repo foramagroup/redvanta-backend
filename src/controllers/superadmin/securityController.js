@@ -70,6 +70,7 @@ export const getAdmins = async (req, res) => {
     phone: true,
     createdAt: true,
     isAdmin: true,
+    roleId: true,
     role: {
       include: {
         rolepermission: {

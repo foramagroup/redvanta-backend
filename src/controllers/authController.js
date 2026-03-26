@@ -51,39 +51,50 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ success: false, error: "Identifiants invalides" });
     }
 
-    // Vérifier qu'il a au moins une company active
-    const activeLink = user.companies?.find(
-      (uc) => ["active", "trial"].includes(uc.company?.status)
-    );
-    if (!activeLink) {
-      await logActivity(user.id, user.name, ip, userAgent, "failed");
-      return res.status(403).json({ success: false, error: "Aucune entreprise active associée à ce compte" });
-    }
+      const activeCompanies = user.companies
+      ?.filter((uc) => ["active", "trial"].includes(uc.company?.status))
+      .map(uc => ({
+        id: uc.company.id,
+        name: uc.company.name,
+        isOwner: uc.isOwner,
+        logo: uc.company.logo
+      }));
 
+      if (!activeCompanies || activeCompanies.length === 0) {
+        await logActivity(user.id, user.name, ip, userAgent, "failed");
+        return res.status(403).json({ success: false, error: "Aucune entreprise active associée a ce compte" });
+      }
+
+      if (activeCompanies.length > 1) {
+          return res.json({
+            success: true,
+            requiresSelection: true,
+            companies: activeCompanies,
+            userId: user.id 
+          });
+      }
+
+   const defaultLink = activeCompanies[0];
     // Company par défaut = la company dont il est owner et active
-    const defaultLink = user.companies?.find(
-      (uc) => uc.isOwner && ["active", "trial"].includes(uc.company?.status)
-    ) ?? activeLink;
-
+    // const defaultLink = user.companies?.find(
+    //   (uc) => uc.isOwner && ["active", "trial"].includes(uc.company?.status)
+    // ) ?? activeLink;
     // Générer le JWT avec la company active encodée dedans
     const token = generateToken({
       userId:       user.id,
       email:        user.email,
       isAdmin:      true,
       isSuperadmin: false,
-      companyId:    defaultLink.company.id,
+      companyId:    defaultLink.id,
     });
-
     // Mettre à jour lastLogin
     await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
 
     // Logger
     await logActivity(user.id, user.name, ip, userAgent, "success");
-
-    // ── Cookie HttpOnly ────────────────────────────────────
+   
     res.cookie("admin_token", token, getCookieOptions("admin_token"));
-
-    // Réponse complète (sans le token)
+  
     return res.json({
       success: true,
       message: "Connexion réussie",
@@ -91,6 +102,41 @@ export const login = async (req, res, next) => {
     });
   } catch (e) {
     await logActivity(null, req.body?.email, ip, userAgent, "failed");
+    next(e);
+  }
+};
+
+
+
+export const selectCompany = async (req, res, next) => {
+  try {
+    const { userId, companyId } = req.body;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { companies: { include: { company: true } } }
+    });
+    const hasAccess = user.companies.find(uc => 
+      uc.companyId === companyId && ["active", "trial"].includes(uc.company.status)
+    );
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, error: "Accès refusé à cette entreprise" });
+    }
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      isAdmin: true,
+      isSuperadmin: false,
+      companyId: companyId,
+    });
+    // 3. Mettre à jour le login et poser le cookie
+    await prisma.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+    res.cookie("admin_token", token, getCookieOptions("admin_token"));
+    return res.json({
+      success: true,
+      user: formatAdmin(user),
+      companyId: companyId
+    });
+  } catch (e) {
     next(e);
   }
 };

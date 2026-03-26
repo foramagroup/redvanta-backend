@@ -40,7 +40,9 @@ model User {
   welcomeTokenExp  DateTime?
   affiliates       Affiliate?
   design           Design[]
-  locations        Location[]      @relation("OwnerLocations")
+  orders Order[]
+  cartItems CartItem[]
+
   logins           LoginActivity[]
   role             Role?       @relation(fields: [roleId], references: [id])
   companies        UserCompany[] 
@@ -110,11 +112,9 @@ model Location {
   slug      String    @unique
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  owner     User?     @relation("OwnerLocations", fields: [ownerId], references: [id], onDelete: Cascade, map: "locations_ownerId_idx")
+
   nfcCards  NfcCard[]
   nfctag    nfctag[]
-  orders    Order[]
-  product   Product[]
   reviews   Review[]
 
   @@index([ownerId])
@@ -125,7 +125,7 @@ model Location {
 
 model Conversion {
   id          String    @id @default(uuid())
-  orderId     String
+  orderId     Int
   affiliateId String
   amountCents Int
   currency    String    @default("EUR")
@@ -218,6 +218,8 @@ model Order {
   user        User      @relation(fields: [userId],    references: [id], onDelete: Cascade)
   company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   items       OrderItem[]
+  Conversions Conversion[]
+
 
   @@index([userId, companyId])
   @@index([status])
@@ -238,7 +240,6 @@ model Affiliate {
   user            User?               @relation(fields: [userId], references: [id], onDelete: Cascade, map: "affiliates_userId_key")
   click           click[]
   conversions     Conversion[]
-  orders          Order[]
   payoutrequest   payoutrequest[]
 
   @@map("affiliates")
@@ -252,7 +253,6 @@ model AffiliateTracking {
   userAgent   String?
   createdAt   DateTime  @default(now())
   affiliate   Affiliate @relation(fields: [affiliateId], references: [id])
-  order       Order?    @relation(fields: [orderId], references: [id])
 
   @@index([affiliateId], map: "affiliate_tracking_affiliateId_fkey")
   @@index([orderId])
@@ -322,7 +322,6 @@ model customization {
   costCents Int
   createdAt DateTime @default(now())
   updatedAt DateTime
-  orders    Order    @relation(fields: [orderId], references: [id], map: "Customization_orderId_fkey")
 }
 
 model dashboardstat {
@@ -333,78 +332,159 @@ model dashboardstat {
   updatedAt DateTime
 }
 
-model Design {
-  id          Int             @id @default(autoincrement())
-  userId      Int             @db.UnsignedInt
-  companyId   Int                              // ← company active
-  productId   Int
-  status      DesignStatus    @default(draft)
 
-  // Step 1: Business
-  businessName    String?
-  slogan          String?
-  callToAction    String?  @default("Powered by RedVanta")
-  googlePlaceId   String?
-  googleReviewUrl String?
+  model Design {
+    id          Int             @id @default(autoincrement())
+    userId      Int             @db.UnsignedInt
+    companyId   Int
+    productId   Int
+    status      DesignStatus    @default(draft)
 
-  // Step 2: Design
-  orientation          DesignOrientation @default(landscape)
-  logoUrl              String?
-  colorMode            String?  @default("single")
-  bgColor              String?  @default("#0B0D0F")
-  textColor            String?  @default("#FFFFFF")
-  accentColor          String?  @default("#E10600")
-  starColor            String?  @default("#F59E0B")
-  templateName         String?
-  businessFont         String?  @default("Space Grotesk")
-  businessFontSize     Int?     @default(16)
-  businessFontWeight   String?  @default("Bold")
-  businessFontSpacing  String?  @default("Normal")
-  businessLineHeight   String?  @default("1.4")
-  businessAlign        String?  @default("Left")
-  sloganFont           String?  @default("Inter")
-  sloganFontSize       Int?     @default(12)
-  sloganFontWeight     String?  @default("Regular")
-  sloganFontSpacing    String?  @default("Normal")
-  sloganLineHeight     String?  @default("1.4")
-  sloganAlign          String?  @default("Left")
-  textShadow           String?  @default("None")
-  frontInstruction1    String?  @default("Approach the phone to the card")
-  frontInstruction2    String?  @default("Tap to leave a review")
-  backInstruction1     String?
-  backInstruction2     String?
-  instrFont            String?  @default("Space Grotesk")
-  instrFontSize        Int?     @default(10)
-  instrFontWeight      String?  @default("Regular")
-  instrFontSpacing     String?  @default("Normal")
-  instrLineHeight      String?  @default("1.4")
-  instrAlign           String?  @default("Left")
-  instrCheckboxStyle   String?  @default("checkmark")
-  qrCodeStyle          String?  @default("Left")
-  qrCodeSize           Int?     @default(60)
-  nfcIconSize          Int?     @default(16)
-  googleLogoSize       Int?     @default(20)
-  cardModel            CardModel @default(classic)
+    // ── Step 1 : Business ─────────────────────────────────────
+    businessName    String?
+    slogan          String?
+    callToAction    String?  @default("Powered by RedVanta")
+    ctaPaddingTop   Int?     @default(8)          // ← NOUVEAU : espacement CTA en px
+    googlePlaceId   String?
+    googleReviewUrl String?
 
-  // Step 3
-  version       Int      @default(1)
-  lastAutoSave  DateTime?
-  validatedAt   DateTime?
+    // ── Step 2 : Orientation & Logo ───────────────────────────
+    orientation   DesignOrientation @default(landscape)
+    logoUrl       String?
+    logoPosition  String?  @default("left")       // ← NOUVEAU : "left"|"right"|"top-center"|"top-left"...
+    logoSize      Int?     @default(32)            // ← NOUVEAU : hauteur logo en px
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+    // ── Step 2 : Couleurs ─────────────────────────────────────
+    colorMode   String?  @default("single")        // "single" | "template"
+    bgColor     String?  @default("#0B0D0F")
+    textColor   String?  @default("#FFFFFF")
+    accentColor String?  @default("#E10600")       // = qrColor côté front
+    starColor   String?  @default("#F59E0B")
+    iconsColor  String?  @default("#22C55E")        // ← NOUVEAU : couleur checkmarks/icônes
 
-  user        User        @relation(fields: [userId],    references: [id], onDelete: Cascade)
-  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  cartItem    CartItem?
-  orderItem   OrderItem?
-  versions    DesignVersion[]
+    // ── Step 2 : Template & Bandes ───────────────────────────
+    templateName    String?
+    gradient1       String?  @default("#0B0D0F")   // ← NOUVEAU : couleur gradient 1 du template
+    gradient2       String?  @default("#1A1A1A")   // ← NOUVEAU : couleur gradient 2 du template
+    accentBand1     String?  @default("#E10600")   // ← NOUVEAU : couleur bande 1
+    accentBand2     String?  @default("#FF4444")   // ← NOUVEAU : couleur bande 2
+    bandPosition    String?  @default("bottom")    // ← NOUVEAU : "top"|"bottom"|"hidden"
+    frontBandHeight Int?     @default(22)          // ← NOUVEAU : hauteur bande avant (%)
+    backBandHeight  Int?     @default(12)          // ← NOUVEAU : hauteur bande arrière (%)
 
-  @@index([userId, companyId])   // designs d'une company
-  @@index([status])
-  @@map("designs")
+    // ── Step 2 : Icônes ──────────────────────────────────────
+    showNfcIcon    Boolean  @default(true)          // ← NOUVEAU
+    showGoogleIcon Boolean  @default(true)          // ← NOUVEAU
+    nfcIconSize    Int?     @default(16)
+    googleLogoSize Int?     @default(20)
+
+    // ── Step 2 : Typographie — Nom ───────────────────────────
+    businessFont          String?  @default("Space Grotesk")
+    businessFontSize      Int?     @default(16)
+    businessFontWeight    String?  @default("Bold")
+    businessFontSpacing   String?  @default("Normal")   // id : "tight"|"normal"|"wide"|"wider"
+    businessLineHeight    String?  @default("1.2")
+    businessAlign         String?  @default("Left")
+    businessTextTransform String?  @default("none")      // ← NOUVEAU : "none"|"uppercase"|"capitalize"
+
+    // ── Step 2 : Typographie — Slogan ────────────────────────
+    sloganFont          String?  @default("Inter")
+    sloganFontSize      Int?     @default(12)
+    sloganFontWeight    String?  @default("Regular")
+    sloganFontSpacing   String?  @default("Normal")
+    sloganLineHeight    String?  @default("1.4")
+    sloganAlign         String?  @default("Left")
+    sloganTextTransform String?  @default("none")        // ← NOUVEAU
+
+    // ── Step 2 : Texte d'ombre ───────────────────────────────
+    textShadow  String?  @default("None")              // "None"|"Subtle"|"Medium"|"Strong"|"Outline"
+
+    // ── Step 2 : Instructions ────────────────────────────────
+    frontInstruction1  String?  @default("Approach the phone to the card")
+    frontInstruction2  String?  @default("Tap to leave a review")
+    backInstruction1   String?
+    backInstruction2   String?
+
+    instrFont           String?  @default("Space Grotesk")
+    instrFontSize       Int?     @default(10)
+    instrFontWeight     String?  @default("Regular")
+    instrFontSpacing    String?  @default("Normal")
+    instrLineHeight     String?  @default("1.4")
+    instrAlign          String?  @default("Left")
+    instrCheckboxStyle  String?  @default("checkmark")
+    checkStrokeWidth    Decimal? @default(3.5) @db.Decimal(3,1)  // ← NOUVEAU : 1.0 à 5.0
+
+    // ── Step 2 : QR Code ─────────────────────────────────────
+    qrCodeStyle  String?  @default("Left")            // position : "top"|"bottom"|"left"|"right"
+    qrCodeSize   Int?     @default(60)
+
+    // ── Step 2 : Modèle de carte ─────────────────────────────
+    cardModel  CardModel  @default(classic)
+
+    // ── Step 2 : Positions drag-and-drop ─────────────────────
+    // JSON complet des offsets par orientation/face/élément
+    // Format : { "landscape": { "front": { "businessInfo": {x,y}, "instructions": {x,y}, ... }, "back": {...} }, "portrait": {...} }
+    elementOffsets  Json?                               // ← NOUVEAU
+
+    // ── Step 3 : Review ──────────────────────────────────────
+    version       Int       @default(1)
+    lastAutoSave  DateTime?
+    validatedAt   DateTime?
+
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+
+    // Relations
+    user        User        @relation(fields: [userId],    references: [id], onDelete: Cascade)
+    company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+    cartItem    CartItem?
+    orderItem   OrderItem?
+    versions    DesignVersion[]
+    nfctags     nfctag[]
+
+    @@index([userId, companyId])
+    @@index([status])
+    @@map("designs")
+  }
+
+
+
+model GooglePlaceCache {
+  id              Int      @id @default(autoincrement())
+
+  // Clé du cache — ce qui a été recherché
+  placeId         String   @unique @db.VarChar(255)  // Google Place ID (stable)
+
+  // Données retournées par Google Places Details
+  name            String?  @db.VarChar(255)
+  formattedAddress String? @db.VarChar(500)
+  phone           String?  @db.VarChar(50)
+  website         String?  @db.VarChar(500)
+  // Coordonnées GPS
+  lat             Float?
+  lng             Float?
+  // Notes et avis
+  rating          Float?
+  userRatingsTotal Int?
+  // URL directe pour laisser un avis (lien QR code)
+  // Format : https://search.google.com/local/writereview?placeid=ChIJxxx
+  reviewUrl       String?  @db.VarChar(500)
+  // Photo principale (reference pour l'API Photos)
+  photoReference  String?  @db.Text
+  photoUrl        String?  @db.VarChar(500)
+  // Catégorie principale
+  types           Json?    // tableau de types Google Places
+
+  // Cache metadata
+  cachedAt        DateTime @default(now())
+  expiresAt       DateTime // cachedAt + 30 jours
+
+  @@index([placeId])
+  @@index([expiresAt])  // pour la purge automatique
+  @@map("google_place_cache")
 }
+
 
 model DesignVersion {
   id        Int      @id @default(autoincrement())
@@ -443,7 +523,7 @@ model nfctag {
   locationId String?
   productId  Int?
   userId     String?
-  designId   String?
+  designId   Int?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @default(now())
   design     Design?   @relation(fields: [designId], references: [id], map: "NFCTag_designId_fkey")
@@ -458,19 +538,22 @@ model nfctag {
 }
 
 model OrderItem {
- id          Int      @id @default(autoincrement())
-  orderId     Int
-  productId   Int
-  designId    Int?     @unique
-  cardTypeId  String?
-  quantity    Int
-  unitPrice   Float
-  totalPrice  Float
+  id              Int      @id @default(autoincrement())
+  orderId         Int
+  productId       Int
+  packageTierId   Int?     // snapshot du tier choisi
+  totalCards      Int      // nombre de cartes commandées
+  quantity        Int      // = totalCards (alias afichage)
+  unitPrice       Float    // prix/carte (snapshot)
+  totalPrice      Float    // lineTotal (snapshot)
+  designId        Int?     @unique
+  cardTypeId      Int?
 
-  order       Order    @relation(fields: [orderId],    references: [id], onDelete: Cascade)
-  product     Product  @relation(fields: [productId],  references: [id], onDelete: Restrict)
-  design      Design?  @relation(fields: [designId],   references: [id], onDelete: SetNull)
-  cardType    CardType? @relation(fields: [cardTypeId], references: [id], onDelete: SetNull)
+  order       Order              @relation(fields: [orderId],        references: [id], onDelete: Cascade)
+  product     Product            @relation(fields: [productId],      references: [id], onDelete: Restrict)
+  packageTier ProductPackageTier? @relation(fields: [packageTierId], references: [id], onDelete: SetNull)
+  design      Design?            @relation(fields: [designId],       references: [id], onDelete: SetNull)
+  cardType    CardType?          @relation(fields: [cardTypeId],     references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@map("order_items")
@@ -949,6 +1032,8 @@ model Company {
   id             Int      @id @default(autoincrement())
   name           String
   logo        String?
+  googlePlaceId        String?
+  googleReviewUrl        String?
   logoScale      Int      @default(100)
   vatNumber      String?
   tradeNumber    String?
@@ -1024,7 +1109,7 @@ model Subscription {
 }
 
 model CardType {
-  id        String   @id   
+  id        Int   @id @default(autoincrement())   
   name      String
   color     String   @default("#6b7280")
   image     String?
@@ -1033,6 +1118,8 @@ model CardType {
   updatedAt DateTime @updatedAt
 
   cardTypePrices CardTypePrice[]
+  orderItems OrderItem[] // Pour la relation avec OrderItem
+  cartItems  CartItem[]  // Pour la relation avec CartItem
   @@map("card_type")
 }
 
@@ -1048,11 +1135,12 @@ model Product {
   galleryItems    ProductGalleryItem[]
   packageTiers    ProductPackageTier[]
   cardTypePrices  CardTypePrice[]
-
-  locations       Location[]           // Pour l'erreur sur Location
   bundleProducts  bundleproduct[]      // Pour l'erreur sur bundleproduct
   orderItems      OrderItem[]          // Pour l'erreur sur orderitem
+  cartItems CartItem[]
   upsells         upsell[]
+  designs Design[]
+
 
   nfctags  nfctag[]
 
@@ -1101,31 +1189,36 @@ model ProductPackageTier {
   price     Float // price per card at this qty
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
+  cartItems CartItem[]
+  orderItems OrderItem[]
   @@unique([productId, qty])
   @@map("product_package_tier")
 }
 
 model CartItem {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @db.UnsignedInt
-  companyId   Int                          // ← company active au moment de l'ajout
-  productId   Int
-  quantity    Int      @default(1)
-  unitPrice   Float
-  cardTypeId  String?
-  designId    Int?     @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  userId        Int      @db.UnsignedInt
+  companyId     Int
+  productId     Int
+  // Package tier choisi (ex: qty=10 cartes a 24$/carte)
+  packageTierId Int
+  totalCards    Int      // = packageTier.qty (snapshot)
+  unitPrice     Float    // prix/carte au moment de l'ajout (snapshot)
+  lineTotal     Float    // totalCards x unitPrice
+  // Options
+  cardTypeId    Int?
+  designId      Int?     @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  user        User        @relation(fields: [userId],    references: [id], onDelete: Cascade)
-  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  design      Design?     @relation(fields: [designId],  references: [id], onDelete: SetNull)
-  cardType    CardType?   @relation(fields: [cardTypeId], references: [id], onDelete: SetNull)
+  user        User                @relation(fields: [userId],       references: [id], onDelete: Cascade)
+  company     Company             @relation(fields: [companyId],    references: [id], onDelete: Cascade)
+  product     Product             @relation(fields: [productId],    references: [id], onDelete: Cascade)
+  packageTier ProductPackageTier  @relation(fields: [packageTierId], references: [id], onDelete: Restrict)
+  design      Design?             @relation(fields: [designId],     references: [id], onDelete: SetNull)
+  cardType    CardType?           @relation(fields: [cardTypeId],   references: [id], onDelete: SetNull)
 
-  @@unique([userId, companyId, productId, designId])  // évite les doublons
-  @@index([userId, companyId])                        // filtre panier par company
+  @@index([userId, companyId])
   @@index([productId])
   @@map("cart_items")
 }
@@ -1136,7 +1229,7 @@ model CartItem {
 model CardTypePrice {
   id         Int    @id @default(autoincrement())
   productId  Int
-  cardTypeId String
+  cardTypeId Int
   price      Float  @default(0)  // additional price on top of base
 
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1171,14 +1264,6 @@ enum SmsCategory {
   System
 }
 
-
-enum OrderStatus {
-  pending
-  paid
-  cancelled
-  refunded
-  fulfilled
-}
 
 enum ReviewStatus {
   pending
@@ -1256,6 +1341,12 @@ enum AccountStatus {
 enum DesignOrientation {
   landscape
   portrait
+}
+
+enum DesignStatus {
+  draft
+  validated
+  locked
 }
 
 enum CardModel {

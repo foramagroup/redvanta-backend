@@ -92,6 +92,7 @@ async function getDefaultLanguage() {
 //   5. Connecter directement (cookie JWT)
 //   6. Envoyer email de confirmation (lien 48h)
 // POST /api/auth/signup
+
 export const signup = async (req, res, next) => {
   const ip = getIp(req);
   const userAgent = req.headers["user-agent"] ?? null;
