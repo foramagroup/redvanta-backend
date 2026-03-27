@@ -2,7 +2,7 @@
 
 import { Router } from "express";
 import { authenticateAdmin, requireAdmin, requireSuperAdmin } from "../../middleware/auth.middleware.js";
-import { autocompleteRateLimit } from "../../middleware/Placesratelimit.middleware";
+import { autocompleteRateLimit } from "../../middleware/Placesratelimit.middleware.js";
 import {
   search,
   details,

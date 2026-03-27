@@ -47,6 +47,7 @@ model User {
   role             Role?       @relation(fields: [roleId], references: [id])
   companies        UserCompany[] 
   refreshTokens RefreshToken[]
+   invoices     Invoice[]
   auditLogs AuditLog[] @relation("AdminLogs")
   @@index([email])
   @@map("users")
@@ -124,17 +125,19 @@ model Location {
 
 
 model Conversion {
-  id          String    @id @default(uuid())
-  orderId     Int
-  affiliateId String
-  amountCents Int
-  currency    String    @default("EUR")
-  createdAt   DateTime  @default(now())
-  affiliate   Affiliate @relation(fields: [affiliateId], references: [id])
-  order       Order     @relation(fields: [orderId], references: [id])
+  id           Int      @id @default(autoincrement())
+  orderId      Int
+  currency     String   @db.VarChar(10)
+  rate         Float
+  displayTotal Float
+  baseCurrency String   @default("EUR") @db.VarChar(10)
+  baseTotal    Float    // montant réel en EUR
 
-  @@index([affiliateId], map: "conversions_affiliateId_fkey")
-  @@index([orderId], map: "conversions_orderId_fkey")
+  createdAt    DateTime @default(now())
+
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
   @@map("conversions")
 }
 
@@ -188,6 +191,9 @@ model Review {
   @@map("reviews")
 }
 
+
+
+
 model Order {
  id            Int         @id @default(autoincrement())
   userId        Int         @db.UnsignedInt
@@ -212,6 +218,11 @@ model Order {
   paidAt                DateTime?
   confirmationEmailSentAt DateTime?
 
+  currency     String?  @default("EUR")
+  displayTotal Float?
+  exchangeRate Float?   @default(1)
+
+  invoice      Invoice?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -226,6 +237,8 @@ model Order {
   @@map("order")
 }
 
+
+
 model Affiliate {
   id              String              @id @default(uuid()) @db.Char(36)
   userId          Int?                @unique @db.UnsignedInt
@@ -239,7 +252,6 @@ model Affiliate {
   tracking        AffiliateTracking[]
   user            User?               @relation(fields: [userId], references: [id], onDelete: Cascade, map: "affiliates_userId_key")
   click           click[]
-  conversions     Conversion[]
   payoutrequest   payoutrequest[]
 
   @@map("affiliates")
@@ -1010,6 +1022,105 @@ model EmailTemplateTranslation {
 }
 
 
+model Invoice {
+  id              Int           @id @default(autoincrement())
+  invoiceNumber   String        @unique  // INV-2026-000001
+  orderId         Int?          @unique  // lié à une commande (nullable si manuel)
+  companyId       Int
+  userId          Int           @db.UnsignedInt
+
+  // Statut
+  status          InvoiceStatus @default(paid)
+
+  // Montants (toujours en EUR — devise de base)
+  subtotal        Float
+  taxAmount       Float         @default(0)
+  shippingCost    Float         @default(0)
+  total           Float
+
+  // Devise d'affichage (si le client a payé dans une autre devise)
+  currency        String        @default("EUR") @db.VarChar(10)
+  exchangeRate    Float         @default(1)
+  displayTotal    Float?        // total dans la devise du client
+
+  // Paiement
+  paymentMethod   String?       @db.VarChar(100)  // "Visa •••• 4242"
+  stripePaymentIntentId String? @db.VarChar(255)
+  paidAt          DateTime?
+
+  // Adresse de facturation
+  billingName     String?
+  billingEmail    String?
+  billingPhone    String?
+  billingAddress  String?       @db.Text
+  billingVat      String?       @db.VarChar(50)
+
+  // Notes et conditions
+  notes           String?       @db.Text
+  terms           String?       @db.Text
+  reference       String?       @db.VarChar(100)
+
+  // Récurrence (pour les abonnements)
+  isRecurring     Boolean       @default(false)
+  recurringInterval String?     // "monthly" | "yearly"
+  nextBillingDate DateTime?
+
+  // Dates
+  invoiceDate     DateTime      @default(now())
+  dueDate         DateTime?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  order           Order?        @relation(fields: [orderId],    references: [id], onDelete: SetNull)
+  company         Company       @relation(fields: [companyId],  references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId],     references: [id], onDelete: Cascade)
+  items           InvoiceItem[]
+  refunds         Refund[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([invoiceDate])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          Int      @id @default(autoincrement())
+  invoiceId   Int
+  service     String                   // nom du service/produit
+  description String?  @db.VarChar(500)
+  quantity    Int      @default(1)
+  unit        String   @default("pcs") // "month", "year", "pcs", "hour"
+  unitPrice   Float
+  discount    Float    @default(0)
+  taxRate     Float    @default(0)     // %
+  taxAmount   Float    @default(0)
+  subtotal    Float                    // qty * unitPrice - discount
+  total       Float                    // subtotal + taxAmount
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model Refund {
+  id              Int      @id @default(autoincrement())
+  invoiceId       Int
+  amount          Float
+  reason          String?  @db.Text
+  stripeRefundId  String?  @db.VarChar(255)
+  processedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("refunds")
+}
+
+
 model Webhook {
   id             Int       @id @default(autoincrement())
   name           String    @db.VarChar(100)
@@ -1075,6 +1186,7 @@ model Company {
   cartItems  CartItem[]
   designs    Design[]
   orders     Order[]
+  invoices     Invoice[]
   @@map("companies")
 }
 
@@ -1370,6 +1482,15 @@ enum ShippingMethod {
   standard    // 5-7 jours
   express     // 2-3 jours
   international // 10-14 jours
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  paid
+  overdue
+  cancelled
+  refunded
 }
 
 

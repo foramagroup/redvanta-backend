@@ -14,7 +14,7 @@ fs.mkdirSync(LOGOS_DIR, { recursive: true });
 // ─── Helpers ──────────────────────────────────────────────────
 
 function getCompanyId(req) {
-  const id = req.user?.companyId;
+  const id = req.user.companyId;
   if (!id) throw Object.assign(new Error("Aucune company active"), { status: 403 });
   return parseInt(id);
 }
@@ -233,7 +233,7 @@ export const saveStep1 = async (req, res, next) => {
         googleReviewUrl: place.reviewUrl,
         ...(place.phone   && { phone:   place.phone }),
         ...(place.website && {
-          googleLink: `https://www.google.com/maps/place/?q=place_id:${placeId}`,
+          googleLink: `https://www.google.com/maps/place/?q=place_id:${googlePlaceId}`,
         }),
       },
     });

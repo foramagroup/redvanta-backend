@@ -38,7 +38,6 @@ router.get("/verify-email", authVerifyLimiter, verifyEmail);
 router.post("/resend-verification", authResendLimiter, resendVerification);
 
 
-// ─── Routes protégées (cookie admin_token requis) ─────────────
 
 // GET  /api/auth/me
 router.get("/me", authenticateAdmin, requireAdmin, me);

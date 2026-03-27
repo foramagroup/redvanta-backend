@@ -24,9 +24,9 @@ function hashVerifyToken(token) {
 }
 
 function getFrontendBase() {
-  return process.env.FRONT_URL
+  return  process.env.URL_PROD_FRONTEND
+    ||  process.env.FRONT_URL
     || process.env.URL_DEV_FRONTEND
-    || process.env.URL_PROD_FRONTEND
     || "http://localhost:3000";
 }
 

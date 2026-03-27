@@ -4,15 +4,15 @@ import prisma     from "../../config/database.js";
 
 
 function createTransporter() {
-  const encryption = (process.env.SMTP_SECURE || process.env.MAIL_SECURE || process.env.MAIL_ENCRYPTION || "").toLowerCase();
-  const host = process.env.MAIL_HOST || process.env.SMTP_HOST || "sandbox.smtp.mailtrap.io";
-  const port = parseInt(process.env.MAIL_PORT || process.env.SMTP_PORT || "2525");
-  const user = process.env.MAIL_USERNAME || process.env.MAIL_USER || process.env.SMTP_USER;
-  const pass = process.env.MAIL_PASSWORD || process.env.MAIL_PASS || process.env.SMTP_PASS;
+  const encryption = (process.env.MAIL_SECURE).toLowerCase();
+  const host = process.env.MAIL_HOST || "sandbox.smtp.mailtrap.io";
+  const port = parseInt(process.env.MAIL_PORT || "2525");
+  const user = process.env.MAIL_USER || "5bdf74304b82af";
+  const pass = process.env.MAIL_PASS || "e68a51f3c6efdc";
   return nodemailer.createTransport({
     host,
     port,
-    secure: encryption === "true" || encryption === "ssl",
+    secure: encryption === "true",
     auth: {
       user,
       pass,

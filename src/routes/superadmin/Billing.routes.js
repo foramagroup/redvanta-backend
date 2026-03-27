@@ -1,0 +1,35 @@
+
+import { Router } from "express";
+import { authenticateSuperAdmin, requireSuperAdmin } from "../../middleware/auth.middleware.js";
+import {
+  getStats, listInvoices, getInvoice,
+  createInvoice, updateInvoice, refundInvoice,
+  addManualPayment, listPayments, retryPayment,
+} from "../../controllers/superadmin/Billing.controller.js";
+
+const router = Router();
+const auth   = [authenticateSuperAdmin, requireSuperAdmin];
+
+// Stats dashboard
+router.get ("/stats",                   ...auth, getStats);
+
+// Invoices CRUD
+router.get ("/invoices",                ...auth, listInvoices);
+router.get ("/invoices/:id",            ...auth, getInvoice);
+router.post("/invoices",                ...auth, createInvoice);
+router.put ("/invoices/:id",            ...auth, updateInvoice);
+
+// Actions sur factures
+router.post("/invoices/:id/refund",     ...auth, refundInvoice);
+router.post("/invoices/retry",          ...auth, retryPayment);
+
+// Paiements manuels
+router.post("/payments",                ...auth, addManualPayment);
+router.get ("/payments",                ...auth, listPayments);
+
+export default router;
+
+// ─── src/routes/order.routes.js ──────────────────────────────
+// Ajouter le refund sur les orders (superadmin)
+// import { refundOrder } from "../controllers/order.controller.js";
+// router.post("/:id/refund", authenticateSuperAdmin, requireSuperAdmin, refundOrder);

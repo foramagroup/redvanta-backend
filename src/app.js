@@ -2,6 +2,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import express from "express";
+import { stripeWebhook } from "./controllers/client/Order.controller.js"
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -45,6 +46,7 @@ import companyRoutes from "./routes/superadmin/companyRoutes.js";
 import authSuperAdminRoutes from "./routes/superadmin/authRoutes.js";
 import emailServerConfigRoutes from "./routes/superadmin/emailServerConfigRoutes.js";
 import statusRoutes from "./routes/superadmin/statusRoutes.js";
+import billingRoutes from "./routes/superadmin/Billing.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -52,6 +54,7 @@ import shopRoutes from "./routes/client/Shop.routes.js";
 import settingClientRoutes from "./routes/client/settingClientRoutes.js";
 import clientAuthRoutes from "./routes/client/clientAuthRoutes.js";
 import placesRoutes from "./routes/client/Googleplaces.routes.js";
+import orderClientRoutes   from "./routes/client/Order.route.js";
 
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
@@ -113,6 +116,12 @@ app.use(cors({
   credentials: true,
 }));
 
+app.post(
+  "/api/orders/webhook",
+  express.raw({ type: "application/json" }),
+  (req, res, next) => { req.rawBody = req.body; next(); },
+  stripeWebhook
+);
 // --------------------
 // BODY PARSERS
 // --------------------
@@ -183,6 +192,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/settings", settingClientRoutes);
   app.use("/api/client/auth", clientAuthRoutes);
   app.use("/api/client/places", placesRoutes);
+  app.use("/api/orders", orderClientRoutes);
   startSuspendUnverifiedJob();
 
 
@@ -220,6 +230,7 @@ app.use("/api/customization", customizationRoutes);
   app.use('/api/superadmin/webhooks-settings', webhooksSettingRoutes);
   app.use('/api/superadmin/email-server-config', emailServerConfigRoutes);
   app.use('/api/superadmin/status-settings', statusRoutes);
+  app.use("/api/superadmin/billing", billingRoutes);
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
     // app.use("/uploads", express.static(uploadDir));

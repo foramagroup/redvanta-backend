@@ -26,6 +26,13 @@ function formatItem(item) {
     packageTier: item.packageTier
       ? { id: item.packageTier.id, qty: item.packageTier.qty, price: Number(item.packageTier.price) }
       : null,
+
+      availableTiers: product?.packageTiers?.map(t => ({
+      id: t.id,
+      qty: t.qty,
+      price: Number(t.price)
+    })) || [], 
+
     totalCards: item.totalCards,
     unitPrice:  Number(item.unitPrice),
     lineTotal:  Number(item.lineTotal),
@@ -51,7 +58,6 @@ function getCompanyId(req) {
   if (!id) throw Object.assign(new Error("Aucune company active"), { status: 403 });
   return parseInt(id);
 }
-
 
 
 // GET /api/cart

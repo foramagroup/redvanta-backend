@@ -7,7 +7,7 @@ const router = Router();
 
 router.post("/login",  login);
 
-router.selectCompany("/select-company", selectCompany)
+router.post("/select-company", selectCompany)
 
 router.get ("/me",   authenticateAdmin, requireAdmin, me);
 

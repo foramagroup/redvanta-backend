@@ -1,6 +1,6 @@
 
 
-import prisma from "../../config/database.js";
+import prisma from "../config/database.js";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 const CACHE_TTL_DAYS = 30;

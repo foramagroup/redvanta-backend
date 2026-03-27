@@ -21,11 +21,6 @@ import express from "express";
 
 const router = Router();
 
-// ─── Webhook Stripe (raw body — AVANT express.json) ──────────
-// À monter SÉPARÉMENT dans app.js avec bodyParser.raw
-// app.post("/api/orders/webhook", bodyParser.raw({ type: "application/json" }), stripeWebhook)
-
-// ─── Routes protégées (cookie admin_token requis) ─────────────
 const auth = [authenticateAdmin, requireAdmin];
 
 // ── Panier ────────────────────────────────────────────────────
