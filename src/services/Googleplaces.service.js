@@ -229,3 +229,31 @@ export async function getCacheStats() {
   ]);
   return { total, expired, valid };
 }
+
+
+export async function findPlaceIdFromUrl(manualUrl) {
+  if (!manualUrl) return null;
+  try {
+    const directMatch = manualUrl.match(/\/place\/[^\/]+\/([^\/\?]+)/);
+    if (directMatch && directMatch[1].startsWith('ChIJ')) {
+      return directMatch[1];
+    }
+    const nameMatch = manualUrl.match(/\/place\/([^\/]+)/);
+    if (!nameMatch) return null;
+    const businessName = decodeURIComponent(nameMatch[1].replace(/\+/g, ' '));
+    // 3. Appel API "Find Place" pour convertir le nom en ID
+    const params = new URLSearchParams({
+      input: businessName,
+      inputtype: 'textquery',
+      fields: 'place_id',
+      key: GOOGLE_API_KEY,
+      language: 'fr'
+    });
+    const response = await fetch(`${BASE_URL}/place/findplacefromtext/json?${params}`);
+    const data = await response.json();
+    return data.candidates?.[0]?.place_id || null;
+  } catch (error) {
+    console.error("[GoogleAPI] Erreur findPlaceIdFromUrl:", error.message);
+    return null;
+  }
+}

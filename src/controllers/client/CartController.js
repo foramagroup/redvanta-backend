@@ -27,11 +27,11 @@ function formatItem(item) {
       ? { id: item.packageTier.id, qty: item.packageTier.qty, price: Number(item.packageTier.price) }
       : null,
 
-      availableTiers: product?.packageTiers?.map(t => ({
+    availableTiers: item.product?.packageTiers?.map((t) => ({
       id: t.id,
       qty: t.qty,
-      price: Number(t.price)
-    })) || [], 
+      price: Number(t.price),
+    })) || [],
 
     totalCards: item.totalCards,
     unitPrice:  Number(item.unitPrice),

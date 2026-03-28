@@ -5,7 +5,7 @@ import path   from "path";
 import fs     from "fs";
 import crypto from "crypto";
 import sharp  from "sharp";
-import { getPlaceDetails } from "../../services/Googleplaces.service.js";
+import { getPlaceDetails, findPlaceIdFromUrl } from "../../services/Googleplaces.service.js";
 
 const LOGOS_DIR    = path.resolve(process.env.UPLOAD_DIR || "uploads", "designs", "logos");
 const MAX_VERSIONS = 10;
@@ -218,33 +218,41 @@ export const saveStep1 = async (req, res, next) => {
     const id        = parseInt(req.params.id);
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
-    const { businessName, slogan, callToAction, ctaPaddingTop, googlePlaceId, googleReviewUrl } = req.body;
+    const { businessName, slogan, callToAction, ctaPaddingTop, googlePlaceId, googleReviewUrl, manualUrl } = req.body;
 
     const design = await prisma.design.findFirst({ where: { id, userId, companyId } });
     if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
     if (design.status === "locked") return res.status(409).json({ success: false, error: "Design verrouillé" });
+    let finalPlaceId = googlePlaceId;
+    if (!finalPlaceId && manualUrl) {
+          finalPlaceId = await findPlaceIdFromUrl(manualUrl);
+    }
+    let place = null;
+    if (finalPlaceId) {
+      place = await getPlaceDetails(finalPlaceId).catch(() => null);
+    }
 
-    
-    const place = await getPlaceDetails(googlePlaceId);
-    await prisma.company.update({
-      where: { id: companyId },
-      data: {
-        googlePlaceId:   googlePlaceId,
-        googleReviewUrl: place.reviewUrl,
-        ...(place.phone   && { phone:   place.phone }),
-        ...(place.website && {
-          googleLink: `https://www.google.com/maps/place/?q=place_id:${googlePlaceId}`,
-        }),
-      },
-    });
+    if (place) {
+      await prisma.company.update({
+        where: { id: companyId },
+        data: {
+          googlePlaceId:   finalPlaceId,
+          googleReviewUrl: googleReviewUrl || place.reviewUrl,
+          ...(place.phone   && { phone:   place.phone }),
+          ...(place.website && {
+            googleLink: `https://www.google.com/maps/search/?api=1&query=google&query_place_id=${finalPlaceId}`,
+          }),
+        },
+      });
+    }
 
     const updated = await saveWithVersion(id, {
       businessName:    businessName    ?? design.businessName,
       slogan:          slogan          ?? design.slogan,
       callToAction:    callToAction    ?? design.callToAction,
       ctaPaddingTop:   ctaPaddingTop   ?? design.ctaPaddingTop,
-      googlePlaceId:   googlePlaceId   ?? design.googlePlaceId,
-      googleReviewUrl: googleReviewUrl ?? design.googleReviewUrl,
+      googlePlaceId:   finalPlaceId   ?? design.googlePlaceId,
+      googleReviewUrl: googleReviewUrl || place?.reviewUrl || design.googleReviewUrl,
       lastAutoSave:    new Date(),
     }, design);
 

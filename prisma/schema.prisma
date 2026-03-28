@@ -48,6 +48,7 @@ model User {
   companies        UserCompany[] 
   refreshTokens RefreshToken[]
    invoices     Invoice[]
+   payments    Payment[]
   auditLogs AuditLog[] @relation("AdminLogs")
   @@index([email])
   @@map("users")
@@ -230,6 +231,7 @@ model Order {
   company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   items       OrderItem[]
   Conversions Conversion[]
+  payments    Payment[]
 
 
   @@index([userId, companyId])
@@ -237,6 +239,58 @@ model Order {
   @@map("order")
 }
 
+
+model Payment {
+  id              Int               @id @default(autoincrement())
+  // Références
+  orderId         Int?              // lié à une commande (null si paiement manuel)
+  invoiceId       Int?              // lié à une facture
+  companyId       Int
+  userId          Int               @db.UnsignedInt
+
+  // Montants en EUR
+  amount          Float
+  currency        String            @default("EUR") @db.VarChar(10)
+  exchangeRate    Float             @default(1)
+  displayAmount   Float?            // montant dans la devise du client
+
+  // Stripe
+  stripePaymentIntentId String?     @db.VarChar(255)
+  stripeChargeId        String?     @db.VarChar(255)
+  stripeRefundId        String?     @db.VarChar(255)
+
+  // Méthode de paiement
+  method          PaymentMethodType @default(card)
+  methodLabel     String?           @db.VarChar(100) // "Visa •••• 4242"
+  last4           String?           @db.VarChar(4)
+  brand           String?           @db.VarChar(30)  // "visa", "mastercard"...
+  transactionId   String?           @db.VarChar(255) // ID externe (pour virement, chèque)
+
+  // Statut
+  status          PaymentStatus     @default(completed)
+  failureMessage  String?           @db.Text
+
+  // Notes
+  notes           String?           @db.Text
+
+  // Dates
+  paidAt          DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  order           Order?            @relation(fields: [orderId],    references: [id], onDelete: SetNull)
+  invoice         Invoice?          @relation(fields: [invoiceId],  references: [id], onDelete: SetNull)
+  company         Company           @relation(fields: [companyId],  references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId],     references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([invoiceId])
+  @@index([companyId])
+  @@index([status])
+  @@index([paidAt])
+  @@map("payments")
+}
 
 
 model Affiliate {
@@ -1078,6 +1132,7 @@ model Invoice {
   user            User          @relation(fields: [userId],     references: [id], onDelete: Cascade)
   items           InvoiceItem[]
   refunds         Refund[]
+  payments    Payment[]
 
   @@index([companyId])
   @@index([status])
@@ -1187,6 +1242,7 @@ model Company {
   designs    Design[]
   orders     Order[]
   invoices     Invoice[]
+  payments    Payment[]
   @@map("companies")
 }
 
@@ -1334,8 +1390,6 @@ model CartItem {
   @@index([productId])
   @@map("cart_items")
 }
-
-
 
 
 model CardTypePrice {
@@ -1493,5 +1547,18 @@ enum InvoiceStatus {
   refunded
 }
 
+enum PaymentStatus {
+  completed
+  failed
+  refunded
+  pending
+}
+
+enum PaymentMethodType {
+  card
+  wire
+  check
+  other
+}
 
 

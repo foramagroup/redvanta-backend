@@ -3,17 +3,26 @@
 import jwt   from "jsonwebtoken";
 import prisma from "../config/database.js";
 
-const JWT_SECRET  = process.env.JWT_SECRET;
-const JWT_EXPIRES = process.env.JWT_EXPIRES_IN || "7d"; 
+function getJwtSecret() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET is not configured");
+  }
+  return secret;
+}
+
+function getJwtExpires() {
+  return process.env.JWT_EXPIRES_IN || "7d";
+}
 
 // ─── Générer le JWT ───────────────────────────────────────────
 export function generateToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: getJwtExpires() });
 }
 
 // ─── Vérifier le JWT ─────────────────────────────────────────
 export function verifyToken(token) {
-  return jwt.verify(token, JWT_SECRET);
+  return jwt.verify(token, getJwtSecret());
 }
 
 // ─── Options du cookie HttpOnly ──────────────────────────────

@@ -14,7 +14,7 @@ import {
 } from "../../controllers/client/DesignController.js";
 
 import {
-  getShippingRates, createOrder, listOrders, getOrder, stripeWebhook,
+  getShippingRates, createOrder, listOrders, getOrder, stripeWebhook, getPaymentMethods
 } from "../../controllers/client/Order.controller.js";
 
 import express from "express";
@@ -44,6 +44,7 @@ router.delete("/cart",     ...auth, clearCart);
 // PUT  /api/designs/:id/validate          → valider le design (étape 3)
 // GET  /api/designs/:id/versions          → historique des versions
 // POST /api/designs/:id/restore/:vId      → restaurer une version
+
 router.get  ("/designs/cart-item/:cartItemId",     ...auth, getDesignByCartItem);
 router.post ("/designs",                           ...auth, createDesign);
 router.put  ("/designs/:id/step1",                 ...auth, saveStep1);
@@ -61,5 +62,10 @@ router.get  ("/orders/shipping-rates", ...auth, getShippingRates);
 router.post ("/orders",                ...auth, createOrder);
 router.get  ("/orders",                ...auth, listOrders);
 router.get  ("/orders/:id",            ...auth, getOrder);
+
+
+
+// GET /api/payment-methods
+router.get("/payment-methods", ...auth, getPaymentMethods);
 
 export default router;

@@ -22,6 +22,7 @@ import webhookRoutes from "./routes/webhookRoutes.js";
 import customizationRoutes from "./routes/customizationRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import authAdminRoutes from "./routes/authRoutes.js";
+import orderAdminRoutes from "./routes/order.routes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -46,7 +47,7 @@ import companyRoutes from "./routes/superadmin/companyRoutes.js";
 import authSuperAdminRoutes from "./routes/superadmin/authRoutes.js";
 import emailServerConfigRoutes from "./routes/superadmin/emailServerConfigRoutes.js";
 import statusRoutes from "./routes/superadmin/statusRoutes.js";
-import billingRoutes from "./routes/superadmin/Billing.routes.js";
+import billingRoutes from "./routes/superadmin/billing.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -201,6 +202,7 @@ app.use("/api/customization", customizationRoutes);
 // *************Ges Routes Admin***************
   //auth admin
   app.use("/api/admin/auth", authAdminRoutes);
+  app.use("/api/admin/orders", orderAdminRoutes);
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/admin/affiliates", requireAuth, requireAdmin, adminAffiliateController);

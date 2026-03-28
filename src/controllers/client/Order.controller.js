@@ -208,16 +208,15 @@ export const stripeWebhook = async (req, res, next) => {
   const webhookSecret = await getWebhookSecret();
   const sig = req.headers["stripe-signature"];
   let event;
-
+ 
   try {
     const stripe = await getStripe();
     event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
-    event = req.body;
   } catch (err) {
     console.error("[webhook] Signature invalide:", err.message);
     return res.status(400).json({ error: `Webhook invalide: ${err.message}` });
   }
-
+ 
   if (event.type === "payment_intent.succeeded") {
     const pi = event.data.object;
     try {
@@ -235,41 +234,74 @@ export const stripeWebhook = async (req, res, next) => {
           },
         },
       });
-
+ 
       if (order && order.status === "pending") {
-        // Mettre à jour le mode de paiement depuis Stripe
         const stripe  = await getStripe();
         const charges = await stripe.charges.list({ payment_intent: pi.id, limit: 1 });
-        const paymentMethod = charges.data[0]?.payment_method_details?.card
-          ? `${charges.data[0].payment_method_details.card.brand} •••• ${charges.data[0].payment_method_details.card.last4}`
+        const charge  = charges.data[0];
+ 
+        const methodLabel = charge?.payment_method_details?.card
+          ? `${charge.payment_method_details.card.brand} •••• ${charge.payment_method_details.card.last4}`
           : "Stripe";
-
+        const last4 = charge?.payment_method_details?.card?.last4   ?? null;
+        const brand = charge?.payment_method_details?.card?.brand   ?? null;
+        const stripeChargeId = charge?.id ?? null;
+ 
+        
         await prisma.$transaction([
           prisma.order.update({
             where: { id: order.id },
             data:  { status: "paid", paidAt: new Date() },
           }),
-          prisma.cartItem.deleteMany({ where: { userId: order.userId, companyId: order.companyId } }),
-        ]);
 
-        // Créer la facture automatiquement
+          prisma.cartItem.deleteMany({
+            where: { userId: order.userId, companyId: order.companyId },
+          }),
+        ]);
+ 
+       
         const fullOrder = { ...order, status: "paid", paidAt: new Date() };
         const invoice   = await createInvoiceFromOrder(fullOrder);
-
-        // Mettre à jour le mode de paiement sur la facture
+ 
+        
+        const payment = await prisma.payment.create({
+          data: {
+            orderId:    order.id,
+            invoiceId:  invoice.id,
+            companyId:  order.companyId,
+            userId:     order.userId,
+            amount:     Number(order.total),
+            currency:   order.currency    ?? "EUR",
+            exchangeRate: Number(order.exchangeRate ?? 1),
+            displayAmount: order.displayTotal ? Number(order.displayTotal) : Number(order.total),
+            stripePaymentIntentId: pi.id,
+            stripeChargeId,
+            method:      "card",
+            methodLabel,
+            last4,
+            brand,
+            status:     "completed",
+            paidAt:     new Date(),
+          },
+        });
+ 
+        // 4. Mettre à jour le mode de paiement sur la facture
         await prisma.invoice.update({
           where: { id: invoice.id },
-          data:  { paymentMethod },
+          data:  { paymentMethod: methodLabel },
         });
-
-        // Envoyer les 3 emails
+ 
+        console.log(`[webhook] Paiement #${payment.id} enregistré pour commande #${order.orderNumber}`);
+ 
+        // 5. Envoyer les 3 emails (asynchrone)
         sendOrderEmails(fullOrder, invoice).catch(console.error);
       }
     } catch (e) {
-      console.error("[webhook] Erreur:", e.message);
+      console.error("[webhook] Erreur traitement:", e.message);
     }
   }
-
+ 
+  // Toujours répondre 200 à Stripe
   res.json({ received: true });
 };
 
@@ -358,27 +390,28 @@ export const getOrder = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// ─── Emails post-paiement ─────────────────────────────────────
 
+
+// ─── Emails post-paiement ─────────────────────────────────────
 async function sendOrderEmails(order, invoice) {
   if (order.confirmationEmailSentAt) return;
-
+ 
   const currency     = order.currency ?? "EUR";
   const rate         = Number(order.exchangeRate ?? 1);
   const displayTotal = order.displayTotal ? Number(order.displayTotal) : Number(order.total);
-
+ 
   const items = order.items.map((i) => ({
-    productName:     i.product?.translations?.[0]?.title ?? "Product",
-    totalCards:      i.totalCards,
-    unitPrice:       Number(i.unitPrice),
-    totalPrice:      Number(i.totalPrice),
+    productName:      i.product?.translations?.[0]?.title ?? "Product",
+    totalCards:       i.totalCards,
+    unitPrice:        Number(i.unitPrice),
+    totalPrice:       Number(i.totalPrice),
     displayLineTotal: Math.round(Number(i.totalPrice) * rate * 100) / 100,
   }));
-
+ 
   const shippingLabel = {
     standard: "Standard (5-7j)", express: "Express (2-3j)", international: "International (10-14j)",
   }[order.shippingMethod] ?? order.shippingMethod;
-
+ 
   const vars = {
     customer_name:    order.user.name  || order.user.email,
     company_name:     order.company.name,
@@ -396,28 +429,27 @@ async function sendOrderEmails(order, invoice) {
     shipping_zip:     order.shippingZip       ?? "",
     shipping_country: order.shippingCountry   ?? "",
     currency,
-    order_date:       new Date(order.createdAt).toLocaleDateString("fr-FR"),
-    year:             String(new Date().getFullYear()),
+    order_date: new Date(order.createdAt).toLocaleDateString("fr-FR"),
+    year:       String(new Date().getFullYear()),
     items_html: items.map((i) =>
       `<p style="margin:4px 0;font-size:13px">• ${i.productName} × ${i.totalCards} cartes — ${i.displayLineTotal} ${currency}</p>`
     ).join(""),
   };
+ 
   const applyV = (p) => {
     const r = (s) => s?.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? "") ?? "";
     return { subject: r(p.subject), html: r(p.html), text: r(p.text) };
   };
-
-  // 1. Email client
+ 
   await sendTemplatedMail({
     slug:       "order_confirmation_customer",
     to:         order.user.email,
     variables:  vars,
     fallbackFn: () => applyV(buildOrderConfirmationCustomer({ order, items, currency, displayTotal })),
   });
-
-  // 2. Email admin (si différent du client)
+ 
   const ownerLink = await prisma.userCompany.findFirst({
-    where:   { companyId: order.companyId, isOwner: true },
+    where: { companyId: order.companyId, isOwner: true },
     include: { user: true },
   });
   if (ownerLink && ownerLink.user.email !== order.user.email) {
@@ -428,21 +460,39 @@ async function sendOrderEmails(order, invoice) {
       fallbackFn: () => applyV(buildOrderNotificationAdmin({ order, items, companyName: order.company.name, currency, displayTotal })),
     });
   }
-
-  // 3. Email superadmin
   const saEmail = process.env.SUPERADMIN_EMAIL || process.env.MAIL_FROM_ADDRESS;
   if (saEmail) {
     await sendTemplatedMail({
       slug:       "order_notification_superadmin",
       to:         saEmail,
       variables:  vars,
-      fallbackFn: () => applyV(buildOrderNotificationSuperAdmin({
-        order, companyName: order.company.name,
-        adminEmail: order.user.email, currency, displayTotal,
-      })),
+      fallbackFn: () => applyV(buildOrderNotificationSuperAdmin({ order, companyName: order.company.name, adminEmail: order.user.email, currency, displayTotal })),
     });
   }
-
+ 
   await prisma.order.update({ where: { id: order.id }, data: { confirmationEmailSentAt: new Date() } });
   console.log(`[order] Emails envoyés pour #${order.orderNumber}`);
 }
+
+export const getPaymentMethods = async (req, res, next) => {
+  try {
+    const methods = await prisma.manualPaymentMethod.findMany({
+      where: {
+        status: "Active",
+      },
+      orderBy: { name: "asc" },
+    });
+    const formattedMethods = methods.map(method => ({
+      ...method,
+      supportedCurrencies: method.supportedCurrencies === "all" 
+        ? ["all"] 
+        : method.supportedCurrencies?.split(",").map(c => c.trim()) || []
+    }));
+    res.json({
+      success: true,
+      data: formattedMethods
+    });
+  } catch (e) {
+    next(e);
+  }
+};
