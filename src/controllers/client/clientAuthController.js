@@ -182,7 +182,7 @@ export const signup = async (req, res, next) => {
 
     await logActivity(result.user.id, result.user.name, ip, userAgent, "signup");
 
-    const backendBase = process.env.URL_DEV_BACKEND || process.env.URL_PROD_BACKEND || "http://localhost:4000";
+    const backendBase = process.env.URL_DEV_BACKEND ||  "http://localhost:4000";
     const confirmUrl = `${backendBase}/api/client/auth/verify-email?token=${verifyToken}&redirect=1`;
     const emailPayload = buildConfirmEmailTemplate({
       name: companyName,

@@ -613,7 +613,7 @@ model OrderItem {
   unitPrice       Float    // prix/carte (snapshot)
   totalPrice      Float    // lineTotal (snapshot)
   designId        Int?     @unique
-  cardTypeId      Int?
+  cardTypeId      String?
 
   order       Order              @relation(fields: [orderId],        references: [id], onDelete: Cascade)
   product     Product            @relation(fields: [productId],      references: [id], onDelete: Restrict)
@@ -1277,7 +1277,7 @@ model Subscription {
 }
 
 model CardType {
-  id        Int   @id @default(autoincrement())   
+  id        String  @id @default(cuid())
   name      String
   color     String   @default("#6b7280")
   image     String?
@@ -1374,7 +1374,7 @@ model CartItem {
   unitPrice     Float    // prix/carte au moment de l'ajout (snapshot)
   lineTotal     Float    // totalCards x unitPrice
   // Options
-  cardTypeId    Int?
+  cardTypeId    String?
   designId      Int?     @unique
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -1395,7 +1395,7 @@ model CartItem {
 model CardTypePrice {
   id         Int    @id @default(autoincrement())
   productId  Int
-  cardTypeId Int
+  cardTypeId String
   price      Float  @default(0)  // additional price on top of base
 
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)

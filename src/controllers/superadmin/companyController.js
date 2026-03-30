@@ -16,7 +16,7 @@ const COMPANY_INCLUDE = {
   members: {
     include: {
       user: {
-        select: { id: true, name: true, email: true, isAdmin: true, lastLogin: true, _count: { select: { locations: true } } },
+        select: { id: true, name: true, email: true, isAdmin: true, lastLogin: true },
       },
       role: { select: { id: true, name: true } },
     },
@@ -56,7 +56,7 @@ function formatCompany(c) {
     billingAmount:   c.billingAmount,
     mrr:             c.mrr,
     apiUsageCount:   c.apiUsageCount,
-    locations:       c._count?.locations ?? 0,
+    // locations:       c._count?.locations ?? 0,
     adminCount:      c._count?.members   ?? 0,
     // Admin principal pour la vue tableau
     admin,
