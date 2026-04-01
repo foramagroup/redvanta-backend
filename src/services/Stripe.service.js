@@ -8,7 +8,6 @@ let _lastLoadedAt   = null;
 const CACHE_MS = 5 * 60 * 1000;
 
 
-
 async function loadStripeGateway() {
   const gateway = await prisma.paymentGateway.findFirst({
     where: {
@@ -34,7 +33,6 @@ async function loadStripeGateway() {
 
 export async function getStripe() {
   const now = Date.now();
-
   // Recharger si pas encore chargé ou cache expiré
   if (!_stripeInstance || !_lastLoadedAt || now - _lastLoadedAt > CACHE_MS) {
     const gateway = await loadStripeGateway();

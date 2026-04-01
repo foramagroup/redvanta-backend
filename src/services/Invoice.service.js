@@ -101,11 +101,39 @@ export async function createInvoiceFromOrder(order) {
 
 
 export function formatInvoice(inv) {
+  const payments = (inv.payments ?? []).map((payment) => ({
+    id: payment.id,
+    amount: Number(payment.amount),
+    currency: payment.currency,
+    method: payment.method,
+    methodLabel: payment.methodLabel,
+    transactionId: payment.transactionId,
+    stripePaymentIntentId: payment.stripePaymentIntentId,
+    status: payment.status,
+    paidAt: payment.paidAt,
+  }));
+
+  const refunds = (inv.refunds ?? []).map((refund) => ({
+    id: refund.id,
+    amount: Number(refund.amount),
+    reason: refund.reason,
+    stripeRefundId: refund.stripeRefundId,
+    createdAt: refund.createdAt,
+  }));
+
+  const completedPayments = payments.filter((payment) => payment.status === "completed");
+  const paidAmount = completedPayments.reduce((sum, payment) => sum + payment.amount, 0);
+  const refundedAmount = refunds.reduce((sum, refund) => sum + refund.amount, 0);
+  const balanceDue = Math.max(Number(inv.total) - paidAmount, 0);
+  const lastPayment = [...payments]
+    .sort((a, b) => new Date(b.paidAt ?? 0).getTime() - new Date(a.paidAt ?? 0).getTime())[0] ?? null;
+
   return {
     id:            inv.id,
     invoiceNumber: inv.invoiceNumber,
     orderId:       inv.orderId,
     companyId:     inv.companyId,
+    company:       inv.company ? { id: inv.company.id, name: inv.company.name } : null,
     status:        inv.status,
     subtotal:      Number(inv.subtotal),
     taxAmount:     Number(inv.taxAmount),
@@ -115,6 +143,10 @@ export function formatInvoice(inv) {
     exchangeRate:  Number(inv.exchangeRate),
     displayTotal:  inv.displayTotal ? Number(inv.displayTotal) : null,
     paymentMethod: inv.paymentMethod,
+    paidAmount,
+    refundedAmount,
+    balanceDue,
+    lastPaymentMethod: inv.paymentMethod ?? lastPayment?.methodLabel ?? lastPayment?.method ?? null,
     paidAt:        inv.paidAt,
     billing: {
       name:    inv.billingName,
@@ -131,6 +163,8 @@ export function formatInvoice(inv) {
     notes:             inv.notes,
     terms:             inv.terms,
     reference:         inv.reference,
+    payments,
+    refunds,
     items: inv.items?.map((i) => ({
       id:          i.id,
       service:     i.service,

@@ -24,7 +24,12 @@ const COMPANY_INCLUDE = {
   },
   _count: {
     select: {
-      members:   true,   // nombre d'admins
+      members:   true,
+    },
+  },
+  _count: {
+    select: {
+      locations:   true,
     },
   },
 };
@@ -56,7 +61,7 @@ function formatCompany(c) {
     billingAmount:   c.billingAmount,
     mrr:             c.mrr,
     apiUsageCount:   c.apiUsageCount,
-    // locations:       c._count?.locations ?? 0,
+    locations:       c._count?.locations ?? 0,
     adminCount:      c._count?.members   ?? 0,
     // Admin principal pour la vue tableau
     admin,

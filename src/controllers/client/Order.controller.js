@@ -8,6 +8,7 @@ import {
   buildOrderNotificationAdmin,
   buildOrderNotificationSuperAdmin,
 } from "../../templates/client/Orderemails.js";
+import { generateNfcCardsForOrder } from "../../services/nfc.service.js";
 
 function getCompanyId(req) {
   const id = req.user.companyId;
@@ -292,9 +293,19 @@ export const stripeWebhook = async (req, res, next) => {
         });
  
         console.log(`[webhook] Paiement #${payment.id} enregistré pour commande #${order.orderNumber}`);
+
+         // 5. ✅ NOUVEAU : Générer les cards NFC pour chaque item du design
+        // Les cards sont générés au moment du paiement (pas de la validation du design)
+        // Ils sont inactifs jusqu'à la livraison (order.status = "delivered")
+        
+        generateNfcCardsForOrder(fullOrder).catch((e) =>
+          console.error("[webhook] Erreur génération NFC:", e.message)
+        );
  
         // 5. Envoyer les 3 emails (asynchrone)
         sendOrderEmails(fullOrder, invoice).catch(console.error);
+
+        console.log(`[webhook] Commande #${order.orderNumber} payée + NFC en cours de génération`);
       }
     } catch (e) {
       console.error("[webhook] Erreur traitement:", e.message);

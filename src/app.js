@@ -23,6 +23,7 @@ import customizationRoutes from "./routes/customizationRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import authAdminRoutes from "./routes/authRoutes.js";
 import orderAdminRoutes from "./routes/order.routes.js";
+import locationRoutes from "./routes/location.routes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -193,7 +194,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/settings", settingClientRoutes);
   app.use("/api/client/auth", clientAuthRoutes);
   app.use("/api/client/places", placesRoutes);
-  app.use("/api/orders", orderClientRoutes);
+  app.use("/api/client/orders", orderClientRoutes);
   startSuspendUnverifiedJob();
 
 
@@ -203,6 +204,7 @@ app.use("/api/customization", customizationRoutes);
   //auth admin
   app.use("/api/admin/auth", authAdminRoutes);
   app.use("/api/admin/orders", orderAdminRoutes);
+  app.use("/api/admin/locations", locationRoutes);
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/admin/affiliates", requireAuth, requireAdmin, adminAffiliateController);

@@ -7,6 +7,22 @@ import {
   formatInvoice,
 } from "../../services/Invoice.service.js";
 
+// const INVOICE_STATUS = new Set(["draft", "sent", "paid", "overdue", "cancelled", "refunded"]);
+// const PAYMENT_STATUS = new Set(["completed", "failed", "refunded", "pending"]);
+
+// function getOptionalEnumQuery(value, allowedValues) {
+//   if (typeof value !== "string") return undefined;
+
+//   const normalized = value.trim().toLowerCase();
+//   if (!normalized || normalized === "all" || normalized === "null" || normalized === "undefined") {
+//     return undefined;
+//   }
+
+//   return allowedValues.has(normalized) ? normalized : undefined;
+// }
+
+
+
 function formatPayment(p) {
   return {
     id:            `PAY-${String(p.id).padStart(3, "0")}`,
@@ -55,7 +71,7 @@ export const getStats = async (req, res, next) => {
         where: { status: "paid", invoiceDate: { gte: lastMonth, lt: thisMonth } },
         _sum: { total: true },
       }),
-      prisma.invoice.count({ where: { status: "failed" } }), 
+      prisma.payment.count({ where: { status: "failed" } }),
       prisma.invoice.count({ where: { status: "sent" } }),
       prisma.invoice.count({ where: { status: "overdue" } }),
       prisma.invoice.aggregate({
@@ -63,6 +79,7 @@ export const getStats = async (req, res, next) => {
         _sum: { total: true },
       }),
     ]);
+
 
     const mrr       = Number(mrrResult._sum?.total || 0);
     const arr       = mrr * 12;
@@ -108,14 +125,18 @@ export const listInvoices = async (req, res, next) => {
     const skip   = (page - 1) * limit;
     
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : "";
-    const status = req.query.status || undefined;
+// const status = getOptionalEnumQuery(req.query.status, INVOICE_STATUS);    
+ const status = req.query.status || undefined;
     const from   = req.query.from   || undefined;
     const to     = req.query.to     || undefined;
+    const invoiceDate = {
+      ...(from && { gte: new Date(from) }),
+      ...(to && { lte: new Date(`${to}T23:59:59`) }),
+    };
 
     const where = {
       ...(status && { status }),
-      ...(from   && { invoiceDate: { gte: new Date(from) } }),
-      ...(to     && { invoiceDate: { lte: new Date(to + "T23:59:59") } }),
+      ...(Object.keys(invoiceDate).length > 0 && { invoiceDate }),
       ...(search && {
         OR: [
           { invoiceNumber: { contains: search } },
@@ -173,6 +194,7 @@ export const createInvoice = async (req, res, next) => {
       currency = "EUR", exchangeRate = 1,
       billingName, billingEmail, billingPhone, billingAddress, billingVat,
       notes, terms, reference,
+      invoiceDate,
       dueDate, isRecurring = false, recurringInterval, nextBillingDate,
       items = [],
     } = req.body;
@@ -206,6 +228,7 @@ export const createInvoice = async (req, res, next) => {
         currency, exchangeRate: rate, displayTotal,
         billingName, billingEmail, billingPhone, billingAddress, billingVat,
         notes, terms, reference,
+        invoiceDate:      invoiceDate ? new Date(invoiceDate) : new Date(),
         dueDate:         dueDate         ? new Date(dueDate)         : null,
         nextBillingDate: nextBillingDate ? new Date(nextBillingDate) : null,
         isRecurring,
@@ -398,7 +421,7 @@ export const listPayments = async (req, res, next) => {
 
     // On s'assure que search est bien une chaîne avant d'utiliser .trim()
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : "";
-    const status = req.query.status || undefined;
+     const status = req.query.status || undefined;
 
     // 2. Construction de l'objet de filtrage (Suppression du ": any")
     const where = {

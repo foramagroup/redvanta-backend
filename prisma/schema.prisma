@@ -47,9 +47,12 @@ model User {
   role             Role?       @relation(fields: [roleId], references: [id])
   companies        UserCompany[] 
   refreshTokens RefreshToken[]
-   invoices     Invoice[]
-   payments    Payment[]
+  invoices     Invoice[]
+  payments    Payment[]
+  nfcCards NFCCard[]
+  locations    Location[] @relation("OwnerLocations")
   auditLogs AuditLog[] @relation("AdminLogs")
+  changedStatuses OrderStatusHistory[] @relation("StatusChangedBy")
   @@index([email])
   @@map("users")
 }
@@ -102,24 +105,37 @@ model PlatformSetting {
 
 
 model Location {
-  id        String    @id @default(uuid()) @db.Char(36)
-  ownerId   Int?      @db.UnsignedInt
-  name      String
-  address   String?
+  id          Int      @id @default(autoincrement())
+  companyId   Int              
+  ownerId     Int      @db.UnsignedInt 
+  name        String   @db.VarChar(255) // "Downtown Flagship"
+  address     String?  @db.VarChar(500) // "123 Main St, New York, NY 10001"
+  googlePlaceId   String?  @db.VarChar(255)
+  googleReviewUrl String?  @db.VarChar(500)
+  googleMapsUrl   String?  @db.VarChar(500)
+  googleRating     Float?
+  googleReviewCount Int?    @default(0)
+  cardCount   Int      @default(0)
   city      String?
   postal    String?
   country   String?
   phone     String?
   email     String?
-  slug      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  nfcCards  NfcCard[]
-  nfctag    nfctag[]
+
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner       User     @relation("OwnerLocations", fields: [ownerId], references: [id], onDelete: Cascade)
+  nfcCards NFCCard[]
   reviews   Review[]
+  feedbacks Feedback[]
 
-  @@index([ownerId])
+  @@index([companyId])
+  @@index([googlePlaceId])
+  @@index([active])
   @@map("locations")
 }
 
@@ -142,35 +158,10 @@ model Conversion {
   @@map("conversions")
 }
 
-model NfcCard {
-  id         String    @id @default(uuid()) @db.Char(36)
-  locationId String
-  uid        String    @unique
-  title      String?
-  url        String?
-  createdAt  DateTime  @default(now())
-  location   Location  @relation(fields: [locationId], references: [id])
-  scans      NfcScan[]
-
-  @@index([locationId], map: "nfc_cards_locationId_fkey")
-  @@map("nfc_cards")
-}
-
-model NfcScan {
-  id        String   @id @default(uuid()) @db.Char(36)
-  cardId    String
-  userAgent String?
-  ip        String?
-  createdAt DateTime @default(now())
-  card      NfcCard  @relation(fields: [cardId], references: [id])
-
-  @@index([cardId], map: "nfc_scans_cardId_fkey")
-  @@map("nfc_scans")
-}
 
 model Review {
   id            String       @id @default(uuid()) @db.Char(36)
-  locationId    String
+  locationId    Int
   userId        String?
   userName      String?
   rating        Int
@@ -232,11 +223,28 @@ model Order {
   items       OrderItem[]
   Conversions Conversion[]
   payments    Payment[]
+  statusHistory OrderStatusHistory[]
 
 
   @@index([userId, companyId])
   @@index([status])
   @@map("order")
+}
+
+model OrderStatusHistory {
+  id          Int         @id @default(autoincrement())
+  orderId     Int
+  status      OrderStatus
+  note        String?     @db.VarChar(500) // note interne du superadmin
+  changedBy   Int?        @db.UnsignedInt  // userId du superadmin qui a changé
+  changedAt   DateTime    @default(now())
+
+  order       Order       @relation(fields: [orderId],   references: [id], onDelete: Cascade)
+  admin       User?       @relation("StatusChangedBy", fields: [changedBy], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([changedAt])
+  @@map("order_status_history")
 }
 
 
@@ -329,7 +337,7 @@ model NotificationLog {
   id         String           @id @default(uuid()) @db.Char(36)
   type       NotificationType
   userId     String?
-  locationId String?
+  locationId Int?
   status     String
   payload    String?
   error      String?
@@ -504,10 +512,10 @@ model dashboardstat {
     user        User        @relation(fields: [userId],    references: [id], onDelete: Cascade)
     company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
     product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-    cartItem    CartItem?
-    orderItem   OrderItem?
+    cartItem    CartItem[]
+    orderItem   OrderItem[]
     versions    DesignVersion[]
-    nfctags     nfctag[]
+    nfcCards  NFCCard[]
 
     @@index([userId, companyId])
     @@index([status])
@@ -578,30 +586,132 @@ model emailQueue {
   @@map("emailqueue")
 }
 
-model nfctag {
-  id         String    @id
-  uid        String?   @unique(map: "NFCTag_uid_key")
-  tagSerial  String?
-  qrCodeFile String?
-  payload    String?   @db.Text
-  used       Boolean   @default(false)
-  active     Boolean   @default(true)
-  locationId String?
-  productId  Int?
-  userId     String?
-  designId   Int?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now())
-  design     Design?   @relation(fields: [designId], references: [id], map: "NFCTag_designId_fkey")
-  locations  Location? @relation(fields: [locationId], references: [id], map: "NFCTag_locationId_fkey")
-  product    Product?  @relation(fields: [productId], references: [id], map: "NFCTag_productId_fkey")
-  scanlog    scanlog[]
 
-  @@index([designId], map: "NFCTag_designId_fkey")
-  @@index([locationId], map: "NFCTag_locationId_fkey")
-  @@index([productId], map: "NFCTag_productId_fkey")
-  @@index([userId], map: "NFCTag_userId_fkey")
+
+
+model NFCTag {
+  id          Int          @id @default(autoincrement())
+
+  // Identifiant physique de la puce (lu lors du scan NFC hardware)
+  // Optionnel car pas toujours lisible (ex: iPhone)
+  tagSerial   String?      @unique @db.VarChar(64)
+
+  // Type de puce (optionnel — gestion de stock multi-puces)
+  // ex: "NTAG213", "NTAG215", "NTAG216"
+  chipType    String?      @db.VarChar(50)
+
+  // Statut physique de la puce
+  status      NfcTagStatus @default(NEW)
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relation : une puce peut être associée à une carte métier
+  card        NFCCard?
+
+  @@index([status])
+  @@map("nfc_tags")
 }
+
+
+// NFCCard — Logique métier (carte vendue + utilisée)
+// Représente la carte telle que le client la reçoit et l'utilise
+// Contient TOUT ce qui est business : user, location, design, product
+// ─────────────────────────────────────────────────────────────
+model NFCCard {
+  id          Int           @id @default(autoincrement())
+
+  // uid : identifiant UUID unique stable — utilisé dans l'URL /r/{uid}
+  // C'est cet uid qui est encodé dans le payload (QR + puce NFC)
+  uid         String        @unique @db.VarChar(36)
+
+  // Relation vers la puce hardware (optionnel au moment de la création,
+  // assigné lors de la production physique)
+  tagId       Int?          @unique
+  tag         NFCTag?       @relation(fields: [tagId], references: [id], onDelete: SetNull)
+
+  // ── Logique métier ──────────────────────────────────────────
+  companyId   Int           // company propriétaire
+  userId      Int           @db.UnsignedInt  // admin/user qui a commandé
+  locationId  Int?          // établissement associé
+  designId    Int?          // design utilisé pour l'impression
+  orderItemId Int?            // item de commande qui a généré cette carte
+
+  // ── Payload (URL encodée dans QR + puce NFC) ────────────────
+  // Format : https://app.redvanta.com/r/{uid}
+  // JAMAIS le lien Google directement
+  payload     String?       @db.VarChar(500)
+
+  // URL du fichier image QR code généré
+  qrCodeUrl   String?       @db.VarChar(500)
+
+  // ── Données Google (destination finale) ─────────────────────
+  googlePlaceId   String?   @db.VarChar(255)
+  googleReviewUrl String?   @db.VarChar(500)
+  locationName    String?   @db.VarChar(255)
+  locationAddress String?   @db.VarChar(500)
+
+  // ── Cycle de vie ────────────────────────────────────────────
+  status      NfcCardStatus @default(NOT_PROGRAMMED)
+  active      Boolean       @default(false)  // false jusqu'à DELIVERED
+  used        Boolean       @default(false)  // a été scannée au moins une fois
+
+  // ── Analytics dénormalisés (performance) ────────────────────
+  scanCount           Int       @default(0)
+  googleRedirectCount Int       @default(0)
+  lastScannedAt       DateTime?
+
+  // ── Dates métier ────────────────────────────────────────────
+  generatedAt  DateTime?   // = date paiement
+  activatedAt  DateTime?   // = date livraison
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // ── Relations Prisma ────────────────────────────────────────
+  company     Company       @relation(fields: [companyId],  references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId],     references: [id], onDelete: Cascade)
+  location    Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  design      Design?       @relation(fields: [designId],   references: [id], onDelete: SetNull)
+  orderItem   OrderItem?    @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  scans       NfcScan[]
+  events      AnalyticsEvent[]
+
+  @@index([companyId])
+  @@index([locationId])
+  @@index([status])
+  @@index([active])
+  @@map("nfc_cards")
+}
+
+
+// ─── Scans NFC / QR ──────────────────────────────────────────
+// Chaque fois qu'un client scanne la carte → on enregistre le scan
+// Permet de savoir : combien de scans, d'où ils viennent, à quelle heure
+model NfcScan {
+  id         Int      @id @default(autoincrement())
+  cardUid    String   @db.VarChar(36)   // NFCCard.uid
+  companyId  Int
+
+  scanType   String   @default("qr") @db.VarChar(10) // "nfc" | "qr"
+  ipAddress  String?  @db.VarChar(45)
+  userAgent  String?  @db.VarChar(500)
+  deviceType String?  @db.VarChar(20)
+  country    String?  @db.VarChar(100)
+
+  scannedAt  DateTime @default(now())
+
+  card       NFCCard  @relation(fields: [cardUid],   references: [uid], onDelete: Cascade)
+  company    Company  @relation(fields: [companyId], references: [id],  onDelete: Cascade)
+
+  @@index([cardUid])
+  @@index([companyId])
+  @@index([scannedAt])
+  @@map("nfc_scans")
+}
+
+
+
 
 model OrderItem {
   id              Int      @id @default(autoincrement())
@@ -612,7 +722,7 @@ model OrderItem {
   quantity        Int      // = totalCards (alias afichage)
   unitPrice       Float    // prix/carte (snapshot)
   totalPrice      Float    // lineTotal (snapshot)
-  designId        Int?     @unique
+  designId        Int?     
   cardTypeId      String?
 
   order       Order              @relation(fields: [orderId],        references: [id], onDelete: Cascade)
@@ -620,10 +730,66 @@ model OrderItem {
   packageTier ProductPackageTier? @relation(fields: [packageTierId], references: [id], onDelete: SetNull)
   design      Design?            @relation(fields: [designId],       references: [id], onDelete: SetNull)
   cardType    CardType?          @relation(fields: [cardTypeId],     references: [id], onDelete: SetNull)
-
+  nfcCards  NFCCard[]
   @@index([orderId])
+  @@index([designId])
   @@map("order_items")
 }
+
+
+
+model AnalyticsEvent {
+  id          Int                @id @default(autoincrement())
+  cardUid     String             @db.VarChar(36)
+  companyId   Int
+
+  type        AnalyticsEventType
+  stars       Int?
+
+  ipAddress       String?  @db.VarChar(45)
+  userAgent       String?  @db.VarChar(500)
+  deviceType      String?  @db.VarChar(20)
+  country         String?  @db.VarChar(100)
+  city            String?  @db.VarChar(100)
+  referrer        String?  @db.VarChar(500)
+  fingerprintHash String?  @db.VarChar(64)
+
+  occurredAt  DateTime @default(now())
+
+  card        NFCCard  @relation(fields: [cardUid],   references: [uid], onDelete: Cascade)
+  company     Company  @relation(fields: [companyId], references: [id],  onDelete: Cascade)
+
+  @@index([cardUid])
+  @@index([companyId])
+  @@index([type])
+  @@index([occurredAt])
+  @@map("analytics_events")
+}
+
+// ─── Feedback (avis négatif interne — 1-3 étoiles) ───────────
+// Le scénario : "Cas négatif → affichage d'un formulaire interne"
+model Feedback {
+  id         Int      @id @default(autoincrement())
+  cardUid    String   @db.VarChar(36)
+  companyId  Int
+  locationId Int?
+
+  stars      Int      // 1-3
+  message    String?  @db.Text
+  email      String?  @db.VarChar(255)
+  notifiedAt DateTime?
+
+  createdAt  DateTime @default(now())
+
+  company    Company   @relation(fields: [companyId],  references: [id],  onDelete: Cascade)
+  location   Location? @relation(fields: [locationId], references: [id],  onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([cardUid])
+  @@map("feedbacks")
+}
+
+
 
 model payoutrequest {
   id               String    @id
@@ -661,7 +827,7 @@ model ShippingRate {
 
 model scanlog {
   id       String   @id
-  nfcTagId String
+  nfcTagId Int
   ip       String?
   agent    String?
   lat      Float?
@@ -669,9 +835,7 @@ model scanlog {
   country  String?
   city     String?
   at       DateTime @default(now())
-  nfctag   nfctag   @relation(fields: [nfcTagId], references: [id], map: "ScanLog_nfcTagId_fkey")
-
-  @@index([nfcTagId], map: "ScanLog_nfcTagId_fkey")
+  
 }
 
 model setting {
@@ -1243,6 +1407,13 @@ model Company {
   orders     Order[]
   invoices     Invoice[]
   payments    Payment[]
+  locations   Location[]
+
+ cards    NFCCard[]
+ scans    NfcScan[]
+
+  feedbacks   Feedback[]  // Tous les feedbacks reçus par l'entreprise
+  analytics   AnalyticsEvent[]
   @@map("companies")
 }
 
@@ -1309,8 +1480,6 @@ model Product {
   upsells         upsell[]
   designs Design[]
 
-
-  nfctags  nfctag[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1523,13 +1692,14 @@ enum CardModel {
 }
 
 enum OrderStatus {
-  pending
-  paid
-  processing
-  shipped
-  delivered
-  cancelled
-  refunded
+  pending      // PaymentIntent créé, pas encore payé
+  paid         // Paiement confirmé par Stripe webhook
+  production   // En cours de fabrication
+  printed      // Imprimé + contrôle qualité
+  shipped      // Expédié — tracking number disponible
+  delivered    // Livré
+  cancelled    // Annulé
+  refunded     // Remboursé
 }
 
 enum ShippingMethod {
@@ -1561,4 +1731,28 @@ enum PaymentMethodType {
   other
 }
 
+
+enum NfcCardStatus {
+  NOT_PROGRAMMED  // tag associé, pas encore encodé physiquement
+  PRINTED         // carte imprimée
+  SHIPPED         // expédiée
+  DELIVERED       // livrée (mais pas encore activée par l'utilisateur)
+  ACTIVE          // activée — peut recevoir des scans
+  DISABLED        // désactivée manuellement
+}
+
+
+enum NfcTagStatus {
+  NEW          // puce en stock, jamais programmée
+  PROGRAMMED   // puce encodée avec une URL
+  DEFECTIVE    // puce défectueuse
+}
+
+enum AnalyticsEventType {
+  SCAN
+  PAGE_VIEW
+  RATING_SELECTED
+  GOOGLE_REDIRECT
+  FEEDBACK_SUBMITTED
+}
 
