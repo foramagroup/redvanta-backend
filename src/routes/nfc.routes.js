@@ -4,9 +4,10 @@ import {
   getMyCards, getMyNfcStats, getMyFeedbacks,
 } from "../controllers/nfc.controller.js";
 
-
-export const clientNfcRouter = Router();
+export const router = Router();
 const auth = [authenticateAdmin, requireAdmin];
-clientNfcRouter.get("/stats",     ...auth, getMyNfcStats);
-clientNfcRouter.get("/cards",     ...auth, getMyCards);
-clientNfcRouter.get("/feedbacks", ...auth, getMyFeedbacks);
+router.get("/stats",     ...auth, getMyNfcStats);
+router.get("/cards",     ...auth, getMyCards);
+router.get("/feedbacks", ...auth, getMyFeedbacks);
+
+export default router;

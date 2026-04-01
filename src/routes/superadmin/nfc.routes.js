@@ -15,3 +15,5 @@ router.patch("/cards/:uid/toggle",     ...auth, toggleCard);
 router.get("/tags",                    ...auth, listAllTags);
 router.post("/tags",                   ...auth, addTag);
 router.patch("/tags/:id/assign",       ...auth, assignTag);
+
+export default router;

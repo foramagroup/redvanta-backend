@@ -24,6 +24,7 @@ import dashboardRoutes from "./routes/dashboardRoutes.js";
 import authAdminRoutes from "./routes/authRoutes.js";
 import orderAdminRoutes from "./routes/order.routes.js";
 import locationRoutes from "./routes/location.routes.js";
+import nfcAdminRoutes from "./routes/nfc.routes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -49,6 +50,7 @@ import authSuperAdminRoutes from "./routes/superadmin/authRoutes.js";
 import emailServerConfigRoutes from "./routes/superadmin/emailServerConfigRoutes.js";
 import statusRoutes from "./routes/superadmin/statusRoutes.js";
 import billingRoutes from "./routes/superadmin/billing.routes.js";
+import nfcSuperAdminRoutes from "./routes/superadmin/nfc.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -57,6 +59,7 @@ import settingClientRoutes from "./routes/client/settingClientRoutes.js";
 import clientAuthRoutes from "./routes/client/clientAuthRoutes.js";
 import placesRoutes from "./routes/client/Googleplaces.routes.js";
 import orderClientRoutes   from "./routes/client/Order.route.js";
+import nfcClientRoutes   from "./routes/client/nfc.routes.js";
 
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
@@ -155,6 +158,14 @@ app.use(
 );
 app.use("/download", express.static(path.join(process.cwd(), "downloads")));
 
+app.use("/public/uploads", 
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  },
+  express.static("public/uploads")
+);
+
 // --------------------
 // ROUTES
 // --------------------
@@ -195,6 +206,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/auth", clientAuthRoutes);
   app.use("/api/client/places", placesRoutes);
   app.use("/api/client/orders", orderClientRoutes);
+  app.use("/api/client/nfc", nfcClientRoutes);
   startSuspendUnverifiedJob();
 
 
@@ -205,6 +217,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/admin/auth", authAdminRoutes);
   app.use("/api/admin/orders", orderAdminRoutes);
   app.use("/api/admin/locations", locationRoutes);
+  app.use('/api/admin/nfc', nfcAdminRoutes);
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/admin/affiliates", requireAuth, requireAdmin, adminAffiliateController);
@@ -244,6 +257,9 @@ app.use("/api/customization", customizationRoutes);
   // gestion product
   app.use('/api/superadmin/products', productAdminRoutes);
   app.use('/api/superadmin/card-types', cardTypeAdminRoutes);
+
+  //gestion NFC
+  app.use('/api/superadmin/nfc', nfcSuperAdminRoutes);
 
   // gestion companies
   app.use('/api/superadmin/companies', companyRoutes);
