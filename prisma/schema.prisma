@@ -744,10 +744,8 @@ model AnalyticsEvent {
   id          Int                @id @default(autoincrement())
   cardUid     String             @db.VarChar(36)
   companyId   Int
-
   type        AnalyticsEventType
   stars       Int?
-
   ipAddress       String?  @db.VarChar(45)
   userAgent       String?  @db.VarChar(500)
   deviceType      String?  @db.VarChar(20)
