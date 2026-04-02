@@ -4,8 +4,8 @@ import { authenticateSuperAdmin, requireSuperAdmin } from "../../middleware/auth
 import {
   getStats, listInvoices, getInvoice,
   createInvoice, updateInvoice, refundInvoice,
-  addManualPayment, listPayments, retryPayment,getPayment, deleteInvoice
-} from "../../controllers/superadmin/Billing.controller.js";
+  addManualPayment, listPayments, retryPayment
+} from "../../controllers/superadmin/billing.controller.js";
 
 const router = Router();
 const auth   = [authenticateSuperAdmin, requireSuperAdmin];
@@ -18,7 +18,7 @@ router.get("/invoices",     ...auth, listInvoices);
 router.get("/invoices/:id", ...auth, getInvoice);
 router.post("/invoices",     ...auth, createInvoice);
 router.put("/invoices/:id", ...auth, updateInvoice);
-router.delete("/invoices/:id", ...auth, deleteInvoice);
+// router.delete("/invoices/:id", ...auth, deleteInvoice);
 
 // Actions sur factures
 router.post("/invoices/:id/refund",  ...auth, refundInvoice);
@@ -26,7 +26,7 @@ router.post("/invoices/retry",  ...auth, retryPayment);
 
 // Paiements manuels
 router.get ("/payments",     ...auth, listPayments);
-router.get ("/payments/:id", ...auth, getPayment);
+// router.get ("/payments/:id", ...auth, getPayment);
 router.post("/payments",     ...auth, addManualPayment);
 
 export default router;

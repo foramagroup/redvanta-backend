@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticateAdmin, requireAdmin } from "../../middleware/auth.middleware.js";
+import { authenticateAdmin, requireAdmin } from "../middleware/auth.middleware.js";
 import {
   getMyCards, getMyNfcStats, getMyFeedbacks,
 } from "../controllers/nfc.controller.js";

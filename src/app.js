@@ -25,6 +25,7 @@ import authAdminRoutes from "./routes/authRoutes.js";
 import orderAdminRoutes from "./routes/order.routes.js";
 import locationRoutes from "./routes/location.routes.js";
 import nfcAdminRoutes from "./routes/nfc.routes.js";
+import reviewAdminRoutes from "./routes/reviews.routes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -51,6 +52,7 @@ import emailServerConfigRoutes from "./routes/superadmin/emailServerConfigRoutes
 import statusRoutes from "./routes/superadmin/statusRoutes.js";
 import billingRoutes from "./routes/superadmin/billing.routes.js";
 import nfcSuperAdminRoutes from "./routes/superadmin/nfc.routes.js";
+import orderSuperAdminRoutes from "./routes/superadmin/order.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -210,14 +212,14 @@ app.use("/api/customization", customizationRoutes);
   startSuspendUnverifiedJob();
 
 
-
-
 // *************Ges Routes Admin***************
   //auth admin
   app.use("/api/admin/auth", authAdminRoutes);
   app.use("/api/admin/orders", orderAdminRoutes);
   app.use("/api/admin/locations", locationRoutes);
   app.use('/api/admin/nfc', nfcAdminRoutes);
+  app.use('/api/admin/reviews', reviewAdminRoutes);
+
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);
   app.use("/api/admin/affiliates", requireAuth, requireAdmin, adminAffiliateController);
@@ -257,6 +259,9 @@ app.use("/api/customization", customizationRoutes);
   // gestion product
   app.use('/api/superadmin/products', productAdminRoutes);
   app.use('/api/superadmin/card-types', cardTypeAdminRoutes);
+
+  //gestion Orders
+  app.use('/api/superadmin/orders', orderSuperAdminRoutes);
 
   //gestion NFC
   app.use('/api/superadmin/nfc', nfcSuperAdminRoutes);

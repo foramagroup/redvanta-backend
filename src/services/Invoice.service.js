@@ -3,11 +3,13 @@
 import prisma from "../config/database.js";
 
 
+
 export async function generateInvoiceNumber() {
   const year  = new Date().getFullYear();
   const count = await prisma.invoice.count();
   return `INV-${year}-${String(count + 1).padStart(6, "0")}`;
 }
+
 
 export async function createInvoiceFromOrder(order) {
   const existing = await prisma.invoice.findUnique({
@@ -16,7 +18,6 @@ export async function createInvoiceFromOrder(order) {
   if (existing) return existing;
 
   const invoiceNumber = await generateInvoiceNumber();
-
 
   const invoiceItems = order.items.map((item) => {
     const productName = item.product?.translations?.[0]?.title ?? "Smart Review Card";
@@ -181,3 +182,54 @@ export function formatInvoice(inv) {
     createdAt: inv.createdAt,
   };
 }
+
+
+export async function createUnpaidInvoice(order) {
+  const invoiceNumber = await generateInvoiceNumber();
+  const items = (order.items ?? []).map((i) => {
+    const sub = Number(i.totalPrice);
+    return {
+      service:     i.product?.translations?.[0]?.title ?? "Product",
+      description: null,
+      quantity:    i.totalCards  ?? i.quantity ?? 1,
+      unit:        "pcs",
+      unitPrice:   Number(i.unitPrice),
+      discount:    0,
+      taxRate:     0,
+      taxAmount:   0,
+      subtotal:    sub,
+      total:       sub,
+    };
+  });
+ 
+  const invoice = await prisma.invoice.create({
+    data: {
+      invoiceNumber,
+      orderId:    order.id,
+      companyId:  order.companyId,
+      userId:     order.userId,
+      // ── UNPAID : en attente de confirmation du superadmin ──
+      status:     "unpaid",
+      // Pas de paidAt
+      subtotal:     Number(order.subtotal),
+      taxAmount:    0,
+      shippingCost: Number(order.shippingCost),
+      total:        Number(order.total),
+      currency:     order.currency     ?? "EUR",
+      exchangeRate: Number(order.exchangeRate ?? 1),
+      displayTotal: order.displayTotal ? Number(order.displayTotal) : Number(order.total),
+      billingName:  order.user?.name        ?? null,
+      billingEmail: order.user?.email       ?? null,
+      paymentMethod: order.manualPaymentMethod?.name ?? "Manuel",
+      invoiceDate:  new Date(),
+      dueDate:      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // +7 jours
+      items: { create: items },
+    },
+  });
+ 
+  console.log(`[order] Facture ${invoiceNumber} créée (status=unpaid) pour commande #${order.orderNumber}`);
+  return invoice;
+}
+
+
+

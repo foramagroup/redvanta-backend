@@ -1,4 +1,20 @@
-
+// src/controllers/cart.controller.js
+// ─────────────────────────────────────────────────────────────
+// Deux types de produits supportés :
+//
+//   TYPE A — Avec packageTiers (cartes NFC, stickers, plaques...)
+//     Body: { productId, packageTierId, cardTypeId? }
+//     → Prix et quantité viennent du tier
+//     → Design créé automatiquement avec les infos company
+//
+//   TYPE B — Sans packageTiers (add-ons, services, accès API...)
+//     Body: { productId, quantity?, cardTypeId? }
+//     → Prix vient directement du product.price
+//     → quantity défaut = 1, modifiable via PUT
+//     → Pas de design créé (produit non physique)
+//
+// La logique détecte le type selon la présence de packageTiers sur le produit
+// ─────────────────────────────────────────────────────────────
 
 import prisma from "../../config/database.js";
 
@@ -14,31 +30,39 @@ const CART_INCLUDE = {
   cardType:    true,
 };
 
-
+// ─── Format item ──────────────────────────────────────────────
 
 function formatItem(item) {
-  const title = item.product?.translations?.[0]?.title ?? "Product";
+  const title    = item.product?.translations?.[0]?.title ?? "Product";
+  const hasTiers = (item.product?.packageTiers?.length ?? 0) > 0;
+
   return {
     id:          item.id,
     productId:   item.productId,
     productName: title,
-    // Package tier info
+    productType: hasTiers ? "tiered" : "simple",  // utile pour le front
+
+    // ── Type A — avec tiers ──────────────────────────────────
     packageTier: item.packageTier
       ? { id: item.packageTier.id, qty: item.packageTier.qty, price: Number(item.packageTier.price) }
       : null,
+    availableTiers: hasTiers
+      ? item.product.packageTiers.map((t) => ({ id: t.id, qty: t.qty, price: Number(t.price) }))
+      : [],
 
-    availableTiers: item.product?.packageTiers?.map((t) => ({
-      id: t.id,
-      qty: t.qty,
-      price: Number(t.price),
-    })) || [],
+    // ── Type B — sans tiers ──────────────────────────────────
+    quantity:   item.quantity   ?? 1,
 
-    totalCards: item.totalCards,
+    // ── Commun ───────────────────────────────────────────────
+    totalCards: item.totalCards ?? 0,
     unitPrice:  Number(item.unitPrice),
     lineTotal:  Number(item.lineTotal),
-    cardType:   item.cardType
+
+    cardType: item.cardType
       ? { id: item.cardType.id, name: item.cardType.name, color: item.cardType.color }
       : null,
+
+    // Design uniquement pour les produits physiques (Type A)
     design: item.design ? {
       id:           item.design.id,
       status:       item.design.status,
@@ -47,11 +71,12 @@ function formatItem(item) {
       orientation:  item.design.orientation,
       version:      item.design.version,
       validatedAt:  item.design.validatedAt,
+      isDefault:    item.design.status === "draft" && !item.design.validatedAt,
     } : null,
+
     createdAt: item.createdAt,
   };
 }
-
 
 function getCompanyId(req) {
   const id = req.user?.companyId;
@@ -59,164 +84,278 @@ function getCompanyId(req) {
   return parseInt(id);
 }
 
+// ─── Créer un design par défaut lié à la company ─────────────
+// Uniquement pour les produits physiques (Type A)
+async function createDefaultDesign(tx, { userId, companyId, productId, company }) {
+  return tx.design.create({
+    data: {
+      userId, companyId, productId,
+      businessName:    company?.name            ?? null,
+      accentColor:     company?.primaryColor    ?? "#E10600",
+      googlePlaceId:   company?.googlePlaceId   ?? null,
+      googleReviewUrl: company?.googleReviewUrl ?? null,
+    },
+  });
+}
 
+// ─────────────────────────────────────────────────────────────
 // GET /api/cart
+// ─────────────────────────────────────────────────────────────
+
 export const getCart = async (req, res, next) => {
   try {
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
-    const items    = await prisma.cartItem.findMany({
+
+    const items = await prisma.cartItem.findMany({
       where: { userId, companyId }, include: CART_INCLUDE, orderBy: { createdAt: "asc" },
     });
+
     const formatted  = items.map(formatItem);
     const subtotal   = formatted.reduce((s, i) => s + i.lineTotal, 0);
-    const totalCards = formatted.reduce((s, i) => s + i.totalCards, 0);
-    res.json({ success: true, data: { items: formatted, itemCount: items.length, totalCards, subtotal, companyId } });
+    const totalCards = formatted.reduce((s, i) => s + (i.totalCards ?? 0), 0);
+
+    res.json({
+      success: true,
+      data: { items: formatted, itemCount: items.length, totalCards, subtotal, companyId },
+    });
   } catch (e) { next(e); }
 };
 
+// ─────────────────────────────────────────────────────────────
 // POST /api/cart
-// Body : { productId, packageTierId, cardTypeId? }
+// ─────────────────────────────────────────────────────────────
+// Type A : { productId, packageTierId, cardTypeId? }
+// Type B : { productId, quantity?,     cardTypeId? }
+
 export const addToCart = async (req, res, next) => {
   try {
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
-    const { productId, packageTierId, cardTypeId } = req.body;
+    const { productId, packageTierId, quantity, cardTypeId } = req.body;
 
-    if (!productId || !packageTierId) {
-      return res.status(422).json({ success: false, error: "productId et packageTierId requis" });
+    if (!productId) {
+      return res.status(422).json({ success: false, error: "productId requis" });
     }
 
-    // Vérifier que le produit existe et est actif
-    const product = await prisma.product.findUnique({ where: { id: parseInt(productId) } });
+    // Charger le produit avec ses tiers
+    const product = await prisma.product.findUnique({
+      where:   { id: parseInt(productId) },
+      include: { packageTiers: { orderBy: { qty: "asc" } } },
+    });
     if (!product || !product.active) {
       return res.status(404).json({ success: false, error: "Produit introuvable ou inactif" });
     }
 
-    // Vérifier que le tier appartient bien à ce produit
-    const tier = await prisma.productPackageTier.findFirst({
-      where: { id: parseInt(packageTierId), productId: parseInt(productId) },
-    });
-    if (!tier) {
-      return res.status(422).json({ success: false, error: "Palier de prix introuvable pour ce produit" });
+    const hasTiers = product.packageTiers.length > 0;
+
+    // ── Validation ────────────────────────────────────────────
+    if (hasTiers && !packageTierId) {
+      // Produit tiered sans tier fourni → retourner les options
+      return res.status(422).json({
+        success: false,
+        error:   "Ce produit requiert un packageTierId — choisissez un palier de quantité",
+        availableTiers: product.packageTiers.map((t) => ({
+          id: t.id, qty: t.qty, price: Number(t.price),
+        })),
+      });
     }
 
-    // Calculer le prix total de la ligne
-    const unitPrice = Number(tier.price);
-    const lineTotal = tier.qty * unitPrice;
+    if (!hasTiers && !product.price) {
+      return res.status(422).json({ success: false, error: "Ce produit n'a pas de prix configuré" });
+    }
 
-    const item = await prisma.cartItem.create({
-      data: {
-        userId, companyId,
-        productId:    product.id,
-        packageTierId: tier.id,
-        totalCards:   tier.qty,
-        unitPrice,
-        lineTotal,
-        cardTypeId:   cardTypeId || null,
-      },
-      include: CART_INCLUDE,
+    // ── Résoudre tier si applicable ───────────────────────────
+    let tier = null;
+    if (packageTierId) {
+      tier = product.packageTiers.find((t) => t.id === parseInt(packageTierId));
+      if (!tier) {
+        return res.status(422).json({ success: false, error: "Palier de prix introuvable pour ce produit" });
+      }
+    }
+
+    // ── Calculer prix / quantité / cartes ─────────────────────
+    let unitPrice, lineTotal, totalCards, resolvedQty;
+
+    if (tier) {
+      // Type A
+      unitPrice   = Number(tier.price);
+      totalCards  = tier.qty;
+      resolvedQty = tier.qty;
+      lineTotal   = totalCards * unitPrice;
+    } else {
+      // Type B
+      resolvedQty = Math.max(1, parseInt(quantity) || 1);
+      unitPrice   = Number(product.price);
+      totalCards  = 0;
+      lineTotal   = resolvedQty * unitPrice;
+    }
+
+    // ── Transaction ───────────────────────────────────────────
+    const item = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.findUnique({
+        where:  { id: companyId },
+        select: { name: true, primaryColor: true, googlePlaceId: true, googleReviewUrl: true },
+      });
+
+      // Créer le CartItem
+      const cartItem = await tx.cartItem.create({
+        data: {
+          userId, companyId,
+          productId:     product.id,
+          packageTierId: tier?.id   ?? null,
+          totalCards,
+          quantity:      resolvedQty,
+          unitPrice,
+          lineTotal,
+          cardTypeId:    cardTypeId || null,
+        },
+      });
+
+      // Type A uniquement → design par défaut
+      if (tier) {
+        const design = await createDefaultDesign(tx, {
+          userId, companyId, productId: product.id, company,
+        });
+        await tx.cartItem.update({
+          where: { id: cartItem.id },
+          data:  { designId: design.id },
+        });
+      }
+
+      return tx.cartItem.findUnique({ where: { id: cartItem.id }, include: CART_INCLUDE });
     });
 
     res.status(201).json({ success: true, data: formatItem(item) });
   } catch (e) { next(e); }
 };
 
-
+// ─────────────────────────────────────────────────────────────
 // POST /api/cart/sync
+// Panier guest → DB après connexion
+// ─────────────────────────────────────────────────────────────
+
 export const syncCart = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
-    const companyId = req.user.companyId; 
-    const { items } = req.body; 
+    const userId    = req.user.userId;
+    const companyId = req.user.companyId;
+    const { items } = req.body;
 
     if (!items || !Array.isArray(items)) {
       return res.status(400).json({ success: false, error: "Format de panier invalide" });
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.findUnique({
+        where:  { id: parseInt(companyId) },
+        select: { name: true, primaryColor: true, googlePlaceId: true, googleReviewUrl: true },
+      });
+
       const createdItems = [];
 
       for (const localItem of items) {
-        const { productId, packageTierId, cardTypeId } = localItem;
+        const { productId, packageTierId, quantity, cardTypeId } = localItem;
 
-        const tier = await tx.productPackageTier.findFirst({
-          where: { 
-            id: parseInt(packageTierId), 
-            productId: parseInt(productId),
-            product: { active: true } 
-          },
-          include: { product: true }
+        const product = await tx.product.findFirst({
+          where:   { id: parseInt(productId), active: true },
+          include: { packageTiers: true },
         });
+        if (!product) continue;
 
-        if (!tier) continue; 
+        const hasTiers = product.packageTiers.length > 0;
+        let tier = null;
+        let unitPrice, lineTotal, totalCards, resolvedQty;
 
-        // 2. Calcul du snapshot (comme dans ton addToCart)
-        const unitPrice = Number(tier.price);
-        const lineTotal = tier.qty * unitPrice;
+        if (hasTiers) {
+          if (!packageTierId) continue; // requis pour ce type
+          tier = product.packageTiers.find((t) => t.id === parseInt(packageTierId));
+          if (!tier) continue;
+          unitPrice   = Number(tier.price);
+          totalCards  = tier.qty;
+          resolvedQty = tier.qty;
+          lineTotal   = totalCards * unitPrice;
+        } else {
+          if (!product.price) continue;
+          resolvedQty = Math.max(1, parseInt(quantity) || 1);
+          unitPrice   = Number(product.price);
+          totalCards  = 0;
+          lineTotal   = resolvedQty * unitPrice;
+        }
 
-        // 3. Création dans la base
-        const newItem = await tx.cartItem.create({
+        const cartItem = await tx.cartItem.create({
           data: {
-            userId,
-            companyId,
-            productId: tier.productId,
-            packageTierId: tier.id,
-            totalCards: tier.qty,
-            unitPrice,
-            lineTotal,
+            userId, companyId,
+            productId:     product.id,
+            packageTierId: tier?.id ?? null,
+            totalCards,
+            quantity:      resolvedQty,
+            unitPrice, lineTotal,
             cardTypeId: cardTypeId || null,
-          }
+          },
         });
-        
-        createdItems.push(newItem);
+
+        if (tier) {
+          const design = await createDefaultDesign(tx, {
+            userId, companyId, productId: product.id, company,
+          });
+          await tx.cartItem.update({ where: { id: cartItem.id }, data: { designId: design.id } });
+        }
+
+        createdItems.push(cartItem);
       }
+
       return createdItems;
     });
 
-    res.status(201).json({ 
-      success: true, 
-      count: result.length,
-      message: "Panier synchronisé avec succès" 
-    });
-
-  } catch (e) {
-    next(e);
-  }
+    res.status(201).json({ success: true, count: result.length, message: "Panier synchronisé avec succès" });
+  } catch (e) { next(e); }
 };
 
+// ─────────────────────────────────────────────────────────────
 // PUT /api/cart/:id
-// Permet de changer le packageTier ou le cardType
+// Type A : changer de tier | Type B : changer la quantité
+// Les deux : changer le cardType
+// ─────────────────────────────────────────────────────────────
+
 export const updateCartItem = async (req, res, next) => {
   try {
     const id        = parseInt(req.params.id);
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
-    const { packageTierId, cardTypeId } = req.body;
+    const { packageTierId, quantity, cardTypeId } = req.body;
 
     const existing = await prisma.cartItem.findFirst({
-      where: { id, userId, companyId }, include: { packageTier: true },
+      where:   { id, userId, companyId },
+      include: { packageTier: true, product: { include: { packageTiers: true } } },
     });
     if (!existing) return res.status(404).json({ success: false, error: "Item introuvable" });
 
+    const hasTiers = existing.product?.packageTiers?.length > 0;
     let updateData = {};
 
-    // Changer de palier de prix
-    if (packageTierId && packageTierId !== existing.packageTierId) {
-      const tier = await prisma.productPackageTier.findFirst({
-        where: { id: parseInt(packageTierId), productId: existing.productId },
-      });
+    // Type A — changer de tier
+    if (hasTiers && packageTierId && packageTierId !== existing.packageTierId) {
+      const tier = existing.product.packageTiers.find((t) => t.id === parseInt(packageTierId));
       if (!tier) return res.status(422).json({ success: false, error: "Palier introuvable" });
-
       updateData = {
         packageTierId: tier.id,
         totalCards:    tier.qty,
+        quantity:      tier.qty,
         unitPrice:     Number(tier.price),
         lineTotal:     tier.qty * Number(tier.price),
       };
     }
 
-    // Changer le type de carte
+    // Type B — changer la quantité
+    if (!hasTiers && quantity !== undefined) {
+      const qty = Math.max(1, parseInt(quantity) || 1);
+      updateData = {
+        quantity: qty,
+        lineTotal: qty * Number(existing.unitPrice),
+      };
+    }
+
+    // Commun — changer le cardType
     if (cardTypeId !== undefined) {
       updateData.cardTypeId = cardTypeId || null;
     }
@@ -233,24 +372,42 @@ export const updateCartItem = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-
-
+// ─────────────────────────────────────────────────────────────
 // DELETE /api/cart/:id
+// Supprime l'item + le design draft associé (Type A uniquement)
+// ─────────────────────────────────────────────────────────────
+
 export const removeFromCart = async (req, res, next) => {
   try {
     const id        = parseInt(req.params.id);
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
 
-    const existing = await prisma.cartItem.findFirst({ where: { id, userId, companyId } });
+    const existing = await prisma.cartItem.findFirst({
+      where: { id, userId, companyId }, include: { design: true },
+    });
     if (!existing) return res.status(404).json({ success: false, error: "Item introuvable" });
 
-    await prisma.cartItem.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.cartItem.delete({ where: { id } });
+
+      // Supprimer le design draft uniquement si aucun autre item ne l'utilise
+      if (existing.designId && existing.design?.status === "draft") {
+        const otherUses = await tx.cartItem.count({ where: { designId: existing.designId } });
+        if (otherUses === 0) {
+          await tx.design.delete({ where: { id: existing.designId } }).catch(() => {});
+        }
+      }
+    });
+
     res.json({ success: true, message: "Item supprimé du panier" });
   } catch (e) { next(e); }
 };
 
+// ─────────────────────────────────────────────────────────────
 // DELETE /api/cart
+// ─────────────────────────────────────────────────────────────
+
 export const clearCart = async (req, res, next) => {
   try {
     const userId    = req.user.userId;

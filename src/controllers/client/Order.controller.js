@@ -1,7 +1,7 @@
 
 import prisma  from "../../config/database.js";
 import { getStripe, getWebhookSecret } from "../../services/Stripe.service.js";
-import { createInvoiceFromOrder, formatInvoice } from "../../services/Invoice.service.js";
+import { createInvoiceFromOrder, formatInvoice, generateInvoiceNumber, createUnpaidInvoice} from "../../services/Invoice.service.js";
 import { sendTemplatedMail }  from "../../services/client/mail.service.js";
 import {
   buildOrderConfirmationCustomer,
@@ -24,16 +24,17 @@ async function generateOrderNumber() {
 
 function formatOrder(o) {
   return {
-    id:           o.id,
-    orderNumber:  o.orderNumber,
-    status:       o.status,
-    companyId:    o.companyId,
-    subtotal:     Number(o.subtotal),
-    shippingCost: Number(o.shippingCost),
-    total:        Number(o.total),
-    currency:     o.currency     ?? "EUR",
-    displayTotal: o.displayTotal ? Number(o.displayTotal) : null,
-    exchangeRate: o.exchangeRate  ? Number(o.exchangeRate) : 1,
+    id:            o.id,
+    orderNumber:   o.orderNumber,
+    status:        o.status,
+    paymentMethod: o.paymentMethod ?? "stripe",
+    companyId:     o.companyId,
+    subtotal:      Number(o.subtotal),
+    shippingCost:  Number(o.shippingCost),
+    total:         Number(o.total),
+    currency:      o.currency     ?? "EUR",
+    displayTotal:  o.displayTotal ? Number(o.displayTotal) : null,
+    exchangeRate:  o.exchangeRate  ? Number(o.exchangeRate) : 1,
     shipping: {
       fullName: o.shippingFullName,  address:  o.shippingAddress,
       city:     o.shippingCity,      state:    o.shippingState,
@@ -41,8 +42,8 @@ function formatOrder(o) {
       method:   o.shippingMethod,
     },
     stripeClientSecret: o.stripeClientSecret ?? null,
-    paidAt:     o.paidAt,
-    createdAt:  o.createdAt,
+    paidAt:    o.paidAt,
+    createdAt: o.createdAt,
     items: o.items?.map((i) => ({
       id:          i.id,
       productName: i.product?.translations?.[0]?.title ?? "Product",
@@ -77,7 +78,6 @@ export const getShippingRates = async (req, res, next) => {
 };
 
 
-
 // ─── POST /api/orders ─────────────────────────────────────────
 export const createOrder = async (req, res, next) => {
   try {
@@ -89,10 +89,28 @@ export const createOrder = async (req, res, next) => {
       shippingMethod,
       currency     = "EUR",
       exchangeRate = 1,
+      paymentMethod  = "stripe",
+      paymentMethodId = null,
     } = req.body;
 
-    const cartItems = await prisma.cartItem.findMany({
-      where:   { userId, companyId },
+    const isStripe = paymentMethod === "stripe";
+    const isManual = paymentMethod === "manual";
+
+    if (!isStripe && !isManual) {
+      return res.status(422).json({ success: false, error: "paymentMethod invalide : 'stripe' | 'manual'" });
+    }
+
+    let manualMethod = null;
+    if (isManual) {
+      if (!paymentMethodId) return res.status(422).json({ success: false, error: "paymentMethodId requis" });
+      manualMethod = await prisma.manualPaymentMethod.findFirst({
+        where: { id: parseInt(paymentMethodId), status: "Active" },
+      });
+      if (!manualMethod) return res.status(422).json({ success: false, error: "Méthode manuelle introuvable ou inactive" });
+    }
+
+     const cartItems = await prisma.cartItem.findMany({
+      where: { userId, companyId },
       include: {
         product:     { include: { translations: { take: 1, orderBy: { langId: "asc" } } } },
         design:      true,
@@ -102,17 +120,25 @@ export const createOrder = async (req, res, next) => {
     });
 
     if (!cartItems.length) return res.status(422).json({ success: false, error: "Votre panier est vide" });
+        // const unvalidated = cartItems.filter(
+        //   (i) => i.design && !["validated", "locked"].includes(i.design.status)
+        // );
+        // if (unvalidated.length) {
+        //   return res.status(422).json({
+        //     success: false,
+        //     error:   `${unvalidated.length} design(s) non validé(s).`,
+        //     code:    "DESIGNS_NOT_VALIDATED",
+        //   });
+        // }
 
-    const unvalidated = cartItems.filter(
-      (i) => i.design && !["validated", "locked"].includes(i.design.status)
-    );
-    if (unvalidated.length) {
-      return res.status(422).json({
-        success: false,
-        error:   `${unvalidated.length} design(s) non validé(s).`,
-        code:    "DESIGNS_NOT_VALIDATED",
-      });
-    }
+        const alreadyLocked = cartItems.filter((i) => i.design?.status === "locked");
+        if (alreadyLocked.length) {
+          return res.status(422).json({
+            success: false,
+            error:   `${alreadyLocked.length} design(s) déjà verrouillé(s) par une commande existante.`,
+            code:    "DESIGNS_ALREADY_LOCKED",
+          });
+        }
 
     const shippingRate = await prisma.shippingRate.findUnique({
       where: { method: shippingMethod || "standard" },
@@ -122,84 +148,110 @@ export const createOrder = async (req, res, next) => {
     const totalEUR        = subtotalEUR + shippingCostEUR;
     const rate            = parseFloat(exchangeRate) || 1;
     const displayTotal    = Math.round(totalEUR * rate * 100) / 100;
+    const orderNumber     = await generateOrderNumber();
+
+    let paymentIntent      = null;
+    let stripeClientSecret = null;
+
 
     // ── Stripe depuis la DB ──────────────────────────────────
-    const stripe = await getStripe();
+    if (isStripe) {
+      const stripe = await getStripe();
+      paymentIntent = await stripe.paymentIntents.create({
+        amount:   Math.round(totalEUR * 100),
+        currency: "eur",
+        automatic_payment_methods: { enabled: true },
+        metadata: { userId: String(userId), companyId: String(companyId), displayCurrency: currency, exchangeRate: String(rate) },
+      });
+      stripeClientSecret = paymentIntent.client_secret;
+    }
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount:   Math.round(totalEUR * 100),
-      currency: "eur",
-      automatic_payment_methods: { enabled: true },
-      metadata: {
-        userId:          String(userId),
-        companyId:       String(companyId),
-        displayCurrency: currency,
-        exchangeRate:    String(rate),
-      },
-    });
-
-    const orderNumber = await generateOrderNumber();
-
+  
     const order = await prisma.$transaction(async (tx) => {
       const o = await tx.order.create({
         data: {
           userId, companyId, orderNumber,
-          status:       "pending",
-          subtotal:     subtotalEUR,
-          shippingCost: shippingCostEUR,
-          total:        totalEUR,
+          // ── stripe → "pending" | manual → "unpaid"
+          status:        isStripe ? "pending" : "unpaid",
+          paymentMethod: paymentMethod,
+          manualPaymentMethodId: isManual ? manualMethod.id : null,
+          subtotal: subtotalEUR, shippingCost: shippingCostEUR, total: totalEUR,
           currency, displayTotal, exchangeRate: rate,
           shippingFullName: shippingFullName || null,
           shippingAddress:  shippingAddress  || null,
           shippingCity:     shippingCity     || null,
           shippingState:    shippingState    || null,
           shippingZip:      shippingZip      || null,
-          shippingCountry:  shippingCountry  || "United States",
+          shippingCountry:  shippingCountry  || "France",
           shippingMethod:   shippingMethod   || "standard",
-          stripePaymentIntentId: paymentIntent.id,
-          stripeClientSecret:    paymentIntent.client_secret,
+          stripePaymentIntentId: paymentIntent?.id ?? null,
+          stripeClientSecret:    stripeClientSecret ?? null,
           items: {
             create: cartItems.map((item) => ({
-              productId:    item.productId,
+              productId:     item.productId,
               packageTierId: item.packageTierId,
-              totalCards:   item.totalCards,
-              quantity:     item.totalCards,
-              unitPrice:    Number(item.unitPrice),
-              totalPrice:   Number(item.lineTotal),
-              designId:     item.designId   || null,
-              cardTypeId:   item.cardTypeId || null,
+              totalCards:    item.totalCards,
+              quantity:      item.totalCards,
+              unitPrice:     Number(item.unitPrice),
+              totalPrice:    Number(item.lineTotal),
+              designId:      item.designId   || null,
+              cardTypeId:    item.cardTypeId || null,
             })),
           },
         },
         include: {
-          items: { include: { product: { include: { translations: { take: 1 } } }, design: true, cardType: true } },
+          user:    true,
+          company: true,
+          items: {
+            include: {
+              product: { include: { translations: { take: 1, orderBy: { langId: "asc" } } } },
+              design:  true, cardType: true,
+            },
+          },
         },
       });
-
-      // Sauvegarder la conversion
+ 
       await tx.conversion.create({
-        data: {
-          orderId: o.id, currency, rate,
-          displayTotal, baseCurrency: "EUR", baseTotal: totalEUR,
-        },
+        data: { orderId: o.id, currency, rate, displayTotal, baseCurrency: "EUR", baseTotal: totalEUR },
       });
-
-      // Verrouiller les designs
-      const designIds = cartItems.filter((i) => i.designId).map((i) => i.designId);
-      if (designIds.length) {
-        await tx.design.updateMany({ where: { id: { in: designIds } }, data: { status: "locked" } });
-      }
-
+ 
+      // Verrouiller tous les designs (draft ou validated) au moment du paiement
+      // Le design reste lisible pour la production même sans personnalisation
+      // const designIds = cartItems.filter((i) => i.designId).map((i) => i.designId);
+      // if (designIds.length) {
+      //   await tx.design.updateMany({
+      //     where: { id: { in: designIds } },
+      //     data:  { status: "locked" },
+      //   });
+      // }
+ 
+      // Vider le panier pour les deux méthodes
+      // (pour Stripe, re-vidé dans le webhook en sécurité)
+      await tx.cartItem.deleteMany({ where: { userId, companyId } });
       return o;
     });
-
+ 
+    // ── CASH : créer la facture immédiatement en "unpaid" ─────
+    // PAS de NFC — ils seront générés quand le superadmin confirme le paiement
+    let invoiceNumber = null;
+    if (isManual) {
+      const invoice = await createUnpaidInvoice(order);
+      invoiceNumber = invoice.invoiceNumber;
+      sendOrderPendingEmail(order, invoice, manualMethod).catch(console.error);
+    }
+ 
     res.status(201).json({
-      success:            true,
-      data:               formatOrder(order),
-      stripeClientSecret: paymentIntent.client_secret,
-      amounts: {
-        subtotalEUR, shippingCostEUR, totalEUR, displayTotal, currency, exchangeRate: rate,
-      },
+      success:      true,
+      data:         formatOrder(order),
+      stripeClientSecret,
+      paymentMethod,
+      invoiceNumber,
+      // Instructions de paiement à afficher au client
+      ...(isManual && {
+        manualInstructions: manualMethod.instructions ?? null,
+        message: `Commande ${order.orderNumber} créée. Votre facture ${invoiceNumber} est en attente de paiement.`,
+      }),
+      amounts: { subtotalEUR, shippingCostEUR, totalEUR, displayTotal, currency, exchangeRate: rate },
     });
   } catch (e) { next(e); }
 };
@@ -224,13 +276,11 @@ export const stripeWebhook = async (req, res, next) => {
       const order = await prisma.order.findUnique({
         where:   { stripePaymentIntentId: pi.id },
         include: {
-          user:    true,
-          company: true,
+          user: true, company: true,
           items: {
             include: {
               product:  { include: { translations: { take: 1, orderBy: { langId: "asc" } } } },
-              design:   true,
-              cardType: true,
+              design: true, cardType: true,
             },
           },
         },
@@ -240,81 +290,52 @@ export const stripeWebhook = async (req, res, next) => {
         const stripe  = await getStripe();
         const charges = await stripe.charges.list({ payment_intent: pi.id, limit: 1 });
         const charge  = charges.data[0];
- 
-        const methodLabel = charge?.payment_method_details?.card
+        const methodLabel    = charge?.payment_method_details?.card
           ? `${charge.payment_method_details.card.brand} •••• ${charge.payment_method_details.card.last4}`
           : "Stripe";
-        const last4 = charge?.payment_method_details?.card?.last4   ?? null;
-        const brand = charge?.payment_method_details?.card?.brand   ?? null;
+        const last4          = charge?.payment_method_details?.card?.last4 ?? null;
+        const brand          = charge?.payment_method_details?.card?.brand ?? null;
         const stripeChargeId = charge?.id ?? null;
  
-        
         await prisma.$transaction([
-          prisma.order.update({
-            where: { id: order.id },
-            data:  { status: "paid", paidAt: new Date() },
-          }),
-
-          prisma.cartItem.deleteMany({
-            where: { userId: order.userId, companyId: order.companyId },
-          }),
+          prisma.order.update({ where: { id: order.id }, data: { status: "paid", paidAt: new Date() } }),
+          prisma.cartItem.deleteMany({ where: { userId: order.userId, companyId: order.companyId } }),
         ]);
  
-       
         const fullOrder = { ...order, status: "paid", paidAt: new Date() };
         const invoice   = await createInvoiceFromOrder(fullOrder);
  
-        
-        const payment = await prisma.payment.create({
+        await prisma.payment.create({
           data: {
-            orderId:    order.id,
-            invoiceId:  invoice.id,
-            companyId:  order.companyId,
-            userId:     order.userId,
-            amount:     Number(order.total),
-            currency:   order.currency    ?? "EUR",
-            exchangeRate: Number(order.exchangeRate ?? 1),
+            orderId:   order.id, invoiceId: invoice.id,
+            companyId: order.companyId, userId: order.userId,
+            amount:    Number(order.total),
+            currency:  order.currency ?? "EUR",
+            exchangeRate:  Number(order.exchangeRate ?? 1),
             displayAmount: order.displayTotal ? Number(order.displayTotal) : Number(order.total),
-            stripePaymentIntentId: pi.id,
-            stripeChargeId,
-            method:      "card",
-            methodLabel,
-            last4,
-            brand,
-            status:     "completed",
-            paidAt:     new Date(),
+            stripePaymentIntentId: pi.id, stripeChargeId,
+            method: "card", methodLabel, last4, brand,
+            status: "completed", paidAt: new Date(),
           },
         });
  
-        // 4. Mettre à jour le mode de paiement sur la facture
-        await prisma.invoice.update({
-          where: { id: invoice.id },
-          data:  { paymentMethod: methodLabel },
-        });
+        await prisma.invoice.update({ where: { id: invoice.id }, data: { paymentMethod: methodLabel } });
  
-        console.log(`[webhook] Paiement #${payment.id} enregistré pour commande #${order.orderNumber}`);
-
-         // 5. ✅ NOUVEAU : Générer les cards NFC pour chaque item du design
-        // Les cards sont générés au moment du paiement (pas de la validation du design)
-        // Ils sont inactifs jusqu'à la livraison (order.status = "delivered")
-        
         generateNfcCardsForOrder(fullOrder).catch((e) =>
           console.error("[webhook] Erreur génération NFC:", e.message)
         );
- 
-        // 5. Envoyer les 3 emails (asynchrone)
         sendOrderEmails(fullOrder, invoice).catch(console.error);
-
-        console.log(`[webhook] Commande #${order.orderNumber} payée + NFC en cours de génération`);
+        console.log(`[webhook] Commande #${order.orderNumber} payée`);
       }
     } catch (e) {
       console.error("[webhook] Erreur traitement:", e.message);
     }
   }
  
-  // Toujours répondre 200 à Stripe
   res.json({ received: true });
 };
+
+
 
 // ─── POST /api/orders/:id/refund ─────────────────────────────
 // Superadmin — rembourser une commande via Stripe
@@ -323,51 +344,20 @@ export const refundOrder = async (req, res, next) => {
     const id     = parseInt(req.params.id);
     const amount = req.body.amount ? Math.round(parseFloat(req.body.amount) * 100) : undefined;
     const reason = req.body.reason || null;
-
-    const order = await prisma.order.findUnique({
-      where:   { id },
-      include: { invoice: true },
-    });
+    const order  = await prisma.order.findUnique({ where: { id }, include: { invoice: true } });
     if (!order) return res.status(404).json({ success: false, error: "Commande introuvable" });
-    if (!order.stripePaymentIntentId) {
-      return res.status(422).json({ success: false, error: "Aucun paiement Stripe associé" });
-    }
-
-    const stripe = await getStripe();
-
-    // Récupérer le charge depuis le PaymentIntent
+    if (!order.stripePaymentIntentId) return res.status(422).json({ success: false, error: "Aucun paiement Stripe associé" });
+    const stripe  = await getStripe();
     const charges = await stripe.charges.list({ payment_intent: order.stripePaymentIntentId, limit: 1 });
-    if (!charges.data.length) {
-      return res.status(422).json({ success: false, error: "Aucune charge Stripe trouvée" });
-    }
-
-    const refund = await stripe.refunds.create({
-      charge: charges.data[0].id,
-      ...(amount && { amount }),
-    });
-
-    // Mettre à jour la commande et la facture
+    if (!charges.data.length) return res.status(422).json({ success: false, error: "Aucune charge Stripe trouvée" });
+    const refund  = await stripe.refunds.create({ charge: charges.data[0].id, ...(amount && { amount }) });
     await prisma.$transaction([
-      prisma.order.update({
-        where: { id },
-        data:  { status: "refunded" },
-      }),
+      prisma.order.update({ where: { id }, data: { status: "refunded" } }),
       ...(order.invoice ? [
-        prisma.invoice.update({
-          where: { id: order.invoice.id },
-          data:  { status: "refunded" },
-        }),
-        prisma.refund.create({
-          data: {
-            invoiceId:    order.invoice.id,
-            amount:       amount ? amount / 100 : Number(order.total),
-            reason,
-            stripeRefundId: refund.id,
-          },
-        }),
+        prisma.invoice.update({ where: { id: order.invoice.id }, data: { status: "refunded" } }),
+        prisma.refund.create({ data: { invoiceId: order.invoice.id, amount: amount ? amount / 100 : Number(order.total), reason, stripeRefundId: refund.id } }),
       ] : []),
     ]);
-
     res.json({ success: true, message: "Remboursement effectué", refundId: refund.id });
   } catch (e) { next(e); }
 };
@@ -375,9 +365,8 @@ export const refundOrder = async (req, res, next) => {
 // ─── GET /api/orders ──────────────────────────────────────────
 export const listOrders = async (req, res, next) => {
   try {
-    const userId    = req.user.userId;
-    const companyId = getCompanyId(req);
-    const orders    = await prisma.order.findMany({
+    const userId = req.user.userId; const companyId = getCompanyId(req);
+    const orders = await prisma.order.findMany({
       where:   { userId, companyId },
       include: { items: { include: { product: { include: { translations: { take: 1 } } }, design: true, cardType: true } } },
       orderBy: { createdAt: "desc" },
@@ -389,10 +378,8 @@ export const listOrders = async (req, res, next) => {
 // ─── GET /api/orders/:id ──────────────────────────────────────
 export const getOrder = async (req, res, next) => {
   try {
-    const id        = parseInt(req.params.id);
-    const userId    = req.user.userId;
-    const companyId = getCompanyId(req);
-    const order     = await prisma.order.findFirst({
+    const id = parseInt(req.params.id); const userId = req.user.userId; const companyId = getCompanyId(req);
+    const order = await prisma.order.findFirst({
       where:   { id, userId, companyId },
       include: { items: { include: { product: { include: { translations: { take: 1 } } }, design: true, cardType: true } } },
     });
@@ -400,6 +387,38 @@ export const getOrder = async (req, res, next) => {
     res.json({ success: true, data: formatOrder(order) });
   } catch (e) { next(e); }
 };
+
+
+export const getPaymentMethods = async (req, res, next) => {
+  try {
+    const manualMethods = await prisma.manualPaymentMethod.findMany({
+      where: { status: "Active" }, orderBy: { name: "asc" },
+    });
+    res.json({
+      success: true,
+      data: [
+        {
+          id: "stripe", type: "stripe", name: "Credit / Debit Card",
+          instructions: null, verificationRequired: false,
+          supportedCurrencies: ["all"],
+        },
+        ...manualMethods.map((m) => ({
+          id:   m.id, type: "manual", name: m.name,
+          instructions: m.instructions ?? null,
+          verificationRequired: m.verificationRequired,
+          supportedCurrencies: m.supportedCurrencies === "all"
+            ? ["all"]
+            : m.supportedCurrencies?.split(",").map((c) => c.trim()) || [],
+        })),
+      ],
+    });
+  } catch (e) { next(e); }
+};
+
+
+
+
+
 
 
 
@@ -485,25 +504,37 @@ async function sendOrderEmails(order, invoice) {
   console.log(`[order] Emails envoyés pour #${order.orderNumber}`);
 }
 
-export const getPaymentMethods = async (req, res, next) => {
+
+async function sendOrderPendingEmail(order, invoice, manualMethod) {
   try {
-    const methods = await prisma.manualPaymentMethod.findMany({
-      where: {
-        status: "Active",
+    await sendTemplatedMail({
+      slug: "order_pending_payment",
+      to:   order.user.email,
+      variables: {
+        customer_name:       order.user?.name || order.user?.email,
+        order_number:        order.orderNumber,
+        invoice_number:      invoice.invoiceNumber,
+        total:               String(Number(order.total).toFixed(2)),
+        currency:            order.currency ?? "EUR",
+        payment_method:      manualMethod.name,
+        payment_instructions: manualMethod.instructions ?? "",
+        due_date:            new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("fr-FR"),
       },
-      orderBy: { name: "asc" },
-    });
-    const formattedMethods = methods.map(method => ({
-      ...method,
-      supportedCurrencies: method.supportedCurrencies === "all" 
-        ? ["all"] 
-        : method.supportedCurrencies?.split(",").map(c => c.trim()) || []
-    }));
-    res.json({
-      success: true,
-      data: formattedMethods
+      fallbackFn: () => ({
+        subject: `Commande ${order.orderNumber} — En attente de paiement`,
+        html: `
+          <p>Bonjour ${order.user?.name ?? ""},</p>
+          <p>Votre commande <strong>${order.orderNumber}</strong> a été créée.</p>
+          <p>Facture : <strong>${invoice.invoiceNumber}</strong> — Montant : <strong>${Number(order.total).toFixed(2)} ${order.currency ?? "EUR"}</strong></p>
+          <p>Mode de paiement : <strong>${manualMethod.name}</strong></p>
+          ${manualMethod.instructions ? `<p>Instructions : ${manualMethod.instructions}</p>` : ""}
+          <p>Votre commande sera traitée dès réception du paiement.</p>
+        `,
+        text: `Commande ${order.orderNumber} créée. Facture ${invoice.invoiceNumber} - ${Number(order.total).toFixed(2)} ${order.currency ?? "EUR"} en attente de paiement via ${manualMethod.name}.`,
+      }),
     });
   } catch (e) {
-    next(e);
+    console.error("[order] Erreur email pending:", e.message);
   }
-};
+}
+

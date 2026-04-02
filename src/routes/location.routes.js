@@ -1,5 +1,4 @@
 // src/routes/location.routes.js
-
 import { Router } from "express";
 import { authenticateAdmin, requireAdmin } from "../middleware/auth.middleware.js";
 import {
@@ -12,7 +11,7 @@ import {
   getLocationAnalytics,
   getLocationStats,
   refreshGoogleData,
-  assignNfcTag,
+  assignNfcCard,
 } from "../controllers/location.controller.js";
 
 const router = Router();
@@ -54,18 +53,6 @@ router.delete("/:id", ...auth, deleteLocation);
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 // ─── Actions spécifiques ──────────────────────────────────────
 
 // GET  /api/locations/:id/analytics
@@ -81,6 +68,6 @@ router.post("/:id/refresh-google", ...auth, refreshGoogleData);
 // POST /api/locations/:id/assign-card
 // Body: { tagId }
 // → Associe un tag NFC existant à cette location
-router.post("/:id/assign-card", ...auth, assignNfcTag);
+router.post("/:id/assign-card", ...auth, assignNfcCard);
 
 export default router;

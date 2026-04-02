@@ -211,6 +211,7 @@ model Order {
   confirmationEmailSentAt DateTime?
 
   currency     String?  @default("EUR")
+  manualPaymentMethodId Int?
   displayTotal Float?
   exchangeRate Float?   @default(1)
 
@@ -220,6 +221,7 @@ model Order {
 
   user        User      @relation(fields: [userId],    references: [id], onDelete: Cascade)
   company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  paymentMethod     ManualPaymentMethod?   @relation(fields: [manualPaymentMethodId], references: [id], onDelete: SetNull)
   items       OrderItem[]
   Conversions Conversion[]
   payments    Payment[]
@@ -773,13 +775,19 @@ model Feedback {
   cardUid    String   @db.VarChar(36)
   companyId  Int
   locationId Int?
-
+  status      FeedbackStatus @default(PENDING)
+  internalNotes String?      @db.Text
+  adminReply    String?      @db.Text
+  repliedAt     DateTime?
+  source        String?      @db.VarChar(10)  // "NFC" | "QR"
+  customerName  String?      @db.VarChar(255)
   stars      Int      // 1-3
   message    String?  @db.Text
   email      String?  @db.VarChar(255)
   notifiedAt DateTime?
 
   createdAt  DateTime @default(now())
+  updatedAt     DateTime     @updatedAt
 
   company    Company   @relation(fields: [companyId],  references: [id],  onDelete: Cascade)
   location   Location? @relation(fields: [locationId], references: [id],  onDelete: SetNull)
@@ -1172,6 +1180,8 @@ model ManualPaymentMethod {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  orders          Order[]
+
   @@map("manual_payment_methods")
 }
 
@@ -1537,8 +1547,8 @@ model CartItem {
   userId        Int      @db.UnsignedInt
   companyId     Int
   productId     Int
-  // Package tier choisi (ex: qty=10 cartes a 24$/carte)
-  packageTierId Int
+  packageTierId Int?
+  quantity      Int
   totalCards    Int      // = packageTier.qty (snapshot)
   unitPrice     Float    // prix/carte au moment de l'ajout (snapshot)
   lineTotal     Float    // totalCards x unitPrice
@@ -1551,7 +1561,7 @@ model CartItem {
   user        User                @relation(fields: [userId],       references: [id], onDelete: Cascade)
   company     Company             @relation(fields: [companyId],    references: [id], onDelete: Cascade)
   product     Product             @relation(fields: [productId],    references: [id], onDelete: Cascade)
-  packageTier ProductPackageTier  @relation(fields: [packageTierId], references: [id], onDelete: Restrict)
+  packageTier ProductPackageTier?  @relation(fields: [packageTierId], references: [id], onDelete: Restrict)
   design      Design?             @relation(fields: [designId],     references: [id], onDelete: SetNull)
   cardType    CardType?           @relation(fields: [cardTypeId],   references: [id], onDelete: SetNull)
 
@@ -1700,6 +1710,8 @@ enum OrderStatus {
   delivered    // Livré
   cancelled    // Annulé
   refunded     // Remboursé
+  partially_paid
+  unpaid
 }
 
 enum ShippingMethod {
@@ -1715,6 +1727,7 @@ enum InvoiceStatus {
   overdue
   cancelled
   refunded
+  unpaid
 }
 
 enum PaymentStatus {
@@ -1729,6 +1742,15 @@ enum PaymentMethodType {
   wire
   check
   other
+  manual
+  cash
+}
+
+enum FeedbackStatus {
+  PENDING    // en attente de traitement
+  PUBLIC     // visible publiquement (positif redirigé Google)
+  PRIVATE    // feedback interne négatif (1-3 étoiles)
+  RESOLVED   // traité / résolu par l'admin
 }
 
 
