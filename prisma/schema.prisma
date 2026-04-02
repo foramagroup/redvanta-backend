@@ -713,6 +713,21 @@ model NfcScan {
 }
 
 
+model PushSubscription {
+  id              Int      @id @default(autoincrement())
+  endpoint        String   @unique @db.VarChar(500)
+  p256dh          String   @db.VarChar(255)
+  auth            String   @db.VarChar(100)
+  fingerprintHash String?  @db.VarChar(64)
+  expirationTime  BigInt?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([fingerprintHash])
+  @@map("push_subscriptions")
+}
+
+
 
 
 model OrderItem {

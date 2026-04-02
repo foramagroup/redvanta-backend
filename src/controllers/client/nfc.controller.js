@@ -1,4 +1,31 @@
-// src/controllers/nfc.controller.js
+// src/controllers/nfc.controller.js — VERSION FINALE
+// ─────────────────────────────────────────────────────────────
+// FLUX B — Scan NFC/QR → Redirect HTTP → Page d'avis → Google ou Feedback
+//
+// Flux complet :
+//   1. Client scanne → GET /r/:uid
+//      → enregistre SCAN (async)
+//      → HTTP 302 redirect vers ${FRONTEND_URL}/review/:uid
+//      → Android affiche bannière native avec le <title> de la page
+//
+//   2. GET /review/:uid (appelé par Next.js au chargement de la page)
+//      → enregistre PAGE_VIEW
+//      → retourne toutes les données (nom, logo, couleurs, thankYouMessage...)
+//
+//   3. POST /review/:uid/rate  { stars }
+//      → 4-5 ⭐ : enregistre RATING_SELECTED + GOOGLE_REDIRECT
+//                  retourne { action: "GOOGLE_REDIRECT", googleReviewUrl }
+//      → 1-3 ⭐ : enregistre RATING_SELECTED
+//                  retourne { action: "INTERNAL_FEEDBACK" }
+//
+//   4. POST /review/:uid/feedback  { stars, message, email? }
+//      → enregistre FEEDBACK_SUBMITTED
+//      → sauvegarde Feedback en DB
+//      → email de notification à l'admin (async)
+//
+// Identifiant : uid (UUID stable, encodé dans le QR + puce NFC)
+// La bannière Android affiche le <title> de la page /review/:uid
+// configuré via generateMetadata() dans Next.js — aucun code push nécessaire
 
 import prisma from "../../config/database.js";
 import crypto  from "crypto";
@@ -18,7 +45,10 @@ const getIp = (req) =>
 const buildFingerprint = (ip, ua) =>
   crypto.createHash("sha256").update(`${ip}|${ua ?? ""}`).digest("hex").slice(0, 16);
 
-
+// logEvent — wrappeur pour analyticsEvent.create
+// Champs du modèle AnalyticsEvent supportés via extras :
+//   ipAddress, userAgent, deviceType, country, city, referrer,
+//   fingerprintHash, stars
 async function logEvent(cardUid, companyId, type, extras = {}) {
   try {
     await prisma.analyticsEvent.create({
@@ -69,9 +99,11 @@ function formatCardForReview(card, company) {
 // ─────────────────────────────────────────────────────────────
 // GET /r/:uid  — Point d'entrée scan NFC/QR
 // ─────────────────────────────────────────────────────────────
-// Appelé automatiquement quand le client scanne la carte.
-// Enregistre le scan puis retourne les données de redirection.
-// Le front redirige vers /review/:uid pour la page d'avis.
+// Déclenché automatiquement quand Android lit la puce NFC ou quand
+// le client scanne le QR code avec son appareil photo.
+// → enregistre le scan en DB (async, ne bloque pas)
+// → HTTP 302 redirect vers FRONTEND_URL/review/:uid
+// Android affiche la bannière native avec le titre de la page destination.
 
 export const handleScan = async (req, res, next) => {
   try {
@@ -83,7 +115,7 @@ export const handleScan = async (req, res, next) => {
     const fingerprint = buildFingerprint(ip, ua);
 
     // Chercher la carte
-    const card = await prisma.nFCCard.findUnique({ where: { uid } });
+    const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { company: true } });
 
     if (!card) {
       return res.status(404).json({
@@ -134,23 +166,21 @@ export const handleScan = async (req, res, next) => {
       }),
     ]).catch((e) => console.error("[nfc] scan tracking error:", e.message));
 
-    // Retourner les données de redirection
-    // Le front redirige vers /review/:uid pour afficher la page d'avis
-    res.json({
-      success:     true,
-      uid,
-      redirectUrl: `/review/${uid}`,  // URL de la page d'avis (Next.js route)
-      // Données basiques pour afficher un état intermédiaire si besoin
-      locationName:    card.locationName    ?? null,
-      locationAddress: card.locationAddress ?? null,
-    });
+    // ── HTTP 302 redirect vers la page d'avis ───────────────
+    // Android Chrome lit la puce NFC → suit le redirect → affiche le
+    // <title> de la page dans la bannière native en haut de l'écran.
+    // Le visiteur tape sur la bannière → arrive sur /review/:uid.
+    // Aucune lib push / Service Worker nécessaire — c'est le comportement
+    // natif d'Android NFC avec une URL HTTP redirect.
+
+    return res.redirect(302, `${process.env.FRONTEND_URL}/review/${card.company?.name}`);
   } catch (e) { next(e); }
 };
 
 // ─────────────────────────────────────────────────────────────
 // GET /review/:uid  — Données de la page d'avis
 // ─────────────────────────────────────────────────────────────
-// Appelé par le front au chargement de /review/[uid].
+// Appelé par le front au chargement de /review/[companyName].
 // Enregistre PAGE_VIEW et retourne tout ce qu'il faut pour
 // afficher la page (nom, logo, couleurs, message d'accueil...).
 

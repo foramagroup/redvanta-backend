@@ -65,15 +65,15 @@ function formatOrderTracking(o) {
 
   // Cards NFC des items
   const nfcCards = (o.items ?? [])
-  .filter((item) => item.nfccards)
+  .filter((item) => item.nfcCards)
   .map((item) => ({
-    id:          item.nfcCard.id,
-    uid:         item.nfcCard.uid,
-    payload:     item.nfcCard.payload,
-    isActive:    item.nfcCard.active,
-    status:      item.nfcCard.status,
-    scanCount:   item.nfcCard.scanCount ?? 0,
-    location:    item.nfcCard.locationName ?? "Non assigné",
+    id:          item.id,
+    uid:         item.uid,
+    payload:     item.payload,
+    isActive:    item.active,
+    status:      item.status,
+    scanCount:   item.scanCount ?? 0,
+    location:    item.locationName ?? "Non assigné",
   }));
 
   return {
@@ -151,7 +151,7 @@ export const getAllOrders = async (req, res, next) => {
           items: {
             include: {
               product: { include: { translations: { take: 1 } } },
-              nfccards:  { include: { _count: { select: { scans: true } } } },
+              nfcCards:  { include: { _count: { select: { scans: true } } } },
             },
           },
           user:    { select: { name: true, email: true } },
@@ -240,7 +240,7 @@ export const getOrderDetail = async (req, res, next) => {
             product:  { include: { translations: { take: 1, orderBy: { langId: "asc" } } } },
             design:   true,
             cardType: true,
-            nfccards:   { include: { _count: { select: { scans: true } } } },
+            nfcCards:   { include: { _count: { select: { scans: true } } } },
           },
         },
         user:    { select: { id: true, name: true, email: true } },

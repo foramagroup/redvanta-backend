@@ -61,7 +61,7 @@ import settingClientRoutes from "./routes/client/settingClientRoutes.js";
 import clientAuthRoutes from "./routes/client/clientAuthRoutes.js";
 import placesRoutes from "./routes/client/Googleplaces.routes.js";
 import orderClientRoutes   from "./routes/client/Order.route.js";
-import nfcClientRoutes   from "./routes/client/nfc.routes.js";
+import { scanRouter, reviewRouter } from "./routes/client/nfc.routes.js";
 
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
@@ -208,7 +208,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/auth", clientAuthRoutes);
   app.use("/api/client/places", placesRoutes);
   app.use("/api/client/orders", orderClientRoutes);
-  app.use("/api/client/nfc", nfcClientRoutes);
+  app.use("/r",        scanRouter);
+  app.use("/review",   reviewRouter);
   startSuspendUnverifiedJob();
 
 
