@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+  width="1071" height="1416" viewBox="0 0 1071 1416">
+<defs>
+  <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%"   stop-color="#0B0D0F"/>
+    <stop offset="100%" stop-color="#1A1A1A"/>
+  </linearGradient>
+  <clipPath id="cr">
+    <rect x="30" y="30" width="1011" height="638" rx="16"/>
+  </clipPath>
+  <clipPath id="cv">
+    <rect x="30" y="748" width="1011" height="638" rx="16"/>
+  </clipPath>
+</defs>
+
+<!-- Label RECTO -->
+<text x="30" y="20"
+  font-family="Arial,sans-serif" font-size="20" fill="#666">RECTO</text>
+
+<!-- RECTO -->
+<g clip-path="url(#cr)">
+  
+  <!-- Fond gradient -->
+  <rect x="30" y="30" width="1011" height="638" fill="url(#bg)"/>
+
+  <!-- Logo (si disponible) -->
+  
+  <image x="80" y="80" width="110" height="110"
+    href="/uploads/designs/logos/4-1775390522074-7ba9d9bd.webp" preserveAspectRatio="xMidYMid meet"
+    style="border-radius:12px"/>
+
+  <!-- Nom du business -->
+  <text x="220" y="110"
+    font-family="Space Grotesk, sans-serif" font-size="16" font-weight="Bold"
+    text-transform="none"
+    fill="#FFFFFF">VirtualTest</text>
+
+  <!-- Slogan -->
+  <text x="220" y="148"
+    font-family="Inter, sans-serif" font-size="13"
+    fill="#FFFFFF" opacity="0.75">Slogan</text>
+
+  <!-- Étoiles -->
+  <polygon points="220.0,224.0 225.3,234.7 237.1,236.4 228.6,244.8 230.6,256.6 220.0,251.0 209.4,256.6 211.4,244.8 202.9,236.4 214.7,234.7"
+      fill="#F59E0B"/><polygon points="262.0,224.0 267.3,234.7 279.1,236.4 270.6,244.8 272.6,256.6 262.0,251.0 251.4,256.6 253.4,244.8 244.9,236.4 256.7,234.7"
+      fill="#F59E0B"/><polygon points="304.0,224.0 309.3,234.7 321.1,236.4 312.6,244.8 314.6,256.6 304.0,251.0 293.4,256.6 295.4,244.8 286.9,236.4 298.7,234.7"
+      fill="#F59E0B"/><polygon points="346.0,224.0 351.3,234.7 363.1,236.4 354.6,244.8 356.6,256.6 346.0,251.0 335.4,256.6 337.4,244.8 328.9,236.4 340.7,234.7"
+      fill="#F59E0B"/><polygon points="388.0,224.0 393.3,234.7 405.1,236.4 396.6,244.8 398.6,256.6 388.0,251.0 377.4,256.6 379.4,244.8 370.9,236.4 382.7,234.7"
+      fill="#F59E0B"/>
+
+  <!-- Instructions avec checkmarks -->
+  
+  <!-- Checkmark -->
+  <circle cx="94" cy="393" r="14" fill="#22C55E" opacity="0.15"/>
+  <polyline points="88,393 92,400 112,380.4"
+    fill="none" stroke="#22C55E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Texte instruction -->
+  <text x="128" y="400"
+    font-family="Inter, sans-serif" font-size="24"
+    fill="#FFFFFF">Approach the phone to the card</text>
+  
+  <!-- Checkmark -->
+  <circle cx="94" cy="463" r="14" fill="#22C55E" opacity="0.15"/>
+  <polyline points="88,463 92,470 112,450.4"
+    fill="none" stroke="#22C55E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Texte instruction -->
+  <text x="128" y="470"
+    font-family="Inter, sans-serif" font-size="24"
+    fill="#FFFFFF">Tap to leave a review</text>
+
+  <!-- CTA bas gauche -->
+  <text x="80" y="615"
+    font-family="Inter, sans-serif" font-size="22"
+    fill="#FFFFFF" opacity="0.5">Powered by RedVanta</text>
+
+  <!-- Icône NFC haut droite -->
+  
+  <!-- NFC waves ))) -->
+  <path d="M989.8 82 A15.399999999999999 15.399999999999999 0 0 1 989.8 112.8"
+    fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.9"/>
+  <path d="M1005.2 75.4 A28.6 28.6 0 0 1 1005.2 119.4"
+    fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.65"/>
+  <path d="M1020.6 68.8 A41.8 41.8 0 0 1 1020.6 126"
+    fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Google G bas droite -->
+  
+  <text x="986" y="590"
+    font-family="Arial,sans-serif" font-size="32"
+    font-weight="bold" fill="#FFFFFF" opacity="0.8">G</text>
+
+</g>
+
+<!-- Séparateur -->
+<line x1="30" y1="708"
+      x2="1041" y2="708"
+      stroke="#444" stroke-width="1" stroke-dasharray="8 6" opacity="0.4"/>
+
+<!-- Label VERSO -->
+<text x="30" y="738"
+  font-family="Arial,sans-serif" font-size="20" fill="#666">VERSO</text>
+
+<!-- VERSO -->
+<g clip-path="url(#cv)">
+  
+  <!-- Fond gradient -->
+  <rect x="30" y="748" width="1011" height="638" fill="url(#bg)"/>
+
+  <!-- Nom du business (gauche) -->
+  <text x="80" y="848"
+    font-family="Space Grotesk, sans-serif" font-size="16" font-weight="Bold"
+    fill="#FFFFFF">VirtualTest</text>
+
+  <!-- Slogan (gauche) -->
+  <text x="80" y="884"
+    font-family="Inter, sans-serif" font-size="13"
+    fill="#FFFFFF" opacity="0.75">Slogan</text>
+
+  <!-- Étoiles (gauche) -->
+  <polygon points="80.0,942.0 85.3,952.7 97.1,954.4 88.6,962.8 90.6,974.6 80.0,969.0 69.4,974.6 71.4,962.8 62.9,954.4 74.7,952.7"
+      fill="#F59E0B"/><polygon points="122.0,942.0 127.3,952.7 139.1,954.4 130.6,962.8 132.6,974.6 122.0,969.0 111.4,974.6 113.4,962.8 104.9,954.4 116.7,952.7"
+      fill="#F59E0B"/><polygon points="164.0,942.0 169.3,952.7 181.1,954.4 172.6,962.8 174.6,974.6 164.0,969.0 153.4,974.6 155.4,962.8 146.9,954.4 158.7,952.7"
+      fill="#F59E0B"/><polygon points="206.0,942.0 211.3,952.7 223.1,954.4 214.6,962.8 216.6,974.6 206.0,969.0 195.4,974.6 197.4,962.8 188.9,954.4 200.7,952.7"
+      fill="#F59E0B"/><polygon points="248.0,942.0 253.3,952.7 265.1,954.4 256.6,962.8 258.6,974.6 248.0,969.0 237.4,974.6 239.4,962.8 230.9,954.4 242.7,952.7"
+      fill="#F59E0B"/>
+
+  <!-- QR Code avec fond coloré arrondi (droite) -->
+  <rect x="721" y="937" width="260" height="260"
+    rx="20" ry="20" fill="#E10600"/>
+  <g transform="translate(745, 961)">
+    <svg viewBox="0 0 21 21" width="212" height="212"
+         preserveAspectRatio="xMidYMid meet">
+      <path fill="#E10600" d="M0 0h47v47H0z"/><path stroke="#000000" d="M1 1.5h7m1 0h4m1 0h4m6 0h1m3 0h5m1 0h1m2 0h1m1 0h7M1 2.5h1m5 0h1m1 0h1m4 0h4m3 0h1m2 0h1m1 0h1m7 0h1m1 0h1m2 0h1m5 0h1M1 3.5h1m1 0h3m1 0h1m1 0h1m3 0h2m1 0h7m1 0h1m2 0h2m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h3m1 0h1M1 4.5h1m1 0h3m1 0h1m7 0h6m6 0h1m2 0h1m3 0h1m1 0h2m1 0h1m1 0h3m1 0h1M1 5.5h1m1 0h3m1 0h1m4 0h1m3 0h2m3 0h6m1 0h1m2 0h2m1 0h4m1 0h1m1 0h3m1 0h1M1 6.5h1m5 0h1m1 0h2m4 0h3m1 0h1m1 0h1m3 0h2m1 0h3m3 0h1m4 0h1m5 0h1M1 7.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M9 8.5h1m1 0h1m6 0h4m3 0h1m2 0h1m1 0h4m1 0h1m1 0h1M3 9.5h3m1 0h1m1 0h2m2 0h1m2 0h3m2 0h6m2 0h1m1 0h1m3 0h2m1 0h3m2 0h3M1 10.5h1m1 0h1m1 0h1m2 0h1m1 0h3m1 0h7m6 0h1m3 0h3m3 0h2m1 0h6M2 11.5h1m1 0h1m2 0h2m1 0h1m1 0h1m1 0h4m1 0h1m2 0h1m1 0h3m5 0h1m1 0h2m1 0h1m1 0h1m3 0h1M2 12.5h3m1 0h1m1 0h1m1 0h3m2 0h2m1 0h1m1 0h1m1 0h2m1 0h1m3 0h1m1 0h1m1 0h2m1 0h2m2 0h4M2 13.5h3m2 0h1m3 0h4m1 0h1m2 0h2m3 0h1m1 0h3m3 0h1m1 0h1m5 0h1m3 0h1M1 14.5h6m2 0h3m2 0h3m2 0h1m2 0h3m1 0h1m2 0h1m1 0h1m2 0h1m2 0h1m6 0h2M2 15.5h3m2 0h1m2 0h3m1 0h2m4 0h3m1 0h1m2 0h1m2 0h1m1 0h1m2 0h2m1 0h3m2 0h1M2 16.5h1m1 0h3m1 0h3m5 0h3m1 0h2m1 0h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m1 0h1m1 0h6M2 17.5h2m2 0h4m2 0h2m1 0h1m2 0h2m6 0h3m7 0h1m2 0h1m2 0h1m2 0h1M2 18.5h1m2 0h1m3 0h3m1 0h1m4 0h1m1 0h6m4 0h1m2 0h2m2 0h1m2 0h1m1 0h1m2 0h1M2 19.5h1m3 0h2m5 0h1m5 0h4m3 0h2m1 0h1m1 0h1m3 0h1m1 0h3m2 0h1m1 0h1M1 20.5h1m3 0h1m2 0h1m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h3m1 0h1m2 0h1m1 0h1m3 0h2m2 0h3M1 21.5h2m1 0h7m1 0h2m1 0h2m1 0h2m1 0h7m2 0h3m1 0h1m2 0h6m2 0h1M1 22.5h1m3 0h1m3 0h1m2 0h2m3 0h1m3 0h1m3 0h1m1 0h1m1 0h1m1 0h4m1 0h2m3 0h1m1 0h1m1 0h1M1 23.5h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m4 0h5m1 0h1m1 0h2m2 0h3m3 0h1m1 0h1m1 0h1m1 0h1m1 0h2M1 24.5h1m1 0h1m1 0h1m3 0h5m1 0h2m4 0h1m3 0h1m5 0h1m3 0h1m1 0h1m3 0h4M3 25.5h7m1 0h1m2 0h2m1 0h1m2 0h6m1 0h3m2 0h10m3 0h1M2 26.5h1m1 0h2m6 0h1m1 0h1m4 0h4m2 0h2m1 0h1m2 0h1m1 0h1m1 0h2m1 0h1m1 0h1m3 0h2M3 27.5h2m2 0h1m2 0h1m2 0h3m1 0h1m1 0h3m2 0h1m1 0h3m2 0h3m1 0h2m3 0h1m1 0h2M1 28.5h1m4 0h1m2 0h1m3 0h1m2 0h2m4 0h5m2 0h1m2 0h2m1 0h1m1 0h3m3 0h2M3 29.5h2m2 0h2m1 0h1m2 0h2m1 0h1m3 0h4m3 0h1m1 0h2m3 0h1m3 0h2m1 0h2m2 0h1M1 30.5h1m2 0h2m2 0h2m1 0h2m4 0h4m4 0h3m2 0h3m3 0h3m3 0h4M2 31.5h1m2 0h1m1 0h5m1 0h2m1 0h2m2 0h4m1 0h4m2 0h5m1 0h2m1 0h1m1 0h2M2 32.5h1m1 0h1m5 0h3m3 0h1m1 0h6m1 0h1m1 0h2m3 0h3m1 0h1m2 0h1m2 0h3M2 33.5h2m3 0h2m4 0h1m1 0h2m6 0h1m4 0h1m1 0h2m2 0h1m2 0h2m1 0h2m2 0h2M4 34.5h1m3 0h6m1 0h2m1 0h2m1 0h2m3 0h4m1 0h2m1 0h1m1 0h2m1 0h1m2 0h4M5 35.5h1m1 0h2m1 0h4m1 0h3m2 0h4m2 0h2m1 0h3m1 0h3m2 0h1m2 0h1m1 0h1M2 36.5h4m2 0h3m2 0h2m4 0h2m5 0h1m1 0h1m1 0h1m1 0h2m2 0h2m1 0h2m1 0h2M1 37.5h1m2 0h2m1 0h3m1 0h2m1 0h1m2 0h1m1 0h7m1 0h1m1 0h4m2 0h1m1 0h6M9 38.5h2m2 0h6m2 0h1m3 0h1m1 0h4m1 0h3m1 0h2m3 0h1m1 0h1m1 0h1M1 39.5h7m4 0h1m3 0h6m1 0h1m1 0h2m1 0h2m2 0h2m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1M1 40.5h1m5 0h1m2 0h1m3 0h2m1 0h1m1 0h1m1 0h1m3 0h2m2 0h2m2 0h5m3 0h3M1 41.5h1m1 0h3m1 0h1m1 0h2m1 0h2m3 0h1m2 0h7m1 0h1m1 0h3m4 0h6m1 0h2M1 42.5h1m1 0h3m1 0h1m1 0h1m3 0h2m1 0h3m1 0h4m1 0h10m1 0h1m2 0h1m1 0h1m1 0h3M1 43.5h1m1 0h3m1 0h1m1 0h2m2 0h1m4 0h3m1 0h4m1 0h1m1 0h2m1 0h4m1 0h1m1 0h2m1 0h2M1 44.5h1m5 0h1m2 0h3m1 0h5m1 0h2m5 0h1m1 0h1m1 0h1m2 0h2m1 0h1m3 0h3M1 45.5h7m3 0h4m1 0h1m3 0h1m2 0h1m1 0h1m2 0h1m1 0h1m5 0h2m1 0h1m4 0h1"/>
+    </svg>
+  </g>
+
+  <!-- Instructions avec checkmarks (gauche) -->
+  
+  <!-- Checkmark -->
+  <circle cx="94" cy="1111" r="14" fill="#22C55E" opacity="0.15"/>
+  <polyline points="88,1111 92,1118 112,1098.4"
+    fill="none" stroke="#22C55E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Texte instruction -->
+  <text x="128" y="1118"
+    font-family="Inter, sans-serif" font-size="24"
+    fill="#FFFFFF">Use your phone camera to scan the QR code</text>
+  
+  <!-- Checkmark -->
+  <circle cx="94" cy="1181" r="14" fill="#22C55E" opacity="0.15"/>
+  <polyline points="88,1181 92,1188 112,1168.4"
+    fill="none" stroke="#22C55E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Texte instruction -->
+  <text x="128" y="1188"
+    font-family="Inter, sans-serif" font-size="24"
+    fill="#FFFFFF">Write a review on our Google Maps page</text>
+
+  <!-- CTA centré -->
+  <text x="535.5" y="1333"
+    font-family="Inter, sans-serif" font-size="22"
+    fill="#FFFFFF" opacity="0.5" text-anchor="middle">Powered by RedVanta</text>
+
+  <!-- Google G bas droite -->
+  
+  <text x="986" y="1308"
+    font-family="Arial,sans-serif" font-size="32"
+    font-weight="bold" fill="#FFFFFF" opacity="0.8">G</text>
+
+</g>
+</svg>

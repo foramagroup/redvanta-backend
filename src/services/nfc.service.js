@@ -24,37 +24,56 @@ function buildPayload(uid) {
 // Appelé par le webhook Stripe (payment_intent.succeeded)
 export async function generateNfcCardsForOrder(order) {
   const items = order.items ?? [];
-  const cards = [];
+  const allCards = [];
+ 
   for (const item of items) {
     if (!item.designId) {
-      console.log(`[nfc] orderItem #${item.id} sans design — carte ignorée`);
+      console.log(`[nfc] orderItem #${item.id} sans design — cartes ignorées`);
       continue;
     }
-    const existing = await prisma.nFCCard.findUnique({ where: { orderItemId: item.id } });
-    if (existing) {
-      cards.push(existing);
+ 
+    const totalCards = item.totalCards ?? item.quantity ?? 1;
+ 
+    // Compter les cartes déjà générées pour cet item (idempotence)
+    const alreadyCount = await prisma.nFCCard.count({ where: { orderItemId: item.id } });
+ 
+    if (alreadyCount >= totalCards) {
+      console.log(`[nfc] orderItem #${item.id} — ${alreadyCount} carte(s) déjà générée(s), skip`);
+      const existing = await prisma.nFCCard.findMany({ where: { orderItemId: item.id } });
+      allCards.push(...existing);
       continue;
     }
-    const card = await createNfcCard(item, order);
-    cards.push(card);
+ 
+    // Générer les cartes manquantes (en cas de relance partielle)
+    const toGenerate = totalCards - alreadyCount;
+    console.log(`[nfc] orderItem #${item.id} — génération de ${toGenerate} carte(s) (totalCards=${totalCards})`);
+ 
+    for (let i = 0; i < toGenerate; i++) {
+      const card = await createNfcCard(item, order);
+      allCards.push(card);
+    }
   }
-
-  console.log(`[nfc] ${cards.length} NFCCard(s) générées pour commande #${order.orderNumber}`);
-  return cards;
+ 
+  console.log(`[nfc] ${allCards.length} NFCCard(s) au total pour commande #${order.orderNumber}`);
+  return allCards;
 }
-
+ 
 // ─── Créer une NFCCard (avec QR Code) pour un item ───────────
+// ─── Créer UNE NFCCard (avec QR Code) pour un item ──────────
+// Appelé N fois par generateNfcCardsForOrder (N = orderItem.totalCards)
+// Chaque appel produit un uid UUID distinct → QR Code distinct → puce NFC distincte
+// ⚠️  orderItemId n'a PAS @unique dans le schéma → plusieurs cartes peuvent partager le même orderItemId
 async function createNfcCard(orderItem, order) {
-  const design = await prisma.design.findUnique({ where: { id: orderItem.designId } }); 
-
+  const design = await prisma.design.findUnique({ where: { id: orderItem.designId } });
+ 
   // 1. Générer l'uid stable — jamais modifié — utilisé dans l'URL /r/{uid}
   const uid     = uuidv4();
   const payload = buildPayload(uid); // Ex: https://app.redvanta.com/r/a8f3c9d2-…
-
+ 
   // 2. Générer SVG + PNG + PDF via qrcode.service.js
   //    payload = contenu exact encodé dans le QR (JAMAIS lien Google directement)
   const { svgUrl: qrCodeUrl } = await generateAllQrCodes(uid, payload);
-
+ 
   // 3. Créer la NFCCard en DB
   //    tagId   : NULL — puce hardware assignée à la production physique
   //    active  : false — activée seulement lors de la livraison (DELIVERED)
@@ -76,16 +95,16 @@ async function createNfcCard(orderItem, order) {
       generatedAt:     new Date(),
     },
   });
-
+ 
   // 4. Lier à la location via Google Place ID (uid intact, pas modifié)
   if (design?.googlePlaceId) {
     await linkCardToLocation(card, order.companyId, design.googlePlaceId);
   }
-
+ 
   console.log(`[nfc] NFCCard créée uid=${uid} | qrCodeUrl=${qrCodeUrl ?? "null"} | active=false | status=NOT_PROGRAMMED`);
   return card;
 }
-
+ 
 // ─── Régénérer le QR Code d'une carte existante ──────────────
 // Utile si l'upload a échoué lors de la création (qrCodeUrl === null)
 // Endpoint superadmin : PATCH /api/superadmin/nfc/cards/:uid/regenerate-qr
@@ -93,15 +112,15 @@ export async function regenerateQrCode(cardUid) {
   const card = await prisma.nFCCard.findUnique({ where: { uid: cardUid } });
   if (!card)         throw new Error(`NFCCard uid=${cardUid} introuvable`);
   if (!card.payload) throw new Error(`NFCCard uid=${cardUid} n'a pas de payload`);
-
+ 
   const { svgUrl: qrCodeUrl } = await generateAllQrCodes(cardUid, card.payload);
   if (!qrCodeUrl) throw new Error(`Échec de génération du QR Code pour uid=${cardUid}`);
-
+ 
   await prisma.nFCCard.update({ where: { uid: cardUid }, data: { qrCodeUrl } });
   console.log(`[qr] QR Code regénéré pour uid=${cardUid} → ${qrCodeUrl}`);
   return qrCodeUrl;
 }
-
+ 
 // ─── Lier une NFCCard à sa location ──────────────────────────
 async function linkCardToLocation(card, companyId, googlePlaceId) {
   try {
@@ -121,22 +140,22 @@ async function linkCardToLocation(card, companyId, googlePlaceId) {
     console.error("[nfc] Erreur liaison location:", e.message);
   }
 }
-
+ 
 // ─── Mettre à jour le statut des cartes (production → shipped) ─
 export async function updateCardsStatusForOrder(orderId, newOrderStatus) {
   const items = await prisma.orderItem.findMany({ where: { orderId }, include: { nfcCard: true } });
   const cards = items.filter((i) => i.nfcCard).map((i) => i.nfcCard);
   if (!cards.length) return 0;
-
+ 
   const statusMap = { production: "NOT_PROGRAMMED", printed: "PRINTED", shipped: "SHIPPED" };
   const cardStatus = statusMap[newOrderStatus];
   if (!cardStatus) return 0;
-
+ 
   await prisma.nFCCard.updateMany({
     where: { id: { in: cards.map((c) => c.id) } },
     data:  { status: cardStatus },
   });
-
+ 
   // Si printed → marquer les puces hardware liées comme PROGRAMMED
   if (newOrderStatus === "printed") {
     for (const card of cards) {
@@ -148,26 +167,26 @@ export async function updateCardsStatusForOrder(orderId, newOrderStatus) {
       }
     }
   }
-
+ 
   console.log(`[nfc] ${cards.length} NFCCard(s) → status=${cardStatus}`);
   return cards.length;
 }
-
+ 
 // ─── Activer les cartes à la livraison (SEUL moment) ─────────
 export async function activateCardsForOrder(orderId) {
   const items   = await prisma.orderItem.findMany({ where: { orderId }, include: { nfcCard: true } });
   const cardIds = items.filter((i) => i.nfcCard).map((i) => i.nfcCard.id);
   if (!cardIds.length) return 0;
-
+ 
   await prisma.nFCCard.updateMany({
     where: { id: { in: cardIds } },
     data:  { status: "ACTIVE", active: true, activatedAt: new Date() },
   });
-
+ 
   console.log(`[nfc] ${cardIds.length} NFCCard(s) ACTIVÉES pour commande #${orderId}`);
   return cardIds.length;
 }
-
+ 
 // ─── Assigner une puce hardware à une carte ──────────────────
 export async function assignTagToCard(cardUid, tagId) {
   const tag = await prisma.nFCTag.findUnique({ where: { id: tagId } });
@@ -179,13 +198,13 @@ export async function assignTagToCard(cardUid, tagId) {
   await prisma.nFCCard.update({ where: { uid: cardUid }, data: { tagId } });
   console.log(`[nfc] NFCTag #${tagId} → NFCCard uid=${cardUid}`);
 }
-
+ 
 // ─── Formats réponse API ──────────────────────────────────────
 export function formatNfcCard(card) {
   // Dériver PNG + PDF depuis l'URL SVG stockée en DB
   // Aucune modification du schéma Prisma nécessaire
   const { svgUrl, pngUrl, pdfUrl } = deriveQrUrls(card.qrCodeUrl ?? null);
-
+ 
   return {
     id:                  card.id,
     uid:                 card.uid,
@@ -216,7 +235,7 @@ export function formatNfcCard(card) {
     companyName:         card.company?.name        ?? null,
   };
 }
-
+ 
 export function formatNfcTag(tag) {
   return {
     id:         tag.id,

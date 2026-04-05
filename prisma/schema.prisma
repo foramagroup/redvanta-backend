@@ -502,7 +502,7 @@ model dashboardstat {
     // ── Step 2 : Positions drag-and-drop ─────────────────────
     // JSON complet des offsets par orientation/face/élément
     // Format : { "landscape": { "front": { "businessInfo": {x,y}, "instructions": {x,y}, ... }, "back": {...} }, "portrait": {...} }
-    elementOffsets  Json?                               // ← NOUVEAU
+    elementOffsets  Json?                               // ← NOUVEAU                            // ← NOUVEAU
 
     // ── Step 3 : Review ──────────────────────────────────────
     version       Int       @default(1)
@@ -639,7 +639,7 @@ model NFCCard {
   userId      Int           @db.UnsignedInt  // admin/user qui a commandé
   locationId  Int?          // établissement associé
   designId    Int?          // design utilisé pour l'impression
-  orderItemId Int?  @unique            // item de commande qui a généré cette carte
+  orderItemId Int?
 
   // ── Payload (URL encodée dans QR + puce NFC) ────────────────
   // Format : https://app.redvanta.com/r/{uid}

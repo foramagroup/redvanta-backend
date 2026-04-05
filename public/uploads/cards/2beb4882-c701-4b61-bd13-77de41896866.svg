@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+  width="1071" height="1416" viewBox="0 0 1071 1416">
+<defs>
+  
+  <style>@import url('https://fonts.googleapis.com/css2?family=Space%20Grotesk&family=Inter:wght@300;400;700;800&amp;display=swap');</style>
+  <linearGradient id="rectoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%"  stop-color="#0B0D0F"/>
+    <stop offset="70%" stop-color="#0B0D0F"/>
+  </linearGradient>
+  <linearGradient id="versoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%"   stop-color="#0B0D0F"/>
+    <stop offset="100%" stop-color="#0B0D0F"/>
+  </linearGradient>
+  <linearGradient id="bandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%"   stop-color="#E10600"/>
+    <stop offset="100%" stop-color="#FF4444"/>
+  </linearGradient>
+  <clipPath id="cr">
+    <rect x="30" y="30" width="1011" height="638" rx="16"/>
+  </clipPath>
+  <clipPath id="cv">
+    <rect x="30" y="748" width="1011" height="638" rx="16"/>
+  </clipPath>
+</defs>
+
+<!-- RECTO label -->
+<text x="30" y="20" font-family="Arial,sans-serif" font-size="20" fill="#555">RECTO</text>
+
+<g clip-path="url(#cr)">
+  
+  <!-- Fond recto -->
+  <rect x="30" y="30" width="1011" height="638" fill="url(#rectoGrad)"/>
+
+  <!-- NFC icon (absolute top-3 right-3 opacity-30) -->
+  <g transform="translate(943, 72) scale(2.333)"
+    fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"
+    opacity="0.3">
+    <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/>
+    <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/>
+    <path d="M12.91 4.1a16.09 16.09 0 0 1 0 15.8"/>
+  </g>
+
+  <!-- Google icon (absolute bottom-3 right-3 opacity-60) -->
+  <g transform="translate(929, 556) scale(2.917)" opacity="0.6">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>
+
+  <!-- Logo (shrink-0, flex items-center) -->
+  
+
+  <!-- businessName (flex-col justify-center) -->
+  <text x="100" y="183"
+    font-family="'Space Grotesk', sans-serif" font-size="56"
+    font-weight="700"
+    letter-spacing="0em"
+    
+    fill="#FFFFFF"
+    text-anchor="start"
+    >VirtualTest</text>
+
+  <!-- slogan (opacity-70 mt-1) -->
+  <text x="100" y="239"
+    font-family="Inter" font-size="42"
+    font-weight="Regular"
+    letter-spacing="0em"
+    
+    fill="#FFFFFF" opacity="0.70"
+    >Slogan test</text>
+
+  <!-- StarsRow (mt-1, size=14) -->
+  <polygon points="124.50,253.00 130.00,269.93 147.80,269.93 133.40,280.39 138.90,297.32 124.50,286.86 110.10,297.32 115.60,280.39 101.20,269.93 119.00,269.93" fill="#FBBF24"/><polygon points="180.50,253.00 186.00,269.93 203.80,269.93 189.40,280.39 194.90,297.32 180.50,286.86 166.10,297.32 171.60,280.39 157.20,269.93 175.00,269.93" fill="#FBBF24"/><polygon points="236.50,253.00 242.00,269.93 259.80,269.93 245.40,280.39 250.90,297.32 236.50,286.86 222.10,297.32 227.60,280.39 213.20,269.93 231.00,269.93" fill="#FBBF24"/><polygon points="292.50,253.00 298.00,269.93 315.80,269.93 301.40,280.39 306.90,297.32 292.50,286.86 278.10,297.32 283.60,280.39 269.20,269.93 287.00,269.93" fill="#FBBF24"/><polygon points="348.50,253.00 354.00,269.93 371.80,269.93 357.40,280.39 362.90,297.32 348.50,286.86 334.10,297.32 339.60,280.39 325.20,269.93 343.00,269.93" fill="#FBBF24"/>
+
+  <!-- Instructions (space-y-1.5) avec checkmarks ✓ -->
+  
+  <circle cx="121" cy="361" r="23.1" fill="#22C55E" opacity="0.12"/>
+  <polyline
+    points="108.4,361 118.9,377.8 135.7,350.5"
+    fill="none" stroke="#22C55E"
+    stroke-width="6.125"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="163" y="382"
+    font-family="'Space Grotesk', sans-serif" font-size="35"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#FFFFFF" opacity="0.90">Approach the phone to the card</text>
+  
+  <circle cx="121" cy="424" r="23.1" fill="#22C55E" opacity="0.12"/>
+  <polyline
+    points="108.4,424 118.9,440.8 135.7,413.5"
+    fill="none" stroke="#22C55E"
+    stroke-width="6.125"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="163" y="445"
+    font-family="'Space Grotesk', sans-serif" font-size="35"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#FFFFFF" opacity="0.90">Tap to leave a review</text>
+
+  <!-- CTA (text-xs opacity-80) -->
+  <text x="100" y="561"
+    font-family="'Space Grotesk', sans-serif" font-size="32"
+    font-weight="500"
+    fill="#FFFFFF" opacity="0.80">Powered by RedVanta</text>
+
+  
+</g>
+
+<!-- Séparateur -->
+<line x1="30" y1="708"
+      x2="1041" y2="708"
+      stroke="#333" stroke-width="1" stroke-dasharray="8 5" opacity="0.5"/>
+
+<!-- VERSO label -->
+<text x="30" y="738" font-family="Arial,sans-serif" font-size="20" fill="#555">VERSO</text>
+
+<g clip-path="url(#cv)">
+  
+  <!-- Fond verso (gradient inversé) -->
+  <rect x="30" y="748" width="1011" height="638" fill="url(#versoGrad)"/>
+
+  <!-- Google icon (absolute bottom-3 right-3 opacity-60) -->
+  <g transform="translate(929, 1274) scale(2.917)" opacity="0.6">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>
+
+  <!-- QR element : fond coloré arrondi (qrColor+"18" / qrColor+"33") -->
+  <rect x="691" y="790" width="280" height="280"
+    rx="10" ry="10"
+    fill="#E10600" fill-opacity="0.094"
+    stroke="#E10600" stroke-opacity="0.2" stroke-width="3"/>
+  <!-- Vrai QR Code — modules colorés avec qrColor -->
+  <svg x="719" y="818"
+       width="224" height="224"
+       viewBox="0 0 21 21" preserveAspectRatio="xMidYMid meet">
+    <g fill="#E10600"><path stroke="#000000" d="M1 1.5h7m1 0h3m2 0h2m1 0h1m1 0h2m1 0h1m2 0h1m3 0h1m2 0h1m2 0h7M1 2.5h1m5 0h1m1 0h1m1 0h2m5 0h2m1 0h1m6 0h2m1 0h1m1 0h1m1 0h1m5 0h1M1 3.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2m1 0h3m1 0h2m1 0h2m3 0h2m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1M1 4.5h1m1 0h3m1 0h1m3 0h3m3 0h2m1 0h1m8 0h4m2 0h1m1 0h3m1 0h1M1 5.5h1m1 0h3m1 0h1m3 0h1m1 0h3m2 0h1m2 0h3m2 0h1m3 0h3m2 0h1m1 0h3m1 0h1M1 6.5h1m5 0h1m1 0h2m1 0h1m1 0h1m1 0h2m4 0h2m2 0h3m1 0h1m4 0h1m5 0h1M1 7.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M9 8.5h7m4 0h1m2 0h1m1 0h2m5 0h1M3 9.5h3m1 0h1m1 0h2m3 0h1m1 0h7m2 0h4m1 0h1m3 0h3m2 0h3M1 10.5h1m1 0h2m1 0h1m1 0h1m2 0h1m1 0h2m6 0h2m2 0h1m1 0h1m1 0h5m1 0h1m1 0h1m1 0h1m1 0h1M5 11.5h3m1 0h2m1 0h5m2 0h3m1 0h1m4 0h1m1 0h1m5 0h1m3 0h1M5 12.5h1m4 0h1m1 0h1m2 0h1m1 0h4m5 0h1m1 0h1m4 0h1m1 0h1m1 0h2m1 0h1M1 13.5h7m2 0h1m2 0h1m1 0h2m1 0h1m1 0h2m5 0h1m2 0h5m1 0h1m1 0h2M4 14.5h1m1 0h1m1 0h1m3 0h2m1 0h2m2 0h1m1 0h1m3 0h2m1 0h1m6 0h1m1 0h2m2 0h1M1 15.5h1m3 0h3m5 0h1m8 0h1m3 0h4m3 0h3m1 0h1m2 0h1M2 16.5h5m1 0h4m1 0h1m1 0h1m1 0h1m1 0h4m1 0h1m3 0h1m2 0h1m1 0h3m1 0h1m2 0h1M2 17.5h8m1 0h1m1 0h3m1 0h2m1 0h3m2 0h4m1 0h1m3 0h1m1 0h1m1 0h4M1 18.5h1m2 0h2m5 0h1m1 0h1m3 0h3m1 0h2m2 0h1m1 0h1m3 0h2m1 0h2m1 0h1m1 0h1m1 0h1M1 19.5h1m2 0h1m2 0h1m1 0h2m1 0h1m2 0h1m2 0h4m4 0h4m1 0h1m1 0h2m2 0h1M1 20.5h1m2 0h3m1 0h1m2 0h1m1 0h2m5 0h1m1 0h1m2 0h1m2 0h1m1 0h1m3 0h1m2 0h1m3 0h1M3 21.5h1m2 0h6m1 0h1m2 0h1m1 0h9m1 0h1m1 0h2m1 0h2m1 0h1m1 0h3M1 22.5h3m1 0h1m2 0h1m2 0h1m2 0h3m1 0h1m1 0h1m3 0h2m3 0h1m1 0h3m1 0h1m1 0h1m2 0h2M4 23.5h4m1 0h2m1 0h4m2 0h2m4 0h1m1 0h6m1 0h1m2 0h3M1 24.5h4m3 0h1m1 0h4m1 0h5m4 0h1m3 0h2m2 0h2m1 0h2m3 0h1M1 25.5h1m1 0h1m1 0h3m1 0h5m3 0h1m1 0h1m1 0h3m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m3 0h2M1 26.5h2m1 0h1m3 0h1m1 0h1m4 0h12m2 0h1m1 0h3m1 0h4m1 0h2M1 27.5h3m3 0h2m2 0h1m1 0h1m1 0h3m2 0h1m4 0h1m2 0h1m1 0h2m1 0h1m2 0h2M3 28.5h1m1 0h1m2 0h1m2 0h2m2 0h2m1 0h1m1 0h1m1 0h2m2 0h4m1 0h3m1 0h2m1 0h1m1 0h2M2 29.5h1m1 0h1m1 0h2m1 0h1m2 0h1m2 0h1m4 0h1m6 0h1m2 0h1m1 0h1m3 0h1m1 0h3M1 30.5h1m1 0h1m2 0h1m2 0h1m3 0h3m4 0h1m5 0h2m3 0h5m1 0h1m1 0h1m1 0h1M1 31.5h1m1 0h2m1 0h2m3 0h1m1 0h2m2 0h1m1 0h1m2 0h2m1 0h2m1 0h1m1 0h2m3 0h1m1 0h1m1 0h2M1 32.5h1m1 0h1m1 0h1m2 0h2m2 0h1m3 0h2m3 0h2m2 0h3m3 0h1m1 0h1m1 0h3m2 0h1M1 33.5h1m2 0h1m2 0h1m1 0h5m1 0h1m1 0h2m1 0h1m3 0h8m1 0h7M9 34.5h2m5 0h1m2 0h1m4 0h1m7 0h2m3 0h1m3 0h1M1 35.5h7m2 0h2m3 0h1m1 0h10m1 0h1m1 0h4m1 0h1m1 0h1m1 0h1M1 36.5h1m5 0h1m2 0h1m2 0h3m2 0h1m4 0h2m1 0h2m1 0h3m1 0h1m3 0h1m3 0h1M1 37.5h1m1 0h3m1 0h1m1 0h3m3 0h1m1 0h1m1 0h3m1 0h4m1 0h1m1 0h1m2 0h5m1 0h1m1 0h1M1 38.5h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h1m4 0h9m1 0h1m4 0h1m1 0h1m4 0h1M1 39.5h1m1 0h3m1 0h1m1 0h3m1 0h2m1 0h1m3 0h1m3 0h1m2 0h2m2 0h1m2 0h7M1 40.5h1m5 0h1m3 0h1m1 0h1m1 0h1m1 0h3m1 0h6m6 0h2m2 0h1m2 0h1M1 41.5h7m2 0h1m1 0h2m2 0h1m4 0h2m1 0h1m2 0h2m1 0h1m3 0h1m1 0h2m1 0h1"/></g>
+  </svg>
+
+  <!-- backBusinessInfo (flex-col items-center gap-1) -->
+  <!-- businessName text-center -->
+  <text x="374.5" y="832"
+    font-family="'Space Grotesk', sans-serif" font-size="42"
+    font-weight="700"
+    fill="#FFFFFF" text-anchor="middle">VirtualTest</text>
+
+  <text x="374.5" y="881"
+    font-family="Inter" font-size="35"
+    font-weight="Regular"
+    fill="#FFFFFF" opacity="0.70" text-anchor="middle">Slogan test</text>
+
+  <!-- StarsRow (size=11) centré -->
+  <polygon points="119.50,895.00 123.88,908.47 138.05,908.47 126.58,916.80 130.96,930.28 119.50,921.95 108.04,930.28 112.42,916.80 100.95,908.47 115.12,908.47" fill="#FBBF24"/><polygon points="165.50,895.00 169.88,908.47 184.05,908.47 172.58,916.80 176.96,930.28 165.50,921.95 154.04,930.28 158.42,916.80 146.95,908.47 161.12,908.47" fill="#FBBF24"/><polygon points="211.50,895.00 215.88,908.47 230.05,908.47 218.58,916.80 222.96,930.28 211.50,921.95 200.04,930.28 204.42,916.80 192.95,908.47 207.12,908.47" fill="#FBBF24"/><polygon points="257.50,895.00 261.88,908.47 276.05,908.47 264.58,916.80 268.96,930.28 257.50,921.95 246.04,930.28 250.42,916.80 238.95,908.47 253.12,908.47" fill="#FBBF24"/><polygon points="303.50,895.00 307.88,908.47 322.05,908.47 310.58,916.80 314.96,930.28 303.50,921.95 292.04,930.28 296.42,916.80 284.95,908.47 299.12,908.47" fill="#FBBF24"/>
+
+  <!-- Instructions verso (items-center gap-1.5) -->
+  
+  <circle cx="119.5" cy="1145.5" r="21.450000000000003" fill="#22C55E" opacity="0.12"/>
+  <polyline
+    points="107.8,1145.5 117.55,1161.1 133.15,1135.75"
+    fill="none" stroke="#22C55E"
+    stroke-width="6.125"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="160" y="1165"
+    font-family="'Space Grotesk', sans-serif" font-size="32"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#FFFFFF" opacity="0.90">Use your phone camera to scan the QR code</text>
+  
+  <circle cx="119.5" cy="1205.5" r="21.450000000000003" fill="#22C55E" opacity="0.12"/>
+  <polyline
+    points="107.8,1205.5 117.55,1221.1 133.15,1195.75"
+    fill="none" stroke="#22C55E"
+    stroke-width="6.125"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="160" y="1225"
+    font-family="'Space Grotesk', sans-serif" font-size="32"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#FFFFFF" opacity="0.90">Write a review on our Google Maps page</text>
+
+  <!-- CTA (text-[10px] opacity-70) centré -->
+  <text x="535.5" y="1344"
+    font-family="'Space Grotesk', sans-serif" font-size="35"
+    font-weight="500"
+    fill="#FFFFFF" opacity="0.70" text-anchor="middle">Powered by RedVanta</text>
+
+  
+</g>
+</svg>

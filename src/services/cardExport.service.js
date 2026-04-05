@@ -1,74 +1,98 @@
 // src/services/cardExport.service.js
 // ─────────────────────────────────────────────────────────────
-// Génération des fichiers d'impression des cartes NFC
-//
-// ⚠️  CHEMIN : process.cwd() — compatible Windows/XAMPP
-//     __dirname + ESM + Windows = résolution instable → NE PAS utiliser
-//
-// Fichiers produits :
-//   public/uploads/cards/{uid}.svg  → vectoriel, impression HD
-//   public/uploads/cards/{uid}.png  → 300 DPI via sharp (ou placeholder si sharp absent)
-//   public/uploads/cards/{uid}.pdf  → PDF A4, recto/verso, pur Node.js (pas de dépendance)
-//
-// Format carte PVC CR80 : 85.6mm × 54mm
+// Génération fiche impression NFC — SVG + PNG + PDF
+// ─────────────────────────────────────────────────────────────
+// CORRECTIONS :
+//   1. resolveLogoDataUri() — chemin corrigé pour matcher saveLogo() du controller
+//      saveLogo() écrit dans : process.env.UPLOAD_DIR || "uploads"  (relatif au CWD)
+//      → on résout depuis ROOT_DIR en cherchant "uploads/" PAS "public/uploads/"
+//   2. <image> SVG — ajout xlink:href en plus de href (compatibilité sharp/libvips)
 // ─────────────────────────────────────────────────────────────
 
-import fs   from "fs";        // sync (existsSync, createReadStream)
-import fsP  from "fs/promises"; // async (mkdir, writeFile, unlink)
-import path from "path";
+import fsP   from "fs/promises";
+import path  from "path";
+import { fileURLToPath } from "url";
 import QRCode from "qrcode";
 
-// ── Chemin absolu résolu depuis la racine du process ─────────
-// process.cwd() = C:\xampp\htdocs\x\backend  sur Windows/XAMPP
-// __dirname en ESM sur Windows peut pointer vers un mauvais chemin
-const EXPORT_DIR = path.join(process.cwd(), "public", "uploads", "cards");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+// Structure : backend/src/services/cardExport.service.js
+// ROOT_DIR  = backend/
+const ROOT_DIR   = path.resolve(__dirname, "../..");
+const PUBLIC_DIR = path.join(ROOT_DIR, "public");
 
-// ── Dimensions carte CR80 ─────────────────────────────────────
-const W_PX = 1011;   // 85.6mm @ 300 DPI
-const H_PX =  638;   // 54mm   @ 300 DPI
-const W_PT =  243;   // points PDF (72pt/inch)
-const H_PT =  153;
+// ── FIX LOGO : UPLOAD_DIR correspond au même dossier que saveLogo() ──────────
+// design.controller.js : path.resolve(process.env.UPLOAD_DIR || "uploads", ...)
+// process.cwd() au moment du lancement = backend/
+// Donc le chemin réel = backend/uploads/designs/logos/xxx.webp
+// On réplique exactement la même logique ici :
+const UPLOAD_DIR = path.resolve(
+  process.cwd(),
+  process.env.UPLOAD_DIR || "uploads"
+);
+console.log(`[cardExport] ROOT_DIR   = ${ROOT_DIR}`);
+console.log(`[cardExport] UPLOAD_DIR = ${UPLOAD_DIR}`);
 
-const GAP    = 60;   // espace entre recto et verso dans le SVG global
-const MARGIN = 20;   // marge extérieure du SVG global
+const EXPORT_DIR = path.join(PUBLIC_DIR, "uploads", "cards");
+
+const CR80 = { W: 1011, H: 638 };
+const RX   = 16;
+const SCALE = 3.5;
+const PAD   = Math.round(20 * SCALE);
+const GAP4  = Math.round(16 * SCALE);
+const SHEET_GAP    = 80;
+const SHEET_MARGIN = 30;
 
 // ─────────────────────────────────────────────────────────────
-// EXPORT PRINCIPAL — appelé depuis nfcCards.superadmin.controller.js
+// EXPORT PRINCIPAL
+// ─────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────
+// EXPORT PRINCIPAL
 // ─────────────────────────────────────────────────────────────
 
 export async function generateCardExport(card, design) {
+  if (!card?.payload) throw new Error(`[cardExport] uid=${card?.uid} — payload manquant`);
 
-  // ── 0. Vérifications préalables ─────────────────────────────
-  if (!card?.payload) {
-    throw new Error(`[cardExport] NFCCard uid=${card?.uid} n'a pas de payload`);
-  }
-
-  // ── 1. Créer le dossier de sortie ───────────────────────────
   await fsP.mkdir(EXPORT_DIR, { recursive: true });
   console.log(`[cardExport] EXPORT_DIR = ${EXPORT_DIR}`);
-  console.log(`[cardExport] Génération uid=${card.uid}`);
+  console.log(`[cardExport] uid = ${card.uid}`);
 
-  // ── 2. QR Code inner SVG (contenu, sans les balises <svg> racines) ─
-  const qrInner = await buildQrInner(card.payload, design);
+  // ── Résoudre le logo en Buffer PNG (bypass total de librsvg) ─────────────
+  // librsvg (moteur SVG de sharp) ne supporte PAS les data URI ni WebP dans <image>.
+  // Solution : on ne met PAS le logo dans le SVG.
+  // On rasterise le SVG sans logo, puis on composite le logo par-dessus avec sharp.
+  let logoPngBuffer = null;
+  if (design?.logoUrl) {
+    logoPngBuffer = await resolveLogoBuffer(design.logoUrl);
+  }
 
-  // ── 3. Données de rendu (couleurs, textes, dimensions) ──────
-  const r = buildRenderData(card, design, qrInner);
+  // normalizeDesign : on passe "HAS_LOGO" pour que le layout réserve l'espace
+  const d = normalizeDesign({ ...design, logoUrl: logoPngBuffer ? "HAS_LOGO" : null }, card);
+  const qrInner = await buildQrInner(card.payload, d);
 
-  // ── 4. SVG global (recto en haut / verso en bas) ────────────
-  const svgContent = buildSheetSvg(r);
+  const totalW = d.cardW + SHEET_MARGIN * 2;
+  const totalH = d.cardH * 2 + SHEET_GAP + SHEET_MARGIN * 2;
+  const rectoY = SHEET_MARGIN;
+  const versoY = SHEET_MARGIN + d.cardH + SHEET_GAP;
+
+  // SVG avec logoUrl="HAS_LOGO" pour que bizTextX soit décalé correctement
+  // mais buildRecto ne génère PAS de balise <image> car logoSvg check la vraie valeur
+  // → le layout réserve l'espace logo, l'overlay sharp pose le vrai PNG dessus
+  const svgContent = buildGlobalSvg(d, qrInner, totalW, totalH, rectoY, versoY);
   const svgPath    = path.join(EXPORT_DIR, `${card.uid}.svg`);
   await fsP.writeFile(svgPath, svgContent, "utf-8");
-  console.log(`[cardExport] ✅ SVG écrit  → ${svgPath}`);
+  console.log(`[cardExport] ✅ SVG → ${svgPath}`);
 
-  // ── 5. PNG via sharp (fallback si sharp absent sur Windows) ─
+  // PNG global avec overlay logo
   const pngPath = path.join(EXPORT_DIR, `${card.uid}.png`);
-  await writePng(svgContent, pngPath, r.totalW, r.totalH);
+  await writePngWithLogoOverlay(svgContent, pngPath, totalW, totalH, d, logoPngBuffer, rectoY);
 
-  // ── 6. PDF pur Node.js (aucune dépendance) ──────────────────
+  // PDF A4 avec overlay logo
   const pdfPath = path.join(EXPORT_DIR, `${card.uid}.pdf`);
-  await writePdf(r, pdfPath);
+  await writePdfWithLogoOverlay(d, qrInner, pdfPath, logoPngBuffer);
 
-  // ── 7. Retourner les URLs publiques ─────────────────────────
   const base = (process.env.APP_URL ?? process.env.FRONTEND_URL ?? "http://localhost:4000").replace(/\/$/, "");
   return {
     svgUrl: `${base}/uploads/cards/${card.uid}.svg`,
@@ -78,536 +102,762 @@ export async function generateCardExport(card, design) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// QR CODE — inner SVG (modules uniquement, sans balise <svg> racine)
+// RÉSOLUTION LOGO → Buffer PNG
+// ─────────────────────────────────────────────────────────────
+// Retourne un Buffer PNG redimensionné prêt pour sharp.composite()
+// Contourne totalement librsvg qui ignore les <image> avec data URI / WebP
+
+async function resolveLogoBuffer(logoUrl) {
+  if (!logoUrl) return null;
+
+  // URL externe non supportée en local (pas de fetch dans ce context)
+  if (logoUrl.startsWith("http://") || logoUrl.startsWith("https://")) {
+    console.warn("[cardExport] ⚠️ Logo URL externe ignoré (non supporté en rendu local)");
+    return null;
+  }
+
+  // Trouver le fichier source — DB stocke /uploads/designs/logos/xxx.webp
+  // Sur Windows path.isAbsolute("/uploads/...") = true → résout vers C:\  ← FAUX
+  const normalized = logoUrl.replace(/\//g, path.sep);
+  const relative   = normalized.startsWith(path.sep) ? normalized.slice(path.sep.length) : normalized;
+  const subPath    = relative.replace(/^uploads[\\\\\/]/, "");
+
+  const candidates = [
+    path.join(ROOT_DIR, relative),       // backend/uploads/designs/logos/xxx.webp ✅
+    path.join(PUBLIC_DIR, relative),     // backend/public/uploads/...
+    path.join(UPLOAD_DIR, subPath),      // CWD/uploads/designs/logos/xxx.webp
+  ];
+
+  let srcPath = null;
+  for (const c of candidates) {
+    if (await fsP.access(c).then(() => true).catch(() => false)) {
+      srcPath = c;
+      console.log(`[cardExport] 🔍 Logo source : ${srcPath}`);
+      break;
+    }
+  }
+
+  if (!srcPath) {
+    console.warn(`[cardExport] ⚠️ Logo introuvable — logoUrl="${logoUrl}"`);
+    candidates.forEach((c, i) => console.warn(`[cardExport]   candidate${i+1} = ${c}`));
+    return null;
+  }
+
+  try {
+    const sharp = (await import("sharp")).default;
+    // On retourne le buffer source brut (PNG haute qualité)
+    // Le resize à la bonne taille (d.logoSize * SCALE) se fait dans writePngWithLogoOverlay / writePdfWithLogoOverlay
+    const buf = await sharp(srcPath).png().toBuffer();
+    console.log(`[cardExport] ✅ Logo Buffer PNG source prêt (${buf.length} bytes)`);
+    return buf;
+  } catch (e) {
+    console.warn(`[cardExport] ⚠️ Erreur conversion logo : ${e.message}`);
+    return null;
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// NORMALISATION DU DESIGN
 // ─────────────────────────────────────────────────────────────
 
-async function buildQrInner(payload, design) {
-  const dark  = design?.accentColor ?? "#000000";
-  const light = design?.bgColor     ?? "#FFFFFF";
+const LETTER_SPACING_MAP = {
+  tight:  "-0.025em",
+  normal: "0em",
+  wide:   "0.05em",
+  wider:  "0.1em",
+};
+
+function normalizeDesign(d, card) {
+  d = d ?? {};
+  const colorMode   = d.colorMode   ?? "single";
+  const orientation = d.orientation ?? "landscape";
+  const isLandscape = orientation !== "portrait";
+  const cardW = isLandscape ? CR80.W : CR80.H;
+  const cardH = isLandscape ? CR80.H : CR80.W;
+
+  const bg1  = colorMode === "single" ? (d.bgColor ?? "#0D0D0D") : (d.gradient1 ?? d.bgColor ?? "#0D0D0D");
+  const bg2  = colorMode === "single" ? bg1 : (d.gradient2 ?? "#161616");
+  const vbg1 = colorMode === "single" ? bg1 : bg2;
+  const vbg2 = colorMode === "single" ? bg1 : bg1;
+
+  const accentBand1  = d.accentBand1  ?? d.accentColor ?? "#E10600";
+  const accentBand2  = d.accentBand2  ?? accentBand1;
+  const bandPosition = d.bandPosition ?? "bottom";
+  const frontBandH   = d.frontBandHeight ?? 22;
+  const backBandH    = d.backBandHeight  ?? 12;
+
+  const nameFont       = d.businessFont       ?? d.nameFont       ?? "\'Space Grotesk\', sans-serif";
+  const nameFontSize   = d.businessFontSize    ?? d.nameFontSize   ?? 16;
+  const nameFontWeight = d.businessFontWeight  ?? d.nameFontWeight ?? "700";
+  const nameLetSpacing = LETTER_SPACING_MAP[d.businessFontSpacing ?? d.nameLetterSpacing] ?? "0em";
+  const nameTransform  = (d.businessTextTransform ?? d.nameTextTransform) === "none"
+    ? null : (d.businessTextTransform ?? d.nameTextTransform ?? null);
+  const nameAlign      = d.businessAlign      ?? d.nameTextAlign  ?? "left";
+  const nameLineH      = d.businessLineHeight ?? d.nameLineHeight ?? "1.2";
+
+  const sloganFont       = d.sloganFont       ?? nameFont;
+  const sloganFontSize   = d.sloganFontSize   ?? 12;
+  const sloganFontWeight = d.sloganFontWeight ?? "400";
+  const sloganLetSpacing = LETTER_SPACING_MAP[d.sloganFontSpacing ?? d.sloganLetterSpacing] ?? "0em";
+  const sloganTransform  = d.sloganTextTransform === "none" ? null : (d.sloganTextTransform ?? null);
+  const sloganAlign      = d.sloganAlign      ?? d.sloganTextAlign ?? "left";
+
+  const instrFont       = d.instrFont       ?? d.instructionFont       ?? nameFont;
+  const instrFontSize   = d.instrFontSize   ?? d.instructionFontSize   ?? 10;
+  const instrFontWeight = d.instrFontWeight ?? d.instructionFontWeight ?? "400";
+  const instrLetSpacing = LETTER_SPACING_MAP[d.instrFontSpacing ?? d.instructionLetterSpacing] ?? "0em";
+  const instrAlign      = d.instrAlign      ?? d.instructionTextAlign  ?? "left";
+
+  const qrColor    = d.accentColor ?? d.qrColor    ?? "#E10600";
+  const qrSize     = d.qrCodeSize  ?? d.qrSize     ?? 80;
+  const qrPosition = d.qrPosition  ?? (isLandscape ? "right" : "top");
+
+  const logoUrl      = d.logoUrl      ?? null;
+  const logoPosition = d.logoPosition ?? (isLandscape ? "left" : "top-center");
+  const logoSize     = d.logoSize     ?? 32;
+
+  const starsColor       = d.starColor       ?? d.starsColor      ?? "#FBBF24";
+  const iconsColor       = d.iconsColor      ?? "#22C55E";
+  const checkStrokeWidth = d.checkStrokeWidth ?? 3.5;
+  const showNfcIcon      = d.showNfcIcon     !== false;
+  const showGoogleIcon   = d.showGoogleIcon  !== false;
+  const nfcIconSize      = d.nfcIconSize     ?? 24;
+  const googleIconSize   = d.googleLogoSize  ?? d.googleIconSize  ?? 20;
+
+  const textColor     = d.textColor ?? "#FFFFFF";
+  const businessName  = esc(d.businessName ?? card?.locationName ?? "Business Name");
+  const sloganText    = d.slogan ? esc(d.slogan) : null;
+  const ctaText       = esc(d.cta ?? d.callToAction ?? "Powered by RedVanta");
+  const ctaPaddingTop = d.ctaPaddingTop ?? 8;
+
+  const frontLine1 = esc(d.frontInstruction1 ?? d.frontLine1 ?? "Approach the phone to the card");
+  const frontLine2 = esc(d.frontInstruction2 ?? d.frontLine2 ?? "Tap to leave a review");
+  const backLine1  = esc(d.backInstruction1  ?? d.backLine1  ?? "Use your phone camera to scan the QR code");
+  const backLine2  = esc(d.backInstruction2  ?? d.backLine2  ?? "Write a review on our Google Maps page");
+  const pattern    = d.pattern ?? "none";
+
+  return {
+    cardW, cardH, isLandscape,
+    colorMode, bg1, bg2, vbg1, vbg2, textColor,
+    accentBand1, accentBand2, bandPosition, frontBandH, backBandH,
+    nameFont, nameFontSize, nameFontWeight, nameLetSpacing, nameTransform, nameAlign, nameLineH,
+    sloganFont, sloganFontSize, sloganFontWeight, sloganLetSpacing, sloganTransform, sloganAlign,
+    instrFont, instrFontSize, instrFontWeight, instrLetSpacing, instrAlign,
+    qrColor, qrSize, qrPosition,
+    logoUrl, logoPosition, logoSize,
+    starsColor, iconsColor, checkStrokeWidth,
+    showNfcIcon, nfcIconSize, showGoogleIcon, googleIconSize,
+    businessName, sloganText, ctaText, ctaPaddingTop,
+    frontLine1, frontLine2, backLine1, backLine2, pattern,
+  };
+}
+
+async function buildQrInner(payload, d) {
   const svgStr = await QRCode.toString(payload, {
-    type: "svg",
+    type:                 "svg",
     errorCorrectionLevel: "H",
-    margin: 1,
-    color: { dark, light },
+    margin:               0,          // FIX : margin 0 pour maximiser la taille des modules
+    color: {
+      dark:  d.qrColor,
+      light: "#00000000",
+    },
   });
-  // Extraire le contenu intérieur de <svg>…</svg>
   const m = svgStr.match(/<svg[^>]*>([\s\S]*?)<\/svg>/);
   return m ? m[1] : svgStr;
 }
 
 // ─────────────────────────────────────────────────────────────
-// DONNÉES DE RENDU — lit tous les champs du modèle Design Prisma
+// SVG GLOBAL
 // ─────────────────────────────────────────────────────────────
 
-function buildRenderData(card, design, qrInner) {
-  const d = design ?? {};
-
-  const isPortrait = d.orientation === "portrait";
-  const cardW      = isPortrait ? H_PX : W_PX;
-  const cardH      = isPortrait ? W_PX : H_PX;
-  const qrPct      = d.qrCodeSize    ?? 60;           // % hauteur carte
-  const qrSz       = Math.round(cardH * qrPct / 100);
-  const qrPos      = d.qrCodeStyle   ?? "left";       // left | right
-
-  return {
-    card, uid: card.uid,
-    // Dimensions
-    cardW, cardH,
-    totalW: cardW + MARGIN * 2,
-    totalH: cardH * 2 + GAP + MARGIN * 2,
-    rectoY: MARGIN,
-    versoY: MARGIN + cardH + GAP,
-    // QR
-    qrInner, qrSz, qrPos,
-    qrX:      qrPos === "right" ? cardW - qrSz - 24 : 24,
-    contentX: qrPos === "right" ? 24 : qrSz + 48,
-    // Couleurs
-    bg:        d.bgColor       ?? "#0B0D0F",
-    text:      d.textColor     ?? "#FFFFFF",
-    accent:    d.accentColor   ?? "#E10600",
-    grad1:     d.gradient1     ?? d.bgColor     ?? "#0B0D0F",
-    grad2:     d.gradient2     ?? "#1A1A1A",
-    band:      d.accentBand1   ?? d.accentColor  ?? "#E10600",
-    bandPos:   d.bandPosition  ?? "bottom",
-    frontBandH: d.frontBandHeight ?? 22,   // % hauteur
-    backBandH:  d.backBandHeight  ?? 12,
-    // Typographie
-    bizFont:   esc(d.businessFont       ?? "Arial"),
-    bizSize:   d.businessFontSize       ?? 16,
-    bizWeight: d.businessFontWeight     ?? "700",
-    sloFont:   esc(d.sloganFont         ?? "Arial"),
-    sloSize:   d.sloganFontSize         ?? 11,
-    // Textes
-    biz:       esc(d.businessName       ?? card.locationName ?? "Business"),
-    slogan:    d.slogan   ? esc(d.slogan)   : null,
-    cta:       esc(d.callToAction       ?? "Powered by Opinoor"),
-    fi1:       esc(d.frontInstruction1  ?? "Approchez votre téléphone"),
-    fi2:       esc(d.frontInstruction2  ?? "Appuyez pour laisser un avis"),
-    bi1:       d.backInstruction1 ? esc(d.backInstruction1) : null,
-    bi2:       d.backInstruction2 ? esc(d.backInstruction2) : null,
-    nfcIcon:   d.showNfcIcon    !== false,
-    gIcon:     d.showGoogleIcon !== false,
-  };
-}
-
-// ─────────────────────────────────────────────────────────────
-// SVG GLOBAL — RECTO (haut) + VERSO (bas)
-// ─────────────────────────────────────────────────────────────
-
-function buildSheetSvg(r) {
-  const {
-    cardW, cardH, totalW, totalH, rectoY, versoY,
-    bg, text, accent, grad1, grad2, band, bandPos, frontBandH, backBandH,
-    bizFont, bizSize, bizWeight, sloFont, sloSize,
-    qrInner, qrSz, qrX, contentX,
-    biz, slogan, cta, fi1, fi2, bi1, bi2, nfcIcon, gIcon,
-  } = r;
-
-  const fBandH = Math.round(cardH * frontBandH / 100);
-  const fBandY = bandPos === "top" ? 0 : cardH - fBandH;
-  const bBandH = Math.round(cardH * backBandH  / 100);
-
+function buildGlobalSvg(d, qrInner, totalW, totalH, rectoY, versoY) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
   width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">
 <defs>
-  <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-    <stop offset="0%"   stop-color="${grad1}"/>
-    <stop offset="100%" stop-color="${grad2}"/>
-  </linearGradient>
-  <clipPath id="rc"><rect x="${MARGIN}" y="${rectoY}" width="${cardW}" height="${cardH}" rx="16"/></clipPath>
-  <clipPath id="vc"><rect x="${MARGIN}" y="${versoY}" width="${cardW}" height="${cardH}" rx="16"/></clipPath>
+  ${buildGradientDefs(d)}
+  <clipPath id="cr">
+    <rect x="${SHEET_MARGIN}" y="${rectoY}" width="${d.cardW}" height="${d.cardH}" rx="${RX}"/>
+  </clipPath>
+  <clipPath id="cv">
+    <rect x="${SHEET_MARGIN}" y="${versoY}" width="${d.cardW}" height="${d.cardH}" rx="${RX}"/>
+  </clipPath>
 </defs>
 
-<!-- ═══ LABEL RECTO ═══ -->
-<text x="${MARGIN}" y="${rectoY - 8}" font-family="Arial,sans-serif" font-size="11" fill="#777">RECTO</text>
-
-<!-- ═══ RECTO ═══ -->
-<g clip-path="url(#rc)">
-  <rect x="${MARGIN}" y="${rectoY}" width="${cardW}" height="${cardH}" fill="url(#bg)"/>
-  <rect x="${MARGIN}" y="${rectoY + fBandY}" width="${cardW}" height="${fBandH}" fill="${band}" opacity="0.9"/>
-
-  <!-- QR Code -->
-  <g transform="translate(${MARGIN + qrX},${rectoY + (cardH - qrSz) / 2})">
-    <svg viewBox="0 0 21 21" width="${qrSz}" height="${qrSz}" preserveAspectRatio="xMidYMid meet">
-      ${qrInner}
-    </svg>
-  </g>
-
-  <!-- Nom business -->
-  <text x="${MARGIN + contentX}" y="${rectoY + 44}"
-    font-family="${bizFont},Arial,sans-serif" font-size="${bizSize}" font-weight="${bizWeight}"
-    fill="${text}" dominant-baseline="central">${biz}</text>
-
-  ${slogan ? `<text x="${MARGIN + contentX}" y="${rectoY + 44 + bizSize + 10}"
-    font-family="${sloFont},Arial,sans-serif" font-size="${sloSize}"
-    fill="${text}" opacity="0.72" dominant-baseline="central">${slogan}</text>` : ""}
-
-  <!-- Étoiles décoratives -->
-  ${stars(MARGIN + contentX, rectoY + cardH / 2 - 8, 5, 10)}
-
-  <!-- Instructions -->
-  <text x="${MARGIN + contentX}" y="${rectoY + cardH - 52}"
-    font-family="Arial,sans-serif" font-size="9" fill="${text}" opacity="0.58">${fi1}</text>
-  <text x="${MARGIN + contentX}" y="${rectoY + cardH - 35}"
-    font-family="Arial,sans-serif" font-size="9" fill="${text}" opacity="0.58">${fi2}</text>
-
-  ${gIcon ? googleG(MARGIN + cardW - 32, rectoY + 18, 14) : ""}
+<text x="${SHEET_MARGIN}" y="${rectoY - 10}" font-family="Arial,sans-serif" font-size="20" fill="#555">RECTO</text>
+<g clip-path="url(#cr)">
+  ${buildRecto(d, qrInner, SHEET_MARGIN, rectoY)}
 </g>
 
-<!-- Séparateur pointillé -->
-<line x1="${MARGIN}" y1="${rectoY + cardH + GAP / 2}"
-      x2="${MARGIN + cardW}" y2="${rectoY + cardH + GAP / 2}"
-      stroke="#555" stroke-width="0.5" stroke-dasharray="5 4" opacity="0.35"/>
+<line x1="${SHEET_MARGIN}" y1="${rectoY + d.cardH + SHEET_GAP / 2}"
+      x2="${SHEET_MARGIN + d.cardW}" y2="${rectoY + d.cardH + SHEET_GAP / 2}"
+      stroke="#333" stroke-width="1" stroke-dasharray="8 5" opacity="0.5"/>
 
-<!-- ═══ LABEL VERSO ═══ -->
-<text x="${MARGIN}" y="${versoY - 8}" font-family="Arial,sans-serif" font-size="11" fill="#777">VERSO</text>
-
-<!-- ═══ VERSO ═══ -->
-<g clip-path="url(#vc)">
-  <rect x="${MARGIN}" y="${versoY}" width="${cardW}" height="${cardH}" fill="url(#bg)"/>
-  <rect x="${MARGIN}" y="${versoY}" width="${cardW}" height="${bBandH}" fill="${band}" opacity="0.7"/>
-
-  ${nfcIcon ? nfc(MARGIN + cardW / 2, versoY + cardH / 2 - 14, 34, accent) : ""}
-
-  ${bi1 ? `<text x="${MARGIN + cardW / 2}" y="${versoY + cardH - 44}"
-    font-family="Arial,sans-serif" font-size="9" fill="${text}" opacity="0.58"
-    text-anchor="middle">${bi1}</text>` : ""}
-  ${bi2 ? `<text x="${MARGIN + cardW / 2}" y="${versoY + cardH - 27}"
-    font-family="Arial,sans-serif" font-size="9" fill="${text}" opacity="0.58"
-    text-anchor="middle">${bi2}</text>` : ""}
-
-  <text x="${MARGIN + cardW / 2}" y="${versoY + cardH - 10}"
-    font-family="Arial,sans-serif" font-size="8" fill="${text}" opacity="0.32"
-    text-anchor="middle">${cta}</text>
+<text x="${SHEET_MARGIN}" y="${versoY - 10}" font-family="Arial,sans-serif" font-size="20" fill="#555">VERSO</text>
+<g clip-path="url(#cv)">
+  ${buildVerso(d, qrInner, SHEET_MARGIN, versoY)}
 </g>
 </svg>`;
 }
 
-// ─────────────────────────────────────────────────────────────
-// PNG — via sharp avec fallback PNG minimal valide
-// ─────────────────────────────────────────────────────────────
-
-async function writePng(svgContent, outPath, w, h) {
-  try {
-    const sharp = (await import("sharp")).default;
-    await sharp(Buffer.from(svgContent))
-      .resize(w, h)
-      .png({ compressionLevel: 6 })
-      .toFile(outPath);
-    console.log(`[cardExport] ✅ PNG (sharp) → ${outPath}`);
-  } catch (e) {
-    console.warn(`[cardExport] ⚠️  sharp échoue (${e.message}) — PNG placeholder`);
-    // PNG 1×1 transparent valide — au moins le fichier existe
-    const placeholder = Buffer.from(
-      "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489000000" +
-      "0a49444154789c6260000000000200e221bc330000000049454e44ae426082",
-      "hex"
-    );
-    await fsP.writeFile(outPath, placeholder);
-    console.warn(`[cardExport] ⚠️  PNG placeholder écrit — installez sharp pour la vraie image`);
-  }
+function buildGradientDefs(d) {
+  return `
+  <linearGradient id="rectoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%"  stop-color="${d.bg1}"/>
+    <stop offset="70%" stop-color="${d.bg2}"/>
+  </linearGradient>
+  <linearGradient id="versoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%"   stop-color="${d.vbg1}"/>
+    <stop offset="100%" stop-color="${d.vbg2}"/>
+  </linearGradient>
+  <linearGradient id="bandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%"   stop-color="${d.accentBand1}"/>
+    <stop offset="100%" stop-color="${d.accentBand2}"/>
+  </linearGradient>`;
 }
 
 // ─────────────────────────────────────────────────────────────
-// PDF — pur Node.js, aucune dépendance
-// A4 (595×842 pt) : recto centré en haut, verso centré en bas
-// Deux cas :
-//   A) sharp disponible → images JPEG embarquées (qualité maximale)
-//   B) sharp absent     → rectangles colorés + texte (lisible, imprimable)
+// RECTO
 // ─────────────────────────────────────────────────────────────
 
-async function writePdf(r, outPath) {
-  const PAGE_W = 595, PAGE_H = 842;
-  const CX     = (PAGE_W - W_PT) / 2;
-  const RY     = 90;   // Y recto (depuis le haut de la page)
-  const VY     = 470;  // Y verso
+function buildRecto(d, _qrInner, ox, oy) {
+  const W = d.cardW, H = d.cardH;
 
-  // Essayer avec sharp pour des images JPEG dans le PDF
-  try {
-    const sharp = (await import("sharp")).default;
+  const logoSzPx  = Math.round(d.logoSize       * SCALE);
+  const nameSzPx  = Math.round(d.nameFontSize    * SCALE);
+  const sloganSzPx= Math.round(d.sloganFontSize  * SCALE);
+  const instrSzPx = Math.round(d.instrFontSize   * SCALE);
+  const ctaSzPx   = Math.round(9 * SCALE);
+  const nfcSzPx   = Math.round(d.nfcIconSize     * SCALE);
+  const gSzPx     = Math.round(d.googleIconSize  * SCALE);
+  const starSzPx  = Math.round(14 * SCALE);
+  const checkSzPx = Math.round(12 * SCALE);
+  const instrGap  = Math.round(6  * SCALE);
+  const ctaPadTop = Math.round(d.ctaPaddingTop   * SCALE);
 
-    const rectoSvg = buildFaceSvg("recto", r);
-    const versoSvg = buildFaceSvg("verso",  r);
+  const contentH  = nameSzPx + sloganSzPx + starSzPx + GAP4 + checkSzPx * 2 + instrGap + GAP4 + ctaSzPx + ctaPadTop + 20;
+  const contentY  = Math.round((H - contentH) / 2);
 
-    const [rectoJpeg, versoJpeg] = await Promise.all([
-      sharp(Buffer.from(rectoSvg)).resize(Math.round(W_PT * 4), Math.round(H_PT * 4)).jpeg({ quality: 92 }).toBuffer(),
-      sharp(Buffer.from(versoSvg)).resize(Math.round(W_PT * 4), Math.round(H_PT * 4)).jpeg({ quality: 92 }).toBuffer(),
-    ]);
+  const bizRowY   = contentY;
+  const instrY    = bizRowY + Math.max(logoSzPx, nameSzPx + sloganSzPx + starSzPx + 10) + GAP4;
+  const instr1Y   = instrY + checkSzPx;
+  const instr2Y   = instr1Y + checkSzPx + instrGap;
+  const ctaY      = instr2Y + ctaSzPx + GAP4 + ctaPadTop;
 
-    const pdfBuf = pdfWithImages(PAGE_W, PAGE_H, CX, RY, VY, W_PT, H_PT, rectoJpeg, versoJpeg);
-    await fsP.writeFile(outPath, pdfBuf);
-    console.log(`[cardExport] ✅ PDF (images JPEG) → ${outPath}`);
-    return;
-  } catch (e) {
-    console.warn(`[cardExport] ⚠️  sharp absent pour PDF (${e.message}) — PDF vectoriel`);
-  }
+  const bizTextX  = d.logoUrl ? PAD + logoSzPx + Math.round(6 * SCALE) : PAD;
 
-  // Fallback PDF vectoriel pur — toujours fonctionnel
-  const pdfBuf = pdfVectorial(PAGE_W, PAGE_H, CX, RY, VY, W_PT, H_PT, r);
-  await fsP.writeFile(outPath, pdfBuf);
-  console.log(`[cardExport] ✅ PDF (vectoriel fallback) → ${outPath}`);
+  const nfcX = ox + W - Math.round(12 * SCALE) - nfcSzPx;
+  const nfcY = oy + Math.round(12 * SCALE);
+  const gX   = ox + W - Math.round(12 * SCALE) - gSzPx;
+  const gY   = oy + H - Math.round(12 * SCALE) - gSzPx;
+
+  const bandSvg = d.colorMode === "template" && d.bandPosition !== "hidden"
+    ? buildBandSvg(d, ox, oy, W, H, d.frontBandH) : "";
+
+  // logoUrl="HAS_LOGO" → réserve l'espace (bizTextX décalé) mais pas de balise <image>
+  // Le vrai logo est composé après rasterisation via sharp.composite()
+  const isRealLogoUrl = d.logoUrl && d.logoUrl !== "HAS_LOGO"
+    && !d.logoUrl.startsWith("HAS_");
+  const logoSvg = isRealLogoUrl ? `<image
+    x="${ox + PAD}" y="${oy + bizRowY}"
+    width="${logoSzPx}" height="${logoSzPx}"
+    xlink:href="${d.logoUrl}"
+    href="${d.logoUrl}"
+    preserveAspectRatio="xMidYMid meet"/>` : "";
+
+  return `
+  <!-- Fond recto -->
+  <rect x="${ox}" y="${oy}" width="${W}" height="${H}" fill="url(#rectoGrad)"/>
+
+  <!-- NFC icon (absolute top-3 right-3 opacity-30) -->
+  ${d.showNfcIcon ? buildNfcIcon(nfcX, nfcY, nfcSzPx, d.textColor, 0.30) : ""}
+
+  <!-- Google icon (absolute bottom-3 right-3 opacity-60) -->
+  ${d.showGoogleIcon ? buildGoogleIcon(gX, gY, gSzPx, 0.60) : ""}
+
+  <!-- Logo -->
+  ${logoSvg}
+
+  <!-- businessName -->
+  <text x="${ox + bizTextX}" y="${oy + bizRowY + nameSzPx}"
+    font-family="${d.nameFont}" font-size="${nameSzPx}"
+    font-weight="${d.nameFontWeight}"
+    letter-spacing="${d.nameLetSpacing}"
+    ${d.nameTransform ? `text-transform="${d.nameTransform}"` : ""}
+    fill="${d.textColor}"
+    text-anchor="${d.nameAlign === 'center' ? 'middle' : d.nameAlign === 'right' ? 'end' : 'start'}"
+    >${d.businessName}</text>
+
+  <!-- slogan -->
+  ${d.sloganText ? `<text x="${ox + bizTextX}" y="${oy + bizRowY + nameSzPx + Math.round(4*SCALE) + sloganSzPx}"
+    font-family="${d.sloganFont}" font-size="${sloganSzPx}"
+    font-weight="${d.sloganFontWeight}"
+    letter-spacing="${d.sloganLetSpacing}"
+    ${d.sloganTransform ? `text-transform="${d.sloganTransform}"` : ""}
+    fill="${d.textColor}" opacity="0.70"
+    >${d.sloganText}</text>` : ""}
+
+  <!-- StarsRow -->
+  ${buildStarsRow(
+    ox + bizTextX,
+    oy + bizRowY + nameSzPx + (d.sloganText ? sloganSzPx + Math.round(4*SCALE) : 0) + Math.round(4*SCALE) + starSzPx,
+    5, starSzPx, d.starsColor
+  )}
+
+  <!-- Instructions -->
+  ${buildCheckLine(ox + PAD, oy + instr1Y, d.frontLine1, d, instrSzPx, checkSzPx)}
+  ${d.frontLine2 ? buildCheckLine(ox + PAD, oy + instr2Y, d.frontLine2, d, instrSzPx, checkSzPx) : ""}
+
+  <!-- CTA -->
+  <text x="${ox + PAD}" y="${oy + ctaY}"
+    font-family="${d.instrFont}" font-size="${ctaSzPx}"
+    font-weight="500"
+    fill="${d.textColor}" opacity="0.80">${d.ctaText}</text>
+
+  ${bandSvg}`;
 }
 
 // ─────────────────────────────────────────────────────────────
-// SVG d'une seule face (pour rasterisation PDF)
+// VERSO
 // ─────────────────────────────────────────────────────────────
 
-function buildFaceSvg(face, r) {
-  const { cardW, cardH, bg, text, accent, grad1, grad2, band, bandPos,
-          frontBandH, backBandH, bizFont, bizSize, bizWeight, sloFont, sloSize,
-          qrInner, qrSz, qrX, contentX,
-          biz, slogan, fi1, fi2, bi1, bi2, nfcIcon, cta } = r;
+function buildVerso(d, qrInner, ox, oy) {
+  const W = d.cardW, H = d.cardH;
 
-  if (face === "recto") {
-    const fh = Math.round(cardH * frontBandH / 100);
-    const fy = bandPos === "top" ? 0 : cardH - fh;
-    return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-      viewBox="0 0 ${cardW} ${cardH}" width="${cardW}" height="${cardH}">
-      <defs>
-        <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="${grad1}"/>
-          <stop offset="100%" stop-color="${grad2}"/>
-        </linearGradient>
-        <clipPath id="cc"><rect width="${cardW}" height="${cardH}" rx="12"/></clipPath>
-      </defs>
-      <g clip-path="url(#cc)">
-        <rect width="${cardW}" height="${cardH}" fill="url(#g)"/>
-        <rect y="${fy}" width="${cardW}" height="${fh}" fill="${band}" opacity="0.9"/>
-        <g transform="translate(${qrX},${(cardH - qrSz) / 2})">
-          <svg viewBox="0 0 21 21" width="${qrSz}" height="${qrSz}">${qrInner}</svg>
-        </g>
-        <text x="${contentX}" y="44" font-family="${bizFont},Arial,sans-serif"
-          font-size="${bizSize}" font-weight="${bizWeight}"
-          fill="${text}" dominant-baseline="central">${biz}</text>
-        ${slogan ? `<text x="${contentX}" y="${44 + bizSize + 10}"
-          font-family="${sloFont},Arial,sans-serif" font-size="${sloSize}"
-          fill="${text}" opacity="0.72" dominant-baseline="central">${slogan}</text>` : ""}
-        ${stars(contentX, cardH / 2 - 8, 5, 10)}
-        <text x="${contentX}" y="${cardH - 52}" font-family="Arial,sans-serif"
-          font-size="9" fill="${text}" opacity="0.58">${fi1}</text>
-        <text x="${contentX}" y="${cardH - 35}" font-family="Arial,sans-serif"
-          font-size="9" fill="${text}" opacity="0.58">${fi2}</text>
-      </g>
-    </svg>`;
+  const nameSzPx   = Math.round(Math.max(d.nameFontSize - 4, 8) * SCALE);
+  const sloganSzPx = Math.round(Math.max(d.sloganFontSize - 2, 7) * SCALE);
+  const instrSzPx  = Math.round(Math.max(d.instrFontSize - 1, 7) * SCALE);
+  const ctaSzPx    = Math.round(10 * SCALE);
+  const starSzPx   = Math.round(11 * SCALE);
+  const checkSzPx  = Math.round(11 * SCALE);
+  const gSzPx      = Math.round(d.googleIconSize * SCALE);
+
+  const rowGap   = Math.round(12 * SCALE);
+  const gap4     = GAP4;
+  const instrGap = Math.round(6 * SCALE);
+  const ctaPadTop = Math.round(d.ctaPaddingTop * SCALE);
+
+  const qrSzPx    = Math.min(Math.round(d.qrSize * SCALE), Math.round(H * 0.50));
+  const qrPad     = Math.round(qrSzPx * 0.08);
+  const qrInnerSz = qrSzPx - qrPad * 2;
+
+  const isQrHoriz = d.qrPosition === "left" || d.qrPosition === "right";
+  const isQrFirst = d.qrPosition === "left"  || d.qrPosition === "top";
+
+  const sloganLineH = d.sloganText ? sloganSzPx + Math.round(4 * SCALE) : 0;
+  const infoH  = nameSzPx + Math.round(4 * SCALE) + sloganLineH + Math.round(4 * SCALE) + starSzPx;
+
+  const topRowH = Math.max(qrSzPx, infoH);
+  const instrTotalH = checkSzPx + instrGap + checkSzPx;
+  const totalH = topRowH + gap4 + instrTotalH + gap4 + ctaSzPx + ctaPadTop;
+  const startY = Math.round((H - totalH) / 2);
+
+  const topRowTop  = startY;
+  const instrTop   = topRowTop + topRowH + gap4;
+  const instr1Base = instrTop + checkSzPx;
+  const instr2Base = instr1Base + instrGap + checkSzPx;
+  const ctaBase    = instr2Base + gap4 + ctaSzPx + ctaPadTop;
+
+  const infoBlockW = Math.round(W * 0.40);
+  const topRowW    = isQrHoriz ? (infoBlockW + rowGap + qrSzPx) : Math.max(qrSzPx, infoBlockW);
+  const topRowX    = Math.round((W - topRowW) / 2);
+
+  let qrX, infoBlockX;
+  if (isQrHoriz) {
+    if (isQrFirst) {
+      qrX        = ox + topRowX;
+      infoBlockX = qrX + qrSzPx + rowGap;
+    } else {
+      infoBlockX = ox + topRowX;
+      qrX        = infoBlockX + infoBlockW + rowGap;
+    }
+  } else {
+    qrX        = ox + Math.round((W - qrSzPx) / 2);
+    infoBlockX = ox + Math.round((W - infoBlockW) / 2);
   }
 
-  // VERSO
-  const bh = Math.round(cardH * backBandH / 100);
-  return `<svg xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 ${cardW} ${cardH}" width="${cardW}" height="${cardH}">
-    <defs>
-      <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stop-color="${grad1}"/>
-        <stop offset="100%" stop-color="${grad2}"/>
-      </linearGradient>
-      <clipPath id="cc"><rect width="${cardW}" height="${cardH}" rx="12"/></clipPath>
-    </defs>
-    <g clip-path="url(#cc)">
-      <rect width="${cardW}" height="${cardH}" fill="url(#g)"/>
-      <rect width="${cardW}" height="${bh}" fill="${band}" opacity="0.7"/>
-      ${nfcIcon ? nfc(cardW / 2, cardH / 2 - 14, 34, accent) : ""}
-      ${bi1 ? `<text x="${cardW / 2}" y="${cardH - 44}" font-family="Arial,sans-serif"
-        font-size="9" fill="${text}" opacity="0.58" text-anchor="middle">${bi1}</text>` : ""}
-      ${bi2 ? `<text x="${cardW / 2}" y="${cardH - 27}" font-family="Arial,sans-serif"
-        font-size="9" fill="${text}" opacity="0.58" text-anchor="middle">${bi2}</text>` : ""}
-      <text x="${cardW / 2}" y="${cardH - 10}" font-family="Arial,sans-serif"
-        font-size="8" fill="${text}" opacity="0.32" text-anchor="middle">${cta}</text>
-    </g>
-  </svg>`;
-}
+  const infoCX = infoBlockX + Math.round(infoBlockW / 2);
+  const qrY    = oy + topRowTop + Math.round((topRowH - qrSzPx) / 2);
 
-// ─────────────────────────────────────────────────────────────
-// PDF avec images JPEG (quand sharp est disponible)
-// Structure PDF/1.4 minimale, 6 objets
-// ─────────────────────────────────────────────────────────────
+  const infoTopY    = oy + topRowTop + Math.round((topRowH - infoH) / 2);
+  const nameBaseY   = infoTopY + nameSzPx;
+  const sloganBaseY = nameBaseY + Math.round(4 * SCALE) + sloganSzPx;
+  const starsY      = (d.sloganText ? sloganBaseY : nameBaseY) + Math.round(4 * SCALE) + starSzPx;
 
-function pdfWithImages(PW, PH, cx, ry, vy, cw, ch, rectoJpeg, versoJpeg) {
-  const parts  = [];
-  const xrefs  = [];
-  let   offset = 0;
+  const gX = ox + W - Math.round(12 * SCALE) - gSzPx;
+  const gY = oy + H - Math.round(12 * SCALE) - gSzPx;
 
-  function add(s) {
-    const b = Buffer.isBuffer(s) ? s : Buffer.from(s, "binary");
-    xrefs.push(offset);
-    parts.push(b);
-    offset += b.length;
-  }
-  function raw(b) {
-    // ajouter sans enregistrer dans xrefs (données inline d'un objet déjà ouvert)
-    parts.push(b);
-    offset += b.length;
-  }
+  const bandSvg = d.colorMode === "template" && d.bandPosition !== "hidden"
+    ? buildBandSvg(d, ox, oy, W, H, d.backBandH) : "";
 
-  const hdr = "%PDF-1.4\n%\xe2\xe3\xcf\xd3\n";
-  parts.push(Buffer.from(hdr, "binary"));
-  offset = hdr.length;
+  const starsStartX = infoCX - Math.round(5 * (starSzPx + Math.round(2 * SCALE)) / 2);
 
-  add(`1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n`);
-  add(`2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n`);
-  add(`3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Contents 4 0 R/Resources<</XObject<</R 5 0 R/V 6 0 R>>>>>>\nendobj\n`);
+  return `
+  <!-- Fond verso -->
+  <rect x="${ox}" y="${oy}" width="${W}" height="${H}" fill="url(#versoGrad)"/>
 
-  // Stream de contenu : placer les images
-  // PDF Y=0 est en bas → on convertit depuis le haut
-  const rY = (PH - ry - ch).toFixed(2);
-  const vY = (PH - vy - ch).toFixed(2);
-  const stream = `q ${cw.toFixed(2)} 0 0 ${ch.toFixed(2)} ${cx.toFixed(2)} ${rY} cm /R Do Q\nq ${cw.toFixed(2)} 0 0 ${ch.toFixed(2)} ${cx.toFixed(2)} ${vY} cm /V Do Q`;
-  const sb     = Buffer.from(stream);
-  add(`4 0 obj\n<</Length ${sb.length}>>\nstream\n`);
-  raw(sb);
-  raw(Buffer.from("\nendstream\nendobj\n"));
+  <!-- Google icon -->
+  ${d.showGoogleIcon ? buildGoogleIcon(gX, gY, gSzPx, 0.60) : ""}
 
-  const rW = Math.round(cw * 4), rH = Math.round(ch * 4);
-  add(`5 0 obj\n<</Type/XObject/Subtype/Image/Width ${rW}/Height ${rH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${rectoJpeg.length}>>\nstream\n`);
-  raw(rectoJpeg);
-  raw(Buffer.from("\nendstream\nendobj\n"));
+  <!-- QR box -->
+  <rect x="${qrX}" y="${qrY}" width="${qrSzPx}" height="${qrSzPx}"
+    rx="12" ry="12"
+    fill="${d.qrColor}18"
+    stroke="${d.qrColor}33" stroke-width="3"/>
+  <svg x="${qrX + qrPad}" y="${qrY + qrPad}"
+       width="${qrInnerSz}" height="${qrInnerSz}"
+       viewBox="0 0 21 21" preserveAspectRatio="xMidYMid meet">
+    ${qrInner}
+  </svg>
 
-  add(`6 0 obj\n<</Type/XObject/Subtype/Image/Width ${rW}/Height ${rH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${versoJpeg.length}>>\nstream\n`);
-  raw(versoJpeg);
-  raw(Buffer.from("\nendstream\nendobj\n"));
+  <!-- businessName -->
+  <text x="${infoCX}" y="${nameBaseY}"
+    font-family="${d.nameFont}" font-size="${nameSzPx}"
+    font-weight="${d.nameFontWeight}"
+    fill="${d.textColor}" text-anchor="middle">${d.businessName}</text>
 
-  const xrefOffset = offset;
-  // Les 3 premiers xrefs correspondent aux objets 1,2,3
-  // Les 3 suivants à 4,5,6 (add() les a enregistrés)
-  let xrefTable = `xref\n0 7\n0000000000 65535 f \n`;
-  xrefs.forEach(x => { xrefTable += `${String(x).padStart(10, "0")} 00000 n \n`; });
-  xrefTable += `trailer\n<</Size 7/Root 1 0 R>>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  <!-- slogan -->
+  ${d.sloganText ? `<text x="${infoCX}" y="${sloganBaseY}"
+    font-family="${d.sloganFont}" font-size="${sloganSzPx}"
+    font-weight="${d.sloganFontWeight}"
+    fill="${d.textColor}" opacity="0.70" text-anchor="middle">${d.sloganText}</text>` : ""}
 
-  return Buffer.concat([...parts, Buffer.from(xrefTable)]);
-}
+  <!-- StarsRow -->
+  ${buildStarsRow(starsStartX, starsY, 5, starSzPx, d.starsColor)}
 
-// ─────────────────────────────────────────────────────────────
-// PDF vectoriel fallback — rectangles colorés + texte PDF natif
-// Toujours fonctionnel même sans sharp
-// Résultat : PDF lisible et imprimable, sans image rasterisée
-// ─────────────────────────────────────────────────────────────
+  <!-- Instructions -->
+  ${buildCheckLineCentered(ox + W / 2, oy + instr1Base, d.backLine1, d, instrSzPx, checkSzPx)}
+  ${d.backLine2 ? buildCheckLineCentered(ox + W / 2, oy + instr2Base, d.backLine2, d, instrSzPx, checkSzPx) : ""}
 
-function pdfVectorial(PW, PH, cx, ry, vy, cw, ch, r) {
-  // hex #RRGGBB → "R G B" (0.0–1.0)
-  function rgb(hex) {
-    const h = (hex ?? "#000000").replace("#", "");
-    return [
-      (parseInt(h.slice(0,2),16)/255).toFixed(3),
-      (parseInt(h.slice(2,4),16)/255).toFixed(3),
-      (parseInt(h.slice(4,6),16)/255).toFixed(3),
-    ].join(" ");
-  }
+  <!-- CTA -->
+  <text x="${ox + W / 2}" y="${oy + ctaBase}"
+    font-family="${d.instrFont}" font-size="${ctaSzPx}"
+    font-weight="500"
+    fill="${d.textColor}" opacity="0.70" text-anchor="middle">${d.ctaText}</text>
 
-  const bgRgb     = rgb(r.grad1);
-  const accentRgb = rgb(r.band);
-  const textRgb   = rgb(r.text);
-
-  // Y PDF (bas=0) depuis Y haut-de-page
-  const rY     = PH - ry - ch;
-  const vY     = PH - vy - ch;
-  const fBandH = ch * r.frontBandH / 100;
-  const bBandH = ch * r.backBandH  / 100;
-  const fBandY = r.bandPos === "top" ? rY + ch - fBandH : rY;
-
-  // Texte PDF (encodage Latin-1 simple — pas d'UTF-8 natif en PDF/1.4 sans ToUnicode map)
-  function pdfStr(s) {
-    return (s ?? "").replace(/[^\x20-\x7E]/g, "?").replace(/[()\\]/g, "\\$&");
-  }
-
-  const stream = `
-% ─── RECTO ───
-q
-${bgRgb} rg
-${cx.toFixed(2)} ${rY.toFixed(2)} ${cw.toFixed(2)} ${ch.toFixed(2)} re f
-${accentRgb} rg
-${cx.toFixed(2)} ${fBandY.toFixed(2)} ${cw.toFixed(2)} ${fBandH.toFixed(2)} re f
-${textRgb} rg
-BT /F1 ${r.bizSize} Tf ${(cx + r.contentX).toFixed(2)} ${(rY + ch - 44).toFixed(2)} Td (${pdfStr(r.card.locationName ?? r.biz)}) Tj ET
-BT /F1 9 Tf ${(cx + r.contentX).toFixed(2)} ${(rY + 52).toFixed(2)} Td (${pdfStr(r.fi1)}) Tj ET
-BT /F1 9 Tf ${(cx + r.contentX).toFixed(2)} ${(rY + 35).toFixed(2)} Td (${pdfStr(r.fi2)}) Tj ET
-Q
-
-% ─── LABEL RECTO ───
-BT /F1 9 Tf ${cx.toFixed(2)} ${(rY + ch + 8).toFixed(2)} Td 0.5 0.5 0.5 rg (RECTO) Tj ET
-
-% ─── VERSO ───
-q
-${bgRgb} rg
-${cx.toFixed(2)} ${vY.toFixed(2)} ${cw.toFixed(2)} ${ch.toFixed(2)} re f
-${accentRgb} rg
-${cx.toFixed(2)} ${(vY + ch - bBandH).toFixed(2)} ${cw.toFixed(2)} ${bBandH.toFixed(2)} re f
-${textRgb} rg
-BT /F1 8 Tf ${(cx + cw / 2 - 30).toFixed(2)} ${(vY + 10).toFixed(2)} Td (${pdfStr(r.cta.replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">"))}) Tj ET
-${r.bi1 ? `BT /F1 9 Tf ${(cx + cw / 2 - 60).toFixed(2)} ${(vY + 44).toFixed(2)} Td (${pdfStr(r.bi1)}) Tj ET` : ""}
-${r.bi2 ? `BT /F1 9 Tf ${(cx + cw / 2 - 60).toFixed(2)} ${(vY + 27).toFixed(2)} Td (${pdfStr(r.bi2)}) Tj ET` : ""}
-Q
-
-% ─── LABEL VERSO ───
-BT /F1 9 Tf ${cx.toFixed(2)} ${(vY + ch + 8).toFixed(2)} Td 0.5 0.5 0.5 rg (VERSO) Tj ET
-`.trim();
-
-  const streamBuf = Buffer.from(stream);
-
-  // Construction manuelle du PDF (cross-reference table précise)
-  const hdr     = "%PDF-1.4\n%\xe2\xe3\xcf\xd3\n";
-  let   out     = hdr;
-  const offsets = [];
-
-  function obj(n, dict, body) {
-    offsets[n] = Buffer.byteLength(out, "binary");
-    out += `${n} 0 obj\n${dict}\n`;
-    if (body !== undefined) out += body;
-    out += `endobj\n`;
-  }
-
-  obj(1, `<</Type/Catalog/Pages 2 0 R>>`);
-  obj(2, `<</Type/Pages/Kids[3 0 R]/Count 1>>`);
-  obj(3, `<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>`);
-
-  // Objet 4 : stream de contenu — calculer la taille en bytes
-  const s4len = streamBuf.length;
-  offsets[4]  = Buffer.byteLength(out, "binary");
-  // Convertir out en Buffer pour concat précis
-  let outBuf = Buffer.from(out, "binary");
-  const s4hdr = Buffer.from(`4 0 obj\n<</Length ${s4len}>>\nstream\n`, "binary");
-  const s4end = Buffer.from(`\nendstream\nendobj\n`, "binary");
-  offsets[4]  = outBuf.length;
-
-  obj(5, `<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>`);
-
-  const xrefPos = Buffer.byteLength(out, "binary");
-  out += `xref\n0 6\n0000000000 65535 f \n`;
-  for (let i = 1; i <= 5; i++) {
-    out += `${String(offsets[i] ?? 0).padStart(10, "0")} 00000 n \n`;
-  }
-  out += `trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n`;
-
-  // Reconstruire proprement avec le stream en binaire
-  const part1 = Buffer.from(hdr, "binary");
-  const obj1  = Buffer.from(`1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n`, "binary");
-  const obj2  = Buffer.from(`2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n`, "binary");
-  const obj3  = Buffer.from(`3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>\nendobj\n`, "binary");
-  const obj5  = Buffer.from(`5 0 obj\n<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>\nendobj\n`, "binary");
-
-  const o1 = part1.length;
-  const o2 = o1 + obj1.length;
-  const o3 = o2 + obj2.length;
-  const o4 = o3 + obj3.length;
-  const o4hdr = Buffer.from(`4 0 obj\n<</Length ${streamBuf.length}>>\nstream\n`, "binary");
-  const o4end = Buffer.from(`\nendstream\nendobj\n`, "binary");
-  const o5 = o4 + o4hdr.length + streamBuf.length + o4end.length;
-  const xr = o5 + obj5.length;
-
-  const xrefBuf = Buffer.from(
-    `xref\n0 6\n0000000000 65535 f \n` +
-    `${String(o1).padStart(10,"0")} 00000 n \n` +
-    `${String(o2).padStart(10,"0")} 00000 n \n` +
-    `${String(o3).padStart(10,"0")} 00000 n \n` +
-    `${String(o4).padStart(10,"0")} 00000 n \n` +
-    `${String(o5).padStart(10,"0")} 00000 n \n` +
-    `trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xr}\n%%EOF\n`,
-    "binary"
-  );
-
-  return Buffer.concat([part1, obj1, obj2, obj3, o4hdr, streamBuf, o4end, obj5, xrefBuf]);
+  ${bandSvg}`;
 }
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS SVG
 // ─────────────────────────────────────────────────────────────
 
-function stars(x, y, count, sz) {
-  let s = "";
+function buildBandSvg(d, ox, oy, W, H, pct) {
+  const bH = Math.round(H * pct / 100);
+  const bY = d.bandPosition === "top" ? oy : oy + H - bH;
+  return `<rect x="${ox}" y="${bY}" width="${W}" height="${bH}"
+    fill="url(#bandGrad)" opacity="0.9"/>`;
+}
+
+function buildCheckLine(x, y, text, d, fontSize, checkSz) {
+  if (!text) return "";
+  const cx = x + checkSz / 2;
+  const cy = y - checkSz * 0.5;
+  const tx = x + checkSz + Math.round(6 * SCALE);
+  return `
+  <circle cx="${cx}" cy="${cy}" r="${checkSz * 0.55}" fill="${d.iconsColor}" opacity="0.12"/>
+  <polyline
+    points="${x + checkSz*0.2},${cy} ${cx - checkSz*0.05},${y - checkSz*0.1} ${x + checkSz*0.85},${y - checkSz*0.75}"
+    fill="none" stroke="${d.iconsColor}"
+    stroke-width="${Math.max(1.5, d.checkStrokeWidth * SCALE * 0.5)}"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="${tx}" y="${y}"
+    font-family="${d.instrFont}" font-size="${fontSize}"
+    font-weight="${d.instrFontWeight}"
+    letter-spacing="${d.instrLetSpacing}"
+    fill="${d.textColor}" opacity="0.90">${text}</text>`;
+}
+
+function buildCheckLineCentered(cx, y, text, d, fontSize, checkSz) {
+  if (!text) return "";
+  const textW  = text.length * fontSize * 0.52;
+  const itemW  = checkSz + Math.round(6 * SCALE) + textW;
+  const startX = cx - itemW / 2;
+  return buildCheckLine(startX, y, text, d, fontSize, checkSz);
+}
+
+function buildStarsRow(x, y, count, size, color) {
+  let svg = "";
+  const R   = size / 2;
+  const r   = R * 0.382;
+  const gap = Math.round(2 * SCALE);
   for (let i = 0; i < count; i++) {
-    const cx = x + i * (sz + 3);
-    s += `<polygon points="${starPts(cx, y, sz/2, sz/4, 5)}" fill="#F59E0B" opacity="0.85"/>`;
+    const cx = x + R + i * (size + gap);
+    const cy = y - R;
+    svg += `<polygon points="${starPts(cx, cy, R, r, 5)}" fill="${color}"/>`;
   }
-  return s;
+  return svg;
 }
 
 function starPts(cx, cy, R, r, n) {
   const pts = [];
   for (let i = 0; i < n * 2; i++) {
-    const a = i * Math.PI / n - Math.PI / 2;
-    const d = i % 2 === 0 ? R : r;
-    pts.push(`${(cx + Math.cos(a)*d).toFixed(1)},${(cy + Math.sin(a)*d).toFixed(1)}`);
+    const a    = i * Math.PI / n - Math.PI / 2;
+    const dist = i % 2 === 0 ? R : r;
+    pts.push(`${(cx + Math.cos(a) * dist).toFixed(2)},${(cy + Math.sin(a) * dist).toFixed(2)}`);
   }
   return pts.join(" ");
 }
 
-function nfc(cx, cy, r, color) {
-  return `
-    <circle cx="${cx}" cy="${cy}" r="${(r*0.22).toFixed(1)}" fill="${color}" opacity="0.9"/>
-    <path d="M${cx-r*0.5} ${cy} A${r*0.5} ${r*0.5} 0 0 1 ${cx+r*0.5} ${cy}" fill="none" stroke="${color}" stroke-width="2" opacity="0.7"/>
-    <path d="M${cx-r*0.75} ${cy} A${r*0.75} ${r*0.75} 0 0 1 ${cx+r*0.75} ${cy}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.5"/>
-    <path d="M${cx-r} ${cy} A${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="${color}" stroke-width="1" opacity="0.3"/>`;
+function buildNfcIcon(x, y, size, color, opacity) {
+  const sc = (size / 24).toFixed(3);
+  return `<g transform="translate(${x}, ${y}) scale(${sc})"
+    fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round"
+    opacity="${opacity}">
+    <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/>
+    <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/>
+    <path d="M12.91 4.1a16.09 16.09 0 0 1 0 15.8"/>
+  </g>`;
 }
 
-function googleG(x, y, sz) {
-  return `<text x="${x}" y="${y + sz}" font-family="Arial,sans-serif" font-size="${sz}"
-    font-weight="bold" fill="white" opacity="0.7">G</text>`;
+function buildGoogleIcon(x, y, size, opacity) {
+  const sc = (size / 24).toFixed(3);
+  return `<g transform="translate(${x}, ${y}) scale(${sc})" opacity="${opacity}">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>`;
 }
 
 function esc(s) {
   if (!s) return "";
   return String(s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ─────────────────────────────────────────────────────────────
+// PNG via sharp
+// ─────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────
+// PNG avec overlay logo (sharp composite)
+// ─────────────────────────────────────────────────────────────
+
+async function writePngWithLogoOverlay(svgContent, outPath, w, h, d, logoPngBuffer, rectoY) {
+  try {
+    const sharp = (await import("sharp")).default;
+
+    // 1. Rasteriser le SVG (sans logo)
+    let img = sharp(Buffer.from(svgContent)).resize(w, h);
+
+    // 2. Composite le logo si disponible
+    if (logoPngBuffer) {
+      const logoSzPx = Math.round(d.logoSize * SCALE);   // taille réelle du logo
+      const logoX    = SHEET_MARGIN + PAD;                 // même x que le texte dans buildRecto
+      const bizRowY  = computeBizRowY(d);                  // y du bloc business dans la carte
+      // centrer verticalement le logo dans la bizRow (items-center)
+      const bizRowH  = Math.round(d.logoSize * SCALE);     // hauteur du bizRow ≈ logoSize
+      const logoY    = rectoY + bizRowY;                   // top de la bizRow dans le PNG global
+      console.log(`[cardExport] 🖼 Logo overlay PNG @ (${logoX}, ${logoY}) ${logoSzPx}px`);
+      const logoBuf  = await sharp(logoPngBuffer)
+        .resize({ width: logoSzPx, height: logoSzPx, fit: "inside", background: { r:0,g:0,b:0,alpha:0 } })
+        .png()
+        .toBuffer();
+      img = img.composite([{ input: logoBuf, left: Math.round(logoX), top: Math.round(logoY), blend: "over" }]);
+    }
+
+    await img.png({ compressionLevel: 6 }).toFile(outPath);
+    console.log(`[cardExport] ✅ PNG → ${outPath}`);
+  } catch (e) {
+    console.warn(`[cardExport] ⚠️ Erreur PNG : ${e.message}`);
+    const placeholder = Buffer.from(
+      "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489" +
+      "0000000a49444154789c6260000000000200e221bc330000000049454e44ae426082","hex");
+    await fsP.writeFile(outPath, placeholder);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// PDF A4 avec overlay logo (sharp composite sur chaque face)
+// ─────────────────────────────────────────────────────────────
+
+async function writePdfWithLogoOverlay(d, qrInner, outPath, logoPngBuffer) {
+  const PW = 595, PH = 842;
+  const CW_PT = 243, CH_PT = 153;
+  const CX = (PW - CW_PT) / 2;
+  const RY = 60;
+  const VY = RY + CH_PT + 60;
+
+  try {
+    const sharp    = (await import("sharp")).default;
+    // Passer d directement (logoUrl="HAS_LOGO") → buildRecto réserve l'espace
+    // sans générer de <image>, le logo est posé par sharp.composite() après
+    const rectoSvg = buildFaceSvg("recto", d, qrInner);
+    const versoSvg = buildFaceSvg("verso",  d, qrInner);
+    const W4 = Math.round(d.cardW * 4), H4 = Math.round(d.cardH * 4);
+
+    // Rasteriser les deux faces
+    let rectoImg = sharp(Buffer.from(rectoSvg)).resize(W4, H4);
+    let versoImg = sharp(Buffer.from(versoSvg)).resize(W4, H4);
+
+    // Composite logo sur le recto uniquement
+    if (logoPngBuffer) {
+      const imgScale  = 4;                                         // W4 = cardW × 4
+      const logoSzPx  = Math.round(d.logoSize * SCALE * imgScale); // taille logo dans l'image ×4
+      const logoX     = Math.round(PAD * imgScale);
+      const bizRowY   = Math.round(computeBizRowY(d) * imgScale);
+      console.log(`[cardExport] 🖼 Logo overlay PDF recto @ (${logoX}, ${bizRowY}) ${logoSzPx}px`);
+      const logoBuf4x = await sharp(logoPngBuffer)
+        .resize({ width: logoSzPx, height: logoSzPx, fit: "inside", background: { r:0,g:0,b:0,alpha:0 } })
+        .png()
+        .toBuffer();
+      rectoImg = rectoImg.composite([{ input: logoBuf4x, left: logoX, top: bizRowY, blend: "over" }]);
+    }
+
+    const [rJpeg, vJpeg] = await Promise.all([
+      rectoImg.jpeg({ quality: 97 }).toBuffer(),
+      versoImg.jpeg({ quality: 97 }).toBuffer(),
+    ]);
+
+    await fsP.writeFile(outPath, assemblePdfJpeg(PW, PH, CX, RY, VY, CW_PT, CH_PT, W4, H4, rJpeg, vJpeg));
+    console.log(`[cardExport] ✅ PDF (sharp JPEG ×4 + logo overlay) → ${outPath}`);
+    return;
+  } catch (e) {
+    console.warn(`[cardExport] ⚠️ sharp indisponible : ${e.message}`);
+  }
+
+  // Puppeteer fallback
+  try {
+    const puppeteer = (await import("puppeteer")).default;
+    const rectoSvg  = buildFaceSvg("recto", d, qrInner);
+    const versoSvg  = buildFaceSvg("verso",  d, qrInner);
+    const rectoB64  = Buffer.from(rectoSvg).toString("base64");
+    const versoB64  = Buffer.from(versoSvg).toString("base64");
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>* { margin:0; padding:0; box-sizing:border-box; }
+body { width:21cm; background:#fff; padding:1cm; font-family:Arial,sans-serif; }
+.label { font-size:9pt; color:#555; margin-bottom:4pt; font-weight:bold; }
+.card { width:85.6mm; height:54mm; display:block; margin:0 auto; }
+.sep { border:none; border-top:1px dashed #ccc; margin:8mm auto; width:85.6mm; display:block; }
+</style></head><body>
+<p class="label">RECTO</p>
+<img class="card" src="data:image/svg+xml;base64,${rectoB64}"/>
+<div class="sep"></div>
+<p class="label">VERSO</p>
+<img class="card" src="data:image/svg+xml;base64,${versoB64}"/>
+</body></html>`;
+    const browser = await puppeteer.launch({ args: ["--no-sandbox","--disable-setuid-sandbox","--disable-web-security"] });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "networkidle0" });
+    const pdfBuf = await page.pdf({ format: "A4", printBackground: true });
+    await browser.close();
+    await fsP.writeFile(outPath, pdfBuf);
+    console.log(`[cardExport] ✅ PDF (puppeteer) → ${outPath}`);
+    return;
+  } catch (e) {
+    console.warn(`[cardExport] ⚠️ puppeteer indisponible : ${e.message}`);
+  }
+
+  // Fallback HTML
+  const rectoSvgFb = buildFaceSvg("recto", d, qrInner);
+  const versoSvgFb = buildFaceSvg("verso",  d, qrInner);
+  const htmlFallback = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Carte NFC</title>
+<style>* { margin:0; padding:0; } body { background:#f5f5f5; padding:30px; font-family:Arial; }
+.wrap { background:white; padding:20px; border-radius:8px; display:inline-block; margin:10px; }
+@media print { body { background:white; } .wrap { box-shadow:none; } }
+</style></head><body>
+<div class="wrap"><div style="font-size:10px;color:#888;margin-bottom:6px">RECTO</div>
+${rectoSvgFb.replace(/<\?xml[^>]*\?>/, "")}</div>
+<div class="wrap"><div style="font-size:10px;color:#888;margin-bottom:6px">VERSO</div>
+${versoSvgFb.replace(/<\?xml[^>]*\?>/, "")}</div>
+</body></html>`;
+  await fsP.writeFile(outPath.replace(/\.pdf$/, ".html"), htmlFallback, "utf-8");
+  await fsP.writeFile(outPath, buildNoSharpPdf(PW, PH, d));
+}
+
+// Calcule le Y de bizRow (identique à buildRecto, utilisé pour l'overlay)
+function computeBizRowY(d) {
+  const nameSzPx   = Math.round(d.nameFontSize    * 3.5);
+  const sloganSzPx = Math.round(d.sloganFontSize  * 3.5);
+  const starSzPx   = Math.round(14 * 3.5);
+  const checkSzPx  = Math.round(12 * 3.5);
+  const instrGap   = Math.round(6  * 3.5);
+  const ctaPadTop  = Math.round(d.ctaPaddingTop   * 3.5);
+  const ctaSzPx    = Math.round(9  * 3.5);
+  const logoSzPx   = Math.round(d.logoSize        * 3.5);
+  const contentH   = nameSzPx + sloganSzPx + starSzPx + GAP4 + checkSzPx*2 + instrGap + GAP4 + ctaSzPx + ctaPadTop + 20;
+  return Math.round((d.cardH - contentH) / 2);
+}
+
+function assemblePdfJpeg(PW, PH, cx, ry, vy, cw, ch, imgW, imgH, rJpeg, vJpeg) {
+  const chunks = []; const xrefs = []; let pos = 0;
+  function push(b) { if (!Buffer.isBuffer(b)) b=Buffer.from(b,"binary"); chunks.push(b); pos+=b.length; }
+  function obj(n,s)  { xrefs[n]=pos; push(Buffer.from(s,"binary")); }
+  push(Buffer.from("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n","binary"));
+  obj(1,`1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n`);
+  obj(2,`2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n`);
+  obj(3,`3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Contents 4 0 R/Resources<</XObject<</R 5 0 R/V 6 0 R>>>>>>\nendobj\n`);
+  const rY=(PH-ry-ch).toFixed(2), vY=(PH-vy-ch).toFixed(2);
+  const stream=Buffer.from(`q ${cw.toFixed(2)} 0 0 ${ch.toFixed(2)} ${cx.toFixed(2)} ${rY} cm /R Do Q\nq ${cw.toFixed(2)} 0 0 ${ch.toFixed(2)} ${cx.toFixed(2)} ${vY} cm /V Do Q`);
+  obj(4,`4 0 obj\n<</Length ${stream.length}>>\nstream\n`);push(stream);push(Buffer.from("\nendstream\nendobj\n","binary"));
+  function imgObj(n,jpeg){obj(n,`${n} 0 obj\n<</Type/XObject/Subtype/Image/Width ${imgW}/Height ${imgH}/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ${jpeg.length}>>\nstream\n`);push(jpeg);push(Buffer.from("\nendstream\nendobj\n","binary"));}
+  imgObj(5,rJpeg); imgObj(6,vJpeg);
+  const xpos=pos; let xr=`xref\n0 7\n0000000000 65535 f \n`;
+  for(let i=1;i<=6;i++) xr+=`${String(xrefs[i]??0).padStart(10,"0")} 00000 n \n`;
+  xr+=`trailer\n<</Size 7/Root 1 0 R>>\nstartxref\n${xpos}\n%%EOF\n`;
+  push(Buffer.from(xr,"binary"));
+  return Buffer.concat(chunks);
+}
+
+function buildNoSharpPdf(PW, PH, d) {
+  function pt(s) { return (s ?? "").replace(/[^\x20-\x7E]/g, "?").replace(/[()\\]/g, "\\$&"); }
+  const lines = [
+    `0.97 0.97 0.97 rg 0 0 ${PW} ${PH} re f`,
+    `0.1 0.1 0.1 rg`,
+    `BT /F1 16 Tf 50 790 Td (Fiche impression NFC) Tj ET`,
+    `BT /F1 11 Tf 50 760 Td (Business : ${pt(d.businessName)}) Tj ET`,
+    `0.8 0.1 0.1 rg`,
+    `BT /F1 12 Tf 50 720 Td (Rendu complet indisponible : sharp n\\047est pas installe.) Tj ET`,
+    `0.1 0.1 0.1 rg`,
+    `BT /F1 10 Tf 50 695 Td (Solution : npm install sharp dans le dossier backend) Tj ET`,
+  ].join("\n");
+  const sb = Buffer.from(lines);
+  const p = [], x = []; let o = 0;
+  function ao(s) { x.push(o); const b = Buffer.from(s, "binary"); p.push(b); o += b.length; }
+  const hdr = Buffer.from("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n", "binary");
+  p.push(hdr); o = hdr.length;
+  ao(`1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n`);
+  ao(`2 0 obj\n<</Type/Pages/Kids[3 0 R]/Count 1>>\nendobj\n`);
+  ao(`3 0 obj\n<</Type/Page/Parent 2 0 R/MediaBox[0 0 ${PW} ${PH}]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>\nendobj\n`);
+  x.push(o);
+  const s4h = Buffer.from(`4 0 obj\n<</Length ${sb.length}>>\nstream\n`, "binary");
+  const s4e = Buffer.from("\nendstream\nendobj\n", "binary");
+  p.push(s4h); o += s4h.length; p.push(sb); o += sb.length; p.push(s4e); o += s4e.length;
+  ao(`5 0 obj\n<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>\nendobj\n`);
+  const xp = o;
+  let xr = `xref\n0 6\n0000000000 65535 f \n`;
+  for (let i = 0; i < x.length; i++) xr += `${String(x[i]).padStart(10, "0")} 00000 n \n`;
+  xr += `trailer\n<</Size 6/Root 1 0 R>>\nstartxref\n${xp}\n%%EOF\n`;
+  p.push(Buffer.from(xr, "binary"));
+  return Buffer.concat(p);
+}
+
+function buildFaceSvg(face, d, qrInner) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+  viewBox="0 0 ${d.cardW} ${d.cardH}" width="${d.cardW}" height="${d.cardH}">
+<defs>
+  <linearGradient id="rectoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%"  stop-color="${d.bg1}"/>
+    <stop offset="70%" stop-color="${d.bg2}"/>
+  </linearGradient>
+  <linearGradient id="versoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%"   stop-color="${d.vbg1}"/>
+    <stop offset="100%" stop-color="${d.vbg2}"/>
+  </linearGradient>
+  <linearGradient id="bandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%"   stop-color="${d.accentBand1}"/>
+    <stop offset="100%" stop-color="${d.accentBand2}"/>
+  </linearGradient>
+  <clipPath id="fc"><rect width="${d.cardW}" height="${d.cardH}" rx="${RX}"/></clipPath>
+</defs>
+<g clip-path="url(#fc)">
+  ${face === "recto" ? buildRecto(d, qrInner, 0, 0) : buildVerso(d, qrInner, 0, 0)}
+</g></svg>`;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -615,11 +865,10 @@ function esc(s) {
 // ─────────────────────────────────────────────────────────────
 
 export async function deleteCardExportFiles(uid) {
-  for (const ext of ["svg", "png", "pdf"]) {
-    try { await fsP.unlink(path.join(EXPORT_DIR, `${uid}.${ext}`)); }
-    catch { /* absent = ok */ }
+  for (const ext of ["svg","png","pdf"]) {
+    try { await fsP.unlink(path.join(EXPORT_DIR,`${uid}.${ext}`)); } catch {}
   }
-  console.log(`[cardExport] 🗑️  Fichiers supprimés uid=${uid}`);
+  console.log(`[cardExport] 🗑️  uid=${uid}`);
 }
 
 export function deriveCardUrls(svgUrl) {
@@ -627,6 +876,3 @@ export function deriveCardUrls(svgUrl) {
   const base = svgUrl.replace(/\.svg$/, "");
   return { svgUrl, pngUrl: `${base}.png`, pdfUrl: `${base}.pdf` };
 }
-
-// Log du chemin résolu au démarrage du module (aide au debug)
-console.log(`[cardExport] EXPORT_DIR résolu = ${EXPORT_DIR}`);

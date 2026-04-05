@@ -307,16 +307,16 @@ export const addManualPayment = async (req, res, next) => {
       paymentDate,
       notes,
     } = req.body;
-
+ 
     if (!invoiceId || !amount) {
       return res.status(422).json({ success: false, error: "invoiceId et amount requis" });
     }
-
+ 
     const amountPaid = parseFloat(amount);
     if (isNaN(amountPaid) || amountPaid <= 0) {
       return res.status(422).json({ success: false, error: "Montant invalide" });
     }
-
+ 
     const invoice = await prisma.invoice.findUnique({
       where:   { id: parseInt(invoiceId) },
       include: {
@@ -335,7 +335,7 @@ export const addManualPayment = async (req, res, next) => {
         },
       },
     });
-
+ 
     if (!invoice) {
       return res.status(404).json({ success: false, error: "Facture introuvable" });
     }
@@ -345,16 +345,16 @@ export const addManualPayment = async (req, res, next) => {
     if (invoice.status === "refunded") {
       return res.status(422).json({ success: false, error: "Cette facture a été remboursée" });
     }
-
+ 
     const invoiceTotal  = Number(invoice.total);
     const isFullPayment = amountPaid >= invoiceTotal;
     const paidAt        = paymentDate ? new Date(paymentDate) : new Date();
     const methodLabel   = method ?? "Manuel";
-
+ 
     // ── Paiement COMPLET ──────────────────────────────────────
     if (isFullPayment) {
       const order = invoice.order;
-
+ 
       // ── Cas 1 : facture manuelle sans commande (créée depuis BillingRevenue) ──
       if (!order) {
         const [updatedInvoice] = await prisma.$transaction([
@@ -371,15 +371,15 @@ export const addManualPayment = async (req, res, next) => {
               currency:     invoice.currency ?? "EUR",
               exchangeRate: Number(invoice.exchangeRate ?? 1),
               displayAmount: amountPaid,
-              method:       "manual",   // PaymentMethodType enum
+              method:       "manual",
               methodLabel,
-              status:       "completed", // PaymentStatus enum
+              status:       "completed",
               paidAt,
               ...(transactionId && { transactionId }),
             },
           }),
         ]);
-
+ 
         console.log(`[billing] Facture #${invoice.invoiceNumber} payée (sans commande)`);
         return res.json({
           success: true,
@@ -387,9 +387,8 @@ export const addManualPayment = async (req, res, next) => {
           data:    formatInvoice(updatedInvoice),
         });
       }
-
+ 
       // ── Cas 2 : commande associée → même flux que le webhook Stripe ──
-      // FIX 1 : accepter "unpaid" (cash) ET "pending" (Stripe incomplet)
       const allowedStatuses = ["unpaid", "pending"];
       if (!allowedStatuses.includes(order.status)) {
         return res.status(422).json({
@@ -397,10 +396,9 @@ export const addManualPayment = async (req, res, next) => {
           error:   `La commande est déjà au statut "${order.status}"`,
         });
       }
-
-      // FIX 2 : order + invoice + payment dans UNE SEULE transaction atomique
-      // Avant : payment.create était hors transaction → si il échouait,
-      // la facture passait à "paid" sans aucune ligne de paiement enregistrée
+ 
+      // Transaction atomique : order + invoice + payment + vidage panier
+      // Identique au webhook Stripe dans order.controller.js
       const [, updatedInvoice, newPayment] = await prisma.$transaction([
         // 1. Order → paid
         prisma.order.update({
@@ -412,8 +410,7 @@ export const addManualPayment = async (req, res, next) => {
           where: { id: invoice.id },
           data:  { status: "paid", paidAt, paymentMethod: methodLabel },
         }),
-        // 3. Payment créé dans la même transaction
-        //    → si ce create échoue, order et invoice reviennent en arrière (rollback)
+        // 3. Payment (rollback automatique si ce create échoue)
         prisma.payment.create({
           data: {
             orderId:      order.id,
@@ -426,53 +423,58 @@ export const addManualPayment = async (req, res, next) => {
             displayAmount: order.displayTotal
               ? Number(order.displayTotal)
               : amountPaid,
-            method:      "manual",    // PaymentMethodType enum — valeur valide
+            method:      "manual",
             methodLabel,
-            status:      "completed", // PaymentStatus enum — seule valeur correcte ici
+            status:      "completed",
             paidAt,
             notes:       notes ?? null,
-            ...(transactionId && { transactionId }), // champ transactionId du modèle
+            ...(transactionId && { transactionId }),
           },
         }),
+        // 4. ✅ Vider le panier — identique au webhook Stripe (order.controller.js)
+        //    Le panier est normalement vidé à la création de la commande (createOrder)
+        //    On le refait ici par sécurité (relance, panier non vidé, etc.)
+        prisma.cartItem.deleteMany({
+          where: { userId: order.userId, companyId: order.companyId },
+        }),
       ]);
-
+ 
       console.log(
         `[billing] Paiement #${newPayment.id} enregistré` +
         ` | commande #${order.orderNumber} | montant=${amountPaid} | méthode=${methodLabel}`
       );
-
-      // 4. NFC Cards — même logique que le webhook Stripe
-      //    active=false, status=NOT_PROGRAMMED — activées uniquement à la livraison
+ 
+      // 5. NFC Cards — même logique que le webhook Stripe
       const fullOrder = { ...order, status: "paid", paidAt };
-
+ 
       generateNfcCardsForOrder(fullOrder).catch((e) =>
         console.error("[billing] Erreur génération NFC:", e.message)
       );
-
-      // 5. Emails — même logique que le webhook Stripe
+ 
+      // 6. Emails — même logique que le webhook Stripe
       sendOrderEmails(fullOrder, updatedInvoice).catch((e) =>
         console.error("[billing] Erreur envoi emails:", e.message)
       );
-
+ 
       console.log(`[billing] Commande #${order.orderNumber} payée — NFC en cours de génération`);
-
+ 
       return res.json({
         success: true,
         message: `Commande #${order.orderNumber} marquée comme payée — NFC en cours de génération`,
         data:    formatInvoice(updatedInvoice),
       });
     }
-
+ 
     // ── Paiement PARTIEL ──────────────────────────────────────
     const existingPaid = await prisma.payment.aggregate({
       where: { invoiceId: invoice.id, status: { in: ["partial", "completed"] } },
       _sum:  { amount: true },
     });
-
+ 
     const alreadyPaid      = Number(existingPaid._sum.amount ?? 0);
     const newTotalPaid     = alreadyPaid + amountPaid;
     const remainingBalance = invoiceTotal - newTotalPaid;
-
+ 
     await prisma.$transaction([
       prisma.payment.create({
         data: {
@@ -484,9 +486,9 @@ export const addManualPayment = async (req, res, next) => {
           currency:     invoice.currency ?? "EUR",
           exchangeRate: Number(invoice.exchangeRate ?? 1),
           displayAmount: amountPaid,
-          method:       "manual",   // PaymentMethodType enum
+          method:       "manual",
           methodLabel,
-          status:       "pending",  // PaymentStatus enum — "partial" N'EXISTE PAS dans l'enum
+          status:       "pending",
           paidAt,
           notes:        notes ?? null,
           ...(transactionId && { transactionId }),
@@ -500,12 +502,12 @@ export const addManualPayment = async (req, res, next) => {
         },
       }),
     ]);
-
+ 
     console.log(
       `[billing] Paiement partiel ${amountPaid} pour facture #${invoice.invoiceNumber}` +
       ` | payé: ${newTotalPaid}/${invoiceTotal} | reste: ${remainingBalance}`
     );
-
+ 
     return res.json({
       success:          true,
       message:          `Paiement partiel enregistré — reste ${remainingBalance.toFixed(2)} ${invoice.currency ?? "EUR"} à recevoir`,
@@ -513,7 +515,7 @@ export const addManualPayment = async (req, res, next) => {
       remainingBalance,
       isFullPayment:    false,
     });
-
+ 
   } catch (e) { next(e); }
 };
 
