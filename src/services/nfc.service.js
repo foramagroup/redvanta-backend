@@ -45,7 +45,7 @@ export async function generateNfcCardsForOrder(order) {
 
 // ─── Créer une NFCCard (avec QR Code) pour un item ───────────
 async function createNfcCard(orderItem, order) {
-  const design = await prisma.design.findUnique({ where: { id: orderItem.designId } });
+  const design = await prisma.design.findUnique({ where: { id: orderItem.designId } }); 
 
   // 1. Générer l'uid stable — jamais modifié — utilisé dans l'URL /r/{uid}
   const uid     = uuidv4();

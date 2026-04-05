@@ -197,6 +197,8 @@ model Order {
   shippingCost  Float       @default(0)
   total         Float
 
+  methodPayment  String?
+
   shippingFullName  String?
   shippingAddress   String?
   shippingCity      String?
@@ -637,7 +639,7 @@ model NFCCard {
   userId      Int           @db.UnsignedInt  // admin/user qui a commandé
   locationId  Int?          // établissement associé
   designId    Int?          // design utilisé pour l'impression
-  orderItemId Int?            // item de commande qui a généré cette carte
+  orderItemId Int?  @unique            // item de commande qui a généré cette carte
 
   // ── Payload (URL encodée dans QR + puce NFC) ────────────────
   // Format : https://app.redvanta.com/r/{uid}
@@ -675,7 +677,7 @@ model NFCCard {
   user        User          @relation(fields: [userId],     references: [id], onDelete: Cascade)
   location    Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
   design      Design?       @relation(fields: [designId],   references: [id], onDelete: SetNull)
-  orderItem   OrderItem?    @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+ orderItem   OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   scans       NfcScan[]
   events      AnalyticsEvent[]
 
@@ -1278,6 +1280,7 @@ model Invoice {
   taxAmount       Float         @default(0)
   shippingCost    Float         @default(0)
   total           Float
+  paidAmount      Float         @default(0)
 
   // Devise d'affichage (si le client a payé dans une autre devise)
   currency        String        @default("EUR") @db.VarChar(10)
@@ -1394,7 +1397,7 @@ model Company {
   phone          String?
   country        String?
   address        String?  @db.Text
-  type              CompanyType     @default(direct)
+  type              CompanyType?
   planId           Int?   
   status            CompanyStatus   @default(active)
   defaultLanguageId Int?  

@@ -27,7 +27,7 @@ function formatOrder(o) {
     id:            o.id,
     orderNumber:   o.orderNumber,
     status:        o.status,
-    paymentMethod: o.paymentMethod ?? "stripe",
+    paymentMethod: o.methodPayment ?? "stripe",
     companyId:     o.companyId,
     subtotal:      Number(o.subtotal),
     shippingCost:  Number(o.shippingCost),
@@ -89,7 +89,7 @@ export const createOrder = async (req, res, next) => {
       shippingMethod,
       currency     = "EUR",
       exchangeRate = 1,
-      paymentMethod  = "stripe",
+      paymentMethod,
       paymentMethodId = null,
     } = req.body;
 
@@ -167,13 +167,15 @@ export const createOrder = async (req, res, next) => {
     }
 
   
+
+    
     const order = await prisma.$transaction(async (tx) => {
       const o = await tx.order.create({
         data: {
           userId, companyId, orderNumber,
           // ── stripe → "pending" | manual → "unpaid"
           status:        isStripe ? "pending" : "unpaid",
-          paymentMethod: paymentMethod,
+          methodPayment: paymentMethod,
           manualPaymentMethodId: isManual ? manualMethod.id : null,
           subtotal: subtotalEUR, shippingCost: shippingCostEUR, total: totalEUR,
           currency, displayTotal, exchangeRate: rate,
@@ -244,7 +246,7 @@ export const createOrder = async (req, res, next) => {
       success:      true,
       data:         formatOrder(order),
       stripeClientSecret,
-      paymentMethod,
+      paymentMethod, 
       invoiceNumber,
       // Instructions de paiement à afficher au client
       ...(isManual && {
@@ -397,11 +399,6 @@ export const getPaymentMethods = async (req, res, next) => {
     res.json({
       success: true,
       data: [
-        {
-          id: "stripe", type: "stripe", name: "Credit / Debit Card",
-          instructions: null, verificationRequired: false,
-          supportedCurrencies: ["all"],
-        },
         ...manualMethods.map((m) => ({
           id:   m.id, type: "manual", name: m.name,
           instructions: m.instructions ?? null,

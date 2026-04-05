@@ -70,11 +70,22 @@ function formatCardFull(card) {
 }
 
 // Statuts valides pour la progression production
+// Accepte les valeurs en MAJUSCULES (DB) et en minuscules (frontend AllDesigns.js)
+const STATUS_NORMALIZE = {
+  not_programmed: "NOT_PROGRAMMED",
+  printed:        "PRINTED",
+  shipped:        "SHIPPED",
+  delivered:      "ACTIVE",   // "delivered" côté front = "ACTIVE" côté DB
+  active:         "ACTIVE",
+  disabled:       "DISABLED",
+};
+
 const VALID_STATUS_TRANSITIONS = {
   NOT_PROGRAMMED: ["PRINTED"],
   PRINTED:        ["SHIPPED"],
   SHIPPED:        ["ACTIVE"],
-  ACTIVE:         [],
+  ACTIVE:         ["DISABLED"],
+  DISABLED:       ["ACTIVE"],
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -186,12 +197,24 @@ export const downloadSuperCardExport = async (req, res, next) => {
     if (!card)         return res.status(404).json({ success: false, error: "Carte introuvable" });
     if (!card.payload) return res.status(422).json({ success: false, error: "Carte sans payload" });
 
-    const EXPORT_DIR = path.resolve("public/uploads/cards");
+    // process.cwd() = racine du backend (compatible Windows/XAMPP)
+    const EXPORT_DIR = path.join(process.cwd(), "public", "uploads", "cards");
     const filePath   = path.join(EXPORT_DIR, `${uid}.${format}`);
 
     if (!fs.existsSync(filePath)) {
-      await generateCardExport(card, card.design);
+      console.log(`[export] Fichier absent, génération : ${filePath}`);
+      try {
+        await generateCardExport(card, card.design);
+      } catch (genErr) {
+        console.error("[export] ❌ generateCardExport a échoué :", genErr);
+        return res.status(500).json({
+          success: false,
+          error:   "Échec de génération",
+          detail:  genErr.message,
+        });
+      }
     }
+    console.log(`[export] Vérification fichier : ${filePath}`);
 
     if (!fs.existsSync(filePath)) {
       return res.status(500).json({ success: false, error: "Échec de génération" });
@@ -231,26 +254,33 @@ export const updateCardStatus = async (req, res, next) => {
     const card = await prisma.nFCCard.findUnique({ where: { uid } });
     if (!card) return res.status(404).json({ success: false, error: "Carte introuvable" });
 
+    // Normaliser le statut reçu (minuscules → majuscules DB)
+    // ex: "delivered" → "ACTIVE", "printed" → "PRINTED"
+    const normalizedStatus = STATUS_NORMALIZE[status?.toLowerCase()] ?? status?.toUpperCase();
+
     // Vérifier la transition valide
     const allowed = VALID_STATUS_TRANSITIONS[card.status] ?? [];
-    if (!allowed.includes(status)) {
+    if (!allowed.includes(normalizedStatus)) {
       return res.status(422).json({
         success: false,
-        error:   `Transition invalide : ${card.status} → ${status}`,
+        error:   `Transition invalide : ${card.status} → ${normalizedStatus}`,
         allowed,
       });
     }
 
     // Données à mettre à jour
-    const updateData = { status };
+    const updateData = { status: normalizedStatus };
 
-    if (status === "ACTIVE") {
+    if (normalizedStatus === "ACTIVE") {
       // Livraison → activer la carte
       updateData.active      = true;
       updateData.activatedAt = new Date();
     }
+    if (normalizedStatus === "DISABLED") {
+      updateData.active = false;
+    }
 
-    if (status === "PRINTED" && card.tagId) {
+    if (normalizedStatus === "PRINTED" && card.tagId) {
       // Marquer la puce hardware comme PROGRAMMED
       await prisma.nFCTag.update({
         where: { id: card.tagId },
@@ -264,7 +294,7 @@ export const updateCardStatus = async (req, res, next) => {
       include: CARD_INCLUDE,
     });
 
-    res.json({ success: true, message: `Carte → ${status}`, data: formatCardFull(updated) });
+    res.json({ success: true, message: `Carte → ${normalizedStatus}`, data: formatCardFull(updated) });
   } catch (e) { next(e); }
 };
 
@@ -328,6 +358,97 @@ export const deleteSuperCard = async (req, res, next) => {
 
     await prisma.nFCCard.delete({ where: { uid } });
     res.json({ success: true, message: "Carte supprimée" });
+  } catch (e) { next(e); }
+};
+
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/superadmin/nfc/cards/:uid/qr?format=svg|png|pdf
+// Téléchargement du QR Code seul (sans le design de la carte PVC)
+// Utile pour les affichages digitaux, menus, réseaux sociaux
+// ─────────────────────────────────────────────────────────────
+
+export const downloadQrOnly = async (req, res, next) => {
+  try {
+    const { uid } = req.params;
+    const format  = (req.query.format ?? "svg").toLowerCase();
+
+    if (!["svg", "png", "pdf"].includes(format)) {
+      return res.status(422).json({ success: false, error: "format doit être svg | png | pdf" });
+    }
+
+    const card = await prisma.nFCCard.findUnique({ where: { uid } });
+    if (!card) return res.status(404).json({ success: false, error: "Carte introuvable" });
+
+    // Les QR Codes seuls sont dans /uploads/qrcodes/ (générés par qrcode.service.js)
+    // Les fiches d'impression (recto+verso) sont dans /uploads/cards/
+    const QR_DIR  = path.resolve("public/uploads/qrcodes");
+    const filePath = path.join(QR_DIR, `${uid}.${format}`);
+
+    // Si le fichier QR n'existe pas, essayer de le regénérer depuis qrcode.service.js
+    if (!fs.existsSync(filePath)) {
+      if (!card.payload) {
+        return res.status(422).json({ success: false, error: "Carte sans payload — impossible de générer le QR" });
+      }
+      try {
+        const { generateAllQrCodes } = await import("../services/qrcode.service.js");
+        await generateAllQrCodes(uid, card.payload);
+      } catch (genErr) {
+        // Si le QR complet (recto+verso) existe, servir depuis là
+        const cardFilePath = path.join(path.resolve("public/uploads/cards"), `${uid}.${format}`);
+        if (fs.existsSync(cardFilePath)) {
+          const mimeTypes = { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf" };
+          res.setHeader("Content-Type", mimeTypes[format]);
+          res.setHeader("Content-Disposition", `attachment; filename="qr-${uid.slice(0, 8)}.${format}"`);
+          return fs.createReadStream(cardFilePath).pipe(res);
+        }
+        return res.status(500).json({ success: false, error: "Fichier QR introuvable" });
+      }
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(500).json({ success: false, error: "Échec de génération du QR Code" });
+    }
+
+    const mimeTypes = { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf" };
+    res.setHeader("Content-Type",        mimeTypes[format]);
+    res.setHeader("Content-Disposition", `attachment; filename="qr-${uid.slice(0, 8)}.${format}"`);
+    res.setHeader("Cache-Control",       "private, max-age=3600");
+
+    fs.createReadStream(filePath).pipe(res);
+  } catch (e) { next(e); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/superadmin/nfc/cards/:uid/regenerate-qr
+// Regénérer uniquement le QR Code (SVG + PNG + PDF) sans toucher le design
+// Ne modifie pas le payload encodé dans la puce physique
+// ─────────────────────────────────────────────────────────────
+
+export const regenerateQrOnly = async (req, res, next) => {
+  try {
+    const { uid } = req.params;
+    const card    = await prisma.nFCCard.findUnique({ where: { uid } });
+    if (!card)         return res.status(404).json({ success: false, error: "Carte introuvable" });
+    if (!card.payload) return res.status(422).json({ success: false, error: "Carte sans payload" });
+
+    const { generateAllQrCodes } = await import("../services/qrcode.service.js");
+    const { svgUrl } = await generateAllQrCodes(uid, card.payload);
+
+    if (!svgUrl) {
+      return res.status(500).json({ success: false, error: "Échec de génération du QR Code" });
+    }
+
+    // Mettre à jour l'URL en DB si elle a changé
+    if (svgUrl !== card.qrCodeUrl) {
+      await prisma.nFCCard.update({ where: { uid }, data: { qrCodeUrl: svgUrl } });
+    }
+
+    res.json({
+      success: true,
+      message: `QR Code regénéré pour uid=${uid}`,
+      qrCodeUrl: svgUrl,
+    });
   } catch (e) { next(e); }
 };
 
