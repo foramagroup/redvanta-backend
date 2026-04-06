@@ -5,11 +5,11 @@ import { authenticateSuperAdmin, requireSuperAdmin } from "../../middleware/auth
 const router = Router();
 const auth   = [authenticateSuperAdmin, requireSuperAdmin];
 
-router.get("/orders", ...auth, OrderCtrl.getAllOrders);
+router.get("/", ...auth, OrderCtrl.getAllOrders);
 
-router.get("/orders/:id", ...auth, OrderCtrl.getOrderDetail);
+router.get("/:id", ...auth, OrderCtrl.getOrderDetail);
 
-router.patch("/orders/:id/status", ...auth, OrderCtrl.updateOrderStatus);
+router.patch("/:id/status", ...auth, OrderCtrl.updateOrderStatus);
 
 // GET    /api/superadmin/orders/:id/history
 router.get("/:id/history", ...auth, OrderCtrl.getOrderHistory);

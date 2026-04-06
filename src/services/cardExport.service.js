@@ -255,16 +255,30 @@ function normalizeDesign(d, card) {
 
 async function buildQrInner(payload, d) {
   const svgStr = await QRCode.toString(payload, {
-    type:                 "svg",
+    type: "svg",
     errorCorrectionLevel: "H",
-    margin:               0,          // FIX : margin 0 pour maximiser la taille des modules
+    margin: 1, // On garde une petite marge interne
     color: {
-      dark:  d.qrColor,
-      light: "#00000000",
+      dark: "#000000",
+      light: "#FFFFFF",
     },
   });
-  const m = svgStr.match(/<svg[^>]*>([\s\S]*?)<\/svg>/);
-  return m ? m[1] : svgStr;
+
+  // 1. On récupère la viewBox originale (ex: "0 0 33 33")
+  const viewBoxMatch = svgStr.match(/viewBox="([^"]+)"/);
+  const viewBox = viewBoxMatch ? viewBoxMatch[1] : "0 0 33 33";
+
+  // 2. On récupère le contenu (les <path>)
+  const contentMatch = svgStr.match(/<svg[^>]*>([\s\S]*?)<\/svg>/);
+  const innerContent = contentMatch ? contentMatch[1] : svgStr;
+
+  // 3. On encapsule dans un nouveau SVG avec preserveAspectRatio
+  // Cela force le QR code à remplir tout l'espace disponible (le carré blanc)
+  return `
+    <svg viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">
+      ${innerContent}
+    </svg>
+  `;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -500,15 +514,19 @@ function buildVerso(d, qrInner, ox, oy) {
   <!-- Google icon -->
   ${d.showGoogleIcon ? buildGoogleIcon(gX, gY, gSzPx, 0.60) : ""}
 
-  <!-- QR box -->
+  <!-- QR box — fond blanc obligatoire pour scannabilité (noir sur blanc = standard universel) -->
   <rect x="${qrX}" y="${qrY}" width="${qrSzPx}" height="${qrSzPx}"
-    rx="12" ry="12"
-    fill="${d.qrColor}18"
-    stroke="${d.qrColor}33" stroke-width="3"/>
-  <svg x="${qrX + qrPad}" y="${qrY + qrPad}"
-       width="${qrInnerSz}" height="${qrInnerSz}"
-       viewBox="0 0 21 21" preserveAspectRatio="xMidYMid meet">
-    ${qrInner}
+    rx="8" ry="8"
+    fill="#FFFFFF"/>
+  <!-- Le QR SVG contient déjà son fond blanc grâce à light="#FFFFFF" dans buildQrInner -->
+  <svg x="${qrX}" y="${qrY}"
+       width="${qrSzPx}" height="${qrSzPx}"
+       viewBox="0 0 ${qrSzPx} ${qrSzPx}" preserveAspectRatio="xMidYMid meet">
+    <rect width="${qrSzPx}" height="${qrSzPx}" fill="#FFFFFF"/>
+    <svg x="${qrPad}" y="${qrPad}" width="${qrInnerSz}" height="${qrInnerSz}"
+         viewBox="0 0 ${qrInnerSz} ${qrInnerSz}" preserveAspectRatio="xMidYMid meet">
+      ${qrInner}
+    </svg>
   </svg>
 
   <!-- businessName -->

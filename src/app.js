@@ -160,6 +160,7 @@ app.use(
   },
   express.static(path.join(__dirname, "..", "uploads"))
 );
+
 app.use("/download", express.static(path.join(process.cwd(), "downloads")));
 
 app.use("/public/uploads", 
