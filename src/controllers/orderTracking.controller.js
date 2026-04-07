@@ -42,15 +42,15 @@ function formatOrderTracking(o) {
 
   // Cards NFC des items
   const nfcCards = (o.items ?? [])
-    .filter((item) => item.nfccards)
+    .filter((item) => item.nfcCards)
     .map((item) => ({
-      id:          item.nfcCard.id,
-      uid:         item.nfcCard.uid,
-      payload:     item.nfcCard.payload,
-      isActive:    item.nfcCard.active,
-      status:      item.nfcCard.status,
-      scanCount:   item.nfcCard.scanCount ?? 0,
-      location:    item.nfcCard.locationName ?? "Non assigné",
+      id:          item.id,
+      uid:         item.uid,
+      payload:     item.payload,
+      isActive:    item.active,
+      status:      item.status,
+      scanCount:   item.scanCount ?? 0,
+      location:    item.locationName ?? "Non assigné",
     }));
 
   return {
@@ -83,7 +83,7 @@ function formatOrderTracking(o) {
       totalCards:  i.totalCards,
       unitPrice:   Number(i.unitPrice),
       totalPrice:  Number(i.totalPrice),
-      hasNfc:      !!i.nfccards
+      hasNfc:      !!i.nfcCards
     })),
     // Timeline
     timeline,
@@ -141,6 +141,8 @@ export const getMyOrders = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
+
+
 // GET /api/orders/tracking/:orderNumber — détail commande par numéro
 export const getOrderTracking = async (req, res, next) => {
   try {
@@ -164,82 +166,8 @@ export const getOrderTracking = async (req, res, next) => {
         company: { select: { id: true, name: true } },
       },
     });
-
     if (!order) return res.status(404).json({ success: false, error: "Commande introuvable" });
     res.json({ success: true, data: formatOrderTracking(order) });
-  } catch (e) { next(e); }
-};
-
-
-
-
-// ─────────────────────────────────────────────────────────────
-// ENDPOINTS SUPERADMIN
-// ─────────────────────────────────────────────────────────────
-
-// GET /api/superadmin/orders — toutes les commandes + filtres
-export const listAllOrders = async (req, res, next) => {
-  try {
-    const page   = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit  = Math.min(100, parseInt(req.query.limit) || 20);
-    const skip   = (page - 1) * limit;
-    const search = req.query.search?.trim() || "";
-    const status = req.query.status || undefined;
-
-    const where = {
-      ...(status && status !== "all" && { status }),
-      ...(search && {
-        OR: [
-          { orderNumber:  { contains: search } },
-          { user:         { name:  { contains: search } } },
-          { user:         { email: { contains: search } } },
-          { company:      { name:  { contains: search } } },
-        ],
-      }),
-    };
-
-    const [orders, total] = await Promise.all([
-      prisma.order.findMany({
-        where,
-        include: {
-          items: {
-            include: {
-              product: { include: { translations: { take: 1 } } },
-              nfccards:  { include: { _count: { select: { scans: true } } } },
-            },
-          },
-          user:    { select: { name: true, email: true } },
-          company: { select: { id: true, name: true } },
-          statusHistory: { orderBy: { changedAt: "desc" }, take: 1 }, // dernier changement
-        },
-        orderBy: { createdAt: "desc" },
-        skip, take: limit,
-      }),
-      prisma.order.count({ where }),
-    ]);
-
-    // Stats rapides
-    const [statsResult] = await Promise.all([
-      prisma.order.groupBy({
-        by: ["status"],
-        _count: { id: true },
-        _sum:   { total: true },
-      }),
-    ]);
-
-    const stats = {
-      total:    total,
-      revenue:  orders.filter((o) => !["cancelled","refunded"].includes(o.status)).reduce((s, o) => s + Number(o.total), 0),
-      active:   orders.filter((o) => ["paid","production","printed","shipped"].includes(o.status)).length,
-      customers: new Set(orders.map((o) => o.user?.email)).size,
-    };
-
-    res.json({
-      success: true,
-      data:    orders.map(formatOrderTracking),
-      stats,
-      meta:    { total, page, last_page: Math.ceil(total / limit) },
-    });
   } catch (e) { next(e); }
 };
 

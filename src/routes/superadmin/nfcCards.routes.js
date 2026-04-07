@@ -10,8 +10,6 @@ import {
   activateCard,
   regenerateSuperCardExport,
   deleteSuperCard,
-  listTags,
-  createTags,
   assignTag,
 } from "../../controllers/superadmin/nfcCards.controller.js";
 
@@ -38,6 +36,4 @@ superNfcRouter.post("/cards/:uid/regenerate", ...auth,   regenerateSuperCardExpo
 superNfcRouter.delete("/cards/:uid",          ...auth,   deleteSuperCard);
 
 // Puces hardware
-superNfcRouter.get("/tags",               ...auth,       listTags);
-superNfcRouter.post("/tags",                ...auth,     createTags);
 superNfcRouter.patch("/tags/:id/assign",     ...auth,    assignTag);

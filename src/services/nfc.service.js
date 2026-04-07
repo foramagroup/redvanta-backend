@@ -188,15 +188,28 @@ export async function activateCardsForOrder(orderId) {
 }
  
 // ─── Assigner une puce hardware à une carte ──────────────────
-export async function assignTagToCard(cardUid, tagId) {
-  const tag = await prisma.nFCTag.findUnique({ where: { id: tagId } });
-  if (!tag) throw new Error(`NFCTag #${tagId} introuvable`);
-  if (tag.status !== "NEW") throw new Error(`NFCTag #${tagId} déjà utilisée (status=${tag.status})`);
-  const card = await prisma.nFCCard.findUnique({ where: { uid: cardUid } });
-  if (!card) throw new Error(`NFCCard uid=${cardUid} introuvable`);
-  if (card.tagId) throw new Error(`NFCCard a déjà une puce (tagId=${card.tagId})`);
-  await prisma.nFCCard.update({ where: { uid: cardUid }, data: { tagId } });
-  console.log(`[nfc] NFCTag #${tagId} → NFCCard uid=${cardUid}`);
+export async function assignTagToCard(cardId, tagId) {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Vérifier la disponibilité du Tag
+    const tag = await tx.nFCTag.findUnique({ where: { id: tagId } });
+    if (!tag) throw new Error(`NFCTag #${tagId} introuvable`);
+    if (tag.status !== "NEW") throw new Error(`Tag déjà utilisé (status=${tag.status})`);
+    // 2. Vérifier la Carte
+    const card = await tx.nFCCard.findUnique({ where: { id: cardId } });
+    if (!card) throw new Error(`NFCCard #${cardId} introuvable`);
+    if (card.tagId) throw new Error(`Cette carte possède déjà une puce`);
+    // 3. Update atomique des deux côtés
+    const updatedCard = await tx.nFCCard.update({
+      where: { id: cardId },
+      data: { tagId: tagId }, // On lie le tag à la carte
+    });
+    await tx.nFCTag.update({
+      where: { id: tagId },
+      data: { status: "ASSIGNED" }, // On marque le tag comme assigné
+    });
+    console.log(`[nfc] Liaison réussie : Tag ${tag.tagSerial} ↔ Card ${card.uid}`);
+    return updatedCard;
+  });
 }
  
 // ─── Formats réponse API ──────────────────────────────────────
@@ -244,6 +257,6 @@ export function formatNfcTag(tag) {
     status:     tag.status,
     isAssigned: !!tag.card,
     cardUid:    tag.card?.uid ?? null,
-    createdAt:  tag.createdAt,
+    createdAt:  tag.createdAt.toISOString().split('T')[0],
   };
 }

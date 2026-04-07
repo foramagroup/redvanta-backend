@@ -24,7 +24,7 @@ import path   from "path";
 import fs     from "fs";
 import prisma from "../../config/database.js";
 import { generateCardExport, deriveCardUrls, deleteCardExportFiles } from "../../services/cardExport.service.js";
-import { formatNfcCard, formatNfcTag, assignTagToCard } from "../../services/nfc.service.js";
+import { formatNfcCard, assignTagToCard } from "../../services/nfc.service.js";
 
 // ─── Include Prisma complet (superadmin voit tout) ────────────
 
@@ -456,61 +456,6 @@ export const regenerateQrOnly = async (req, res, next) => {
 // ── PUCES HARDWARE (NFCTag) ───────────────────────────────────
 // ─────────────────────────────────────────────────────────────
 
-// GET /api/superadmin/nfc/tags
-// Liste toutes les puces (avec filtres)
-
-export const listTags = async (req, res, next) => {
-  try {
-    const { status, assigned, search, page = "1", limit = "20" } = req.query;
-
-    const where = {};
-    if (status) where.status = status;
-    if (assigned === "true")  where.card = { isNot: null };
-    if (assigned === "false") where.card = null;
-    if (search)  where.tagSerial = { contains: search };
-
-    const pageNum = Math.max(1, parseInt(page));
-    const take    = Math.min(100, parseInt(limit));
-    const skip    = (pageNum - 1) * take;
-
-    const [tags, total] = await Promise.all([
-      prisma.nFCTag.findMany({
-        where, include: { card: { select: { uid: true, locationName: true, companyId: true } } },
-        orderBy: { id: "desc" }, skip, take,
-      }),
-      prisma.nFCTag.count({ where }),
-    ]);
-
-    res.json({
-      success: true,
-      data:    tags.map(formatNfcTag),
-      meta:    { total, page: pageNum, limit: take, pages: Math.ceil(total / take) },
-    });
-  } catch (e) { next(e); }
-};
-
-// POST /api/superadmin/nfc/tags
-// Créer une ou plusieurs puces (batch)
-// Body : { tags: [{ tagSerial, chipType }] } ou { tagSerial, chipType }
-
-export const createTags = async (req, res, next) => {
-  try {
-    const { tags, tagSerial, chipType } = req.body;
-
-    // Support création batch ou unitaire
-    const items = tags ?? [{ tagSerial, chipType }];
-    if (!items.length) {
-      return res.status(422).json({ success: false, error: "Au moins une puce requise" });
-    }
-
-    const created = await prisma.nFCTag.createMany({
-      data:           items.map((t) => ({ tagSerial: t.tagSerial ?? null, chipType: t.chipType ?? null, status: "NEW" })),
-      skipDuplicates: true,
-    });
-
-    res.status(201).json({ success: true, count: created.count, message: `${created.count} puce(s) créée(s)` });
-  } catch (e) { next(e); }
-};
 
 // PATCH /api/superadmin/nfc/tags/:id/assign
 // Assigner une puce à une carte

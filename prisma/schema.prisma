@@ -198,7 +198,9 @@ model Order {
   total         Float
 
   methodPayment  String?
-
+  trackingNumber   String?
+  trackingUrl      String?
+  estimatedDelivery DateTime?
   shippingFullName  String?
   shippingAddress   String?
   shippingCity      String?
