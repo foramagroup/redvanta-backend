@@ -27,7 +27,7 @@ import locationRoutes from "./routes/location.routes.js";
 import nfcAdminRoutes from "./routes/nfc.routes.js";
 import reviewAdminRoutes from "./routes/reviews.routes.js";
 import orderTrackAdminRoutes from "./routes/orderTrack.routes.js";
-import { clientNfcRouter } from "./routes/nfcCards.routes.js";
+import  myDesignAdminRoutes  from "./routes/myDesign.routes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -224,8 +224,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/admin/auth", authAdminRoutes);
   app.use("/api/admin/orders", orderAdminRoutes);
   app.use("/api/admin/locations", locationRoutes);
-  //NFC/Mydesgn
-  app.use('/api/admin/nfc', clientNfcRouter);
+  //Mydesgn
+  app.use('/api/admin/my-design', myDesignAdminRoutes);
   //ges Review
   app.use('/api/admin/reviews', reviewAdminRoutes);
   

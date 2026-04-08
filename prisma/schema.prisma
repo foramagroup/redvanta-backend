@@ -1710,6 +1710,7 @@ enum DesignStatus {
   draft
   validated
   locked
+  archived
 }
 
 enum CardModel {
