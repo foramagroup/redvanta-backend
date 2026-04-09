@@ -56,6 +56,35 @@ export const listLocations = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
+
+
+export const listCompanyNfcCards = async (req, res, next) => {
+  try {
+    const companyId = getCompanyId(req);
+    const nfcCards = await prisma.nFCCard.findMany({
+      where: { 
+        companyId: companyId,
+        locationId: null
+      },
+      select: {
+        id: true,
+        companyId: true,
+        uid: true,
+        tagId: true,
+        locationId: true,
+        tag: { 
+          select: { 
+            tagSerial: true 
+          } 
+        },
+      }
+    });
+    res.json({ success: true, data: nfcCards });
+  } catch (e) { 
+    next(e); 
+  }
+};
+
 // ─── GET /api/locations/:id ───────────────────────────────────
 export const getLocation = async (req, res, next) => {
   try {

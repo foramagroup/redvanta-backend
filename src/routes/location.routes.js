@@ -12,6 +12,7 @@ import {
   getLocationStats,
   refreshGoogleData,
   assignNfcCard,
+  listCompanyNfcCards
 } from "../controllers/location.controller.js";
 
 const router = Router();
@@ -26,6 +27,9 @@ router.get("/stats", ...auth, getLocationStats);
 // GET    /api/locations
 // → Liste toutes les locations de la company (avec cardCount dynamique)
 router.get("/", ...auth, listLocations);
+
+
+router.get("/list-company-card", ...auth, listCompanyNfcCards);
 
 // GET    /api/locations/:id
 router.get("/:id", ...auth, getLocation);
@@ -47,9 +51,6 @@ router.patch("/:id/toggle", ...auth, toggleLocation);
 // DELETE /api/locations/:id
 // → Détache les tags NFC (SetNull) puis supprime
 router.delete("/:id", ...auth, deleteLocation);
-
-
-
 
 
 

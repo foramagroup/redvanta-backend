@@ -15,7 +15,7 @@
 // Note : create/edit restent dans design.controller.js (step1/step2/validate)
 // ─────────────────────────────────────────────────────────────
 
-import prisma from "../../config/database.js";
+import prisma from "../config/database.js";
 
 // ─── Helper ──────────────────────────────────────────────────
 
@@ -141,9 +141,7 @@ export const listMyDesigns = async (req, res, next) => {
     const companyId = getCompanyId(req);
     const userId    = req.user.userId;
     const { status = "all", search, page = "1", limit = "20" } = req.query;
-
     const where = { companyId, userId };
-
     // Filtre statut
     if (status !== "all") {
       if (status === "active") {
@@ -153,7 +151,6 @@ export const listMyDesigns = async (req, res, next) => {
         where.status = mapStatusToDb(status);
       }
     }
-
     // Recherche sur businessName
     if (search?.trim()) {
       where.businessName = { contains: search.trim() };
@@ -358,6 +355,8 @@ export const deleteMyDesign = async (req, res, next) => {
       where:   { id, companyId, userId },
       include: { nfcCards: { select: { id: true, active: true, status: true } } },
     });
+
+
     if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
 
     // Bloquer si commande en cours

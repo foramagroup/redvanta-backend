@@ -205,7 +205,7 @@ export async function assignTagToCard(cardId, tagId) {
     });
     await tx.nFCTag.update({
       where: { id: tagId },
-      data: { status: "ASSIGNED" }, // On marque le tag comme assigné
+      data: { status: "PROGRAMMED" }, // On marque le tag comme assigné
     });
     console.log(`[nfc] Liaison réussie : Tag ${tag.tagSerial} ↔ Card ${card.uid}`);
     return updatedCard;

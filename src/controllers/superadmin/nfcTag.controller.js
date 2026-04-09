@@ -107,8 +107,8 @@ export const updateTagStatus = async (req, res, next) => {
 
     if (status === "DEFECTIVE") {
       await prisma.nFCCard.updateMany({
-        where: { nfcTagId: parseInt(id) },
-        data: { nfcTagId: null }
+        where: { tagId: parseInt(id) },
+        data: { tagId: null, status: "DISABLED" }
       });
     }
     const updated = await prisma.nFCTag.update({

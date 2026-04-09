@@ -52,7 +52,7 @@ import { assignTagToCard } from "../../services/nfc.service.js";
                 include: {
                 user: { select: { name: true } },
                 tag: { select: { id: true, tagSerial: true } },
-                design: { select: { name: true } },
+                design: { select: { businessName: true } },
                 orderItem: {
                     include: {
                     product: {
@@ -79,7 +79,7 @@ import { assignTagToCard } from "../../services/nfc.service.js";
             uid: c.uid,
             userName: c.user?.name || "N/A",
             locationName: c.locationName || "N/A",
-            designName: c.design?.name || "Standard Design",
+            designName: c.design?.businessName || "Standard Design",
             productName: c.orderItem?.product?.translations[0]?.title || "Classic NFC Card",
             active: c.active,
             tagId: c.tagId,
@@ -109,7 +109,6 @@ import { assignTagToCard } from "../../services/nfc.service.js";
             if (!cardId || !tagId) {
             return res.status(422).json({ success: false, error: "IDs requis" });
             }
-
             // Utilisation de ton service existant
             await assignTagToCard(parseInt(cardId), parseInt(tagId));
             
