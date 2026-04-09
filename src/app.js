@@ -29,6 +29,7 @@ import reviewAdminRoutes from "./routes/reviews.routes.js";
 import orderTrackAdminRoutes from "./routes/orderTrack.routes.js";
 import  myDesignAdminRoutes  from "./routes/myDesign.routes.js";
 import  adminSettingsRoutes  from "./routes/settingsRoutes.js";
+import analyticsEventsRoutes from './routes/analyticsEvents.routes.js';
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -231,6 +232,9 @@ app.use("/api/customization", customizationRoutes);
   app.use('/api/admin/my-design', myDesignAdminRoutes);
   //ges Review
   app.use('/api/admin/reviews', reviewAdminRoutes);
+
+  //ges analytics event
+  app.use('/api/admin/analytics/events', analyticsEventsRoutes);
   
   //ges order Tracking
   app.use('/api/admin/order-tracking', orderTrackAdminRoutes);

@@ -24,6 +24,15 @@ function getOwnerId(req) {
 
 // Format location pour la réponse API
 function formatLocation(loc) {
+  const assignedCards = Array.isArray(loc.nfcCards)
+    ? loc.nfcCards.map((card) => ({
+        id: card.id,
+        uid: card.uid,
+        tagId: card.tagId ?? null,
+        tagSerial: card.tag?.tagSerial ?? null,
+      }))
+    : [];
+
   return {
     id:              loc.id,
     name:            loc.name,
@@ -38,6 +47,8 @@ function formatLocation(loc) {
     active:          loc.active,
     createdAt:       loc.createdAt,
     updatedAt:       loc.updatedAt,
+    assignedCard:    assignedCards[0] ?? null,
+    assignedCards,
   };
 }
 
@@ -55,6 +66,7 @@ export const listLocations = async (req, res, next) => {
     res.json({ success: true, data: locations.map(formatLocation) });
   } catch (e) { next(e); }
 };
+
 
 
 export const listCompanyNfcCards = async (req, res, next) => {
@@ -92,7 +104,18 @@ export const getLocation = async (req, res, next) => {
 
     const loc = await prisma.location.findFirst({
       where:   { id, companyId },
-      include: { _count: { select: { nfcCards: true } } },
+      include: {
+        _count: { select: { nfcCards: true } },
+        nfcCards: {
+          select: {
+            id: true,
+            uid: true,
+            tagId: true,
+            tag: { select: { tagSerial: true } },
+          },
+          orderBy: { id: "asc" },
+        },
+      },
     });
     if (!loc) return res.status(404).json({ success: false, error: "Location introuvable" });
 
@@ -452,3 +475,4 @@ async function getMonthlyTrend(cardUids) {
     return { month: d.toLocaleString("en-US", { month: "short" }), scans: byMonth[key] || 0 };
   });
 }
+
