@@ -89,16 +89,50 @@ model UserCompany {
 }
 
 model PlatformSetting {
-  id                   Int         @id @default(autoincrement()) @db.UnsignedInt
-  platform_name        String      @db.VarChar(150)
-  default_email_sender String      @db.VarChar(150)
-  sms_setting_id       Int?        @db.UnsignedInt
-  rate_limit           Int         @default(60)
-  is_maIntenance       Boolean     @default(false)
-  createdAt            DateTime    @default(now()) @db.Timestamp(0)
-  updatedAt            DateTime    @default(now()) @db.Timestamp(0)
-  smsSetting           SmsSetting? @relation(fields: [sms_setting_id], references: [id])
-  @@index([sms_setting_id])
+  id        Int      @id @default(autoincrement())
+  
+  // General
+  companyName    String   @default("REDVANTA Inc.")
+  companyEmail   String   @default("contact@redvanta.com")
+  companyPhone   String?
+  companyCountry String   @default("United States")
+  countryCode    String   @default("+1")
+  companyAddress String?  @db.Text
+  vatNumber      String?
+  tradeNumber    String?
+  
+  // Branding
+  logoUrl        String?
+  logoScale      Int      @default(100)
+  primaryColor   String   @default("#E10600")
+  secondaryColor String   @default("#1A1A1A")
+  
+  // reCAPTCHA
+  captchaEnabled Boolean  @default(false)
+  captchaSiteKey String?
+  captchaSecret  String?
+  
+  // Google Maps
+  mapsEnabled     Boolean  @default(false)
+  mapsApiKey      String?
+  mapsCloudSecret String?
+  
+  // Review Platforms
+  googleLink      String?
+  facebookLink    String?
+  yelpLink        String?
+  tripadvisorLink String?
+  customReviewLink String?
+  
+  // Security
+  twoFactorEnabled Boolean @default(false)
+  twoFactorEmail   Boolean @default(false)
+  twoFactorPhone   Boolean @default(false)
+  twoFactorGoogle  Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
   @@map("platform_settings")
 }
 
@@ -902,7 +936,6 @@ model SmsSetting {
   status           Boolean?          @default(true)
   createdAt        DateTime          @default(now()) @db.Timestamp(0)
   updatedAt        DateTime          @default(now()) @db.Timestamp(0)
-  platformSettings PlatformSetting[]
   region           SmsRegion         @relation(fields: [region_id], references: [id], onDelete: Cascade, map: "fk_sms_region")
   supplier         SmsSupplier       @relation(fields: [supplier_id], references: [id], onDelete: Cascade, map: "fk_sms_supplier")
 
@@ -944,8 +977,6 @@ model stripeproduct {
   localProductId Int?
   createdAt      DateTime @default(now())
 }
-
-
 
 model template {
   id          String   @id
@@ -1158,6 +1189,7 @@ model GlobalCurrencySettings {
   lastRateUpdate DateTime?
   @@map("global_currency_settings")
 }
+
 
 enum GatewayMode {
   test
@@ -1397,6 +1429,7 @@ model Company {
   tradeNumber    String?
   email          String   @unique
   phone          String?
+  countryCode    String?  @default("+1")
   country        String?
   address        String?  @db.Text
   type              CompanyType?
@@ -1404,17 +1437,21 @@ model Company {
   status            CompanyStatus   @default(active)
   defaultLanguageId Int?  
   primaryColor   String   @default("#E10600")
+  secondaryColor String?  @default("#1A1A1A")  // ← NOUVEAU
   
   captchaEnabled Boolean  @default(false)
   captchaSiteKey String?
   captchaSecret  String?
+
   mapsEnabled    Boolean  @default(false)
   mapsApiKey     String?
+  mapsCloudSecret String? // ← NOUVEAU
   
   googleLink     String?
   facebookLink   String?
   yelpLink       String?
   tripadvisorLink String?
+  customReviewLink String? // ← NOUVEAU
 
   billingAmount     String?
   billingDate       DateTime?
@@ -1449,13 +1486,39 @@ model Company {
 model CompanySettings {
   id                Int      @id @default(autoincrement())
   companyId         Int?      @unique
+
   timezone          String   @default("UTC")
+  dateFormat        String   @default("MM/DD/YYYY")
+  language          String   @default("en")
+
   currency          String   @default("USD")
+  currencySymbol    String   @default("$")
+
   notificationEmail Boolean  @default(true)
-  maxLocations      Int      @default(1)
+  emailNotifications Boolean @default(true)
+  smsNotifications  Boolean  @default(false)
+  pushNotifications Boolean  @default(true)
+
+
+   maxLocations      Int      @default(1)
   maxApiCalls       Int      @default(1000)
   maxSmsCalls       Int      @default(100)
+
   allowCustomColor  Boolean  @default(false)
+  apiEnabled        Boolean  @default(true)
+  apiRateLimit      Int      @default(100)
+
+  twoFactorEnabled  Boolean  @default(false)
+  twoFactorEmail    Boolean  @default(false)
+  twoFactorPhone    Boolean  @default(false)
+  twoFactorGoogle   Boolean  @default(false)
+  sessionTimeout    Int      @default(3600)
+  maxLoginAttempts  Int      @default(5)
+  passwordMinLength Int      @default(8)
+
+createdAt         DateTime @default(now())
+updatedAt         DateTime @updatedAt
+
   company           Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   @@map("company_settings")
 }

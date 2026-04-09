@@ -57,7 +57,6 @@ export const listLocations = async (req, res, next) => {
 };
 
 
-
 export const listCompanyNfcCards = async (req, res, next) => {
   try {
     const companyId = getCompanyId(req);

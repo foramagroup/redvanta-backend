@@ -28,6 +28,7 @@ import nfcAdminRoutes from "./routes/nfc.routes.js";
 import reviewAdminRoutes from "./routes/reviews.routes.js";
 import orderTrackAdminRoutes from "./routes/orderTrack.routes.js";
 import  myDesignAdminRoutes  from "./routes/myDesign.routes.js";
+import  adminSettingsRoutes  from "./routes/settingsRoutes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -58,6 +59,7 @@ import orderSuperAdminRoutes from "./routes/superadmin/order.routes.js";
 import { superNfcRouter } from "./routes/superadmin/nfcCards.routes.js";
 import nfcTagRoutes from "./routes/superadmin/nfcTag.routes.js";
 import nfcCardRoutes from "./routes/superadmin/nfcListCard.routes.js";
+import generalSettingsRoutes from './routes/superadmin/generalSetting.routes.js';
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -224,6 +226,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/admin/auth", authAdminRoutes);
   app.use("/api/admin/orders", orderAdminRoutes);
   app.use("/api/admin/locations", locationRoutes);
+  app.use('/api/admin/general-settings', adminSettingsRoutes);
   //Mydesgn
   app.use('/api/admin/my-design', myDesignAdminRoutes);
   //ges Review
@@ -261,11 +264,12 @@ app.use("/api/customization", customizationRoutes);
   app.use('/api/superadmin/email-server-config', emailServerConfigRoutes);
   app.use('/api/superadmin/status-settings', statusRoutes);
   app.use("/api/superadmin/billing", billingRoutes);
+  app.use('/api/superadmin/general-settings', generalSettingsRoutes);
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
     // app.use("/uploads", express.static(uploadDir));
-    app.use(express.json({ limit: "60mb" }));
-    app.use(express.urlencoded({ extended: true, limit: "60mb" }));
+  app.use(express.json({ limit: "60mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "60mb" }));
 
   // gestion product
   app.use('/api/superadmin/products', productAdminRoutes);
