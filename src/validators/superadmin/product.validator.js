@@ -17,6 +17,17 @@ export const translationSchema = z.object({
   metaImage:       z.string().optional(),
 });
 
+
+export const cardSettingsSchema = z.object({
+  width: z.number().min(1).max(500),
+  height: z.number().min(1).max(500),
+  cornerRadiusEnabled: z.boolean(),
+  cornerRadius: z.number().min(0).max(250),
+  defaultTemplateId: z.string(),
+}).optional();
+
+
+
 export const galleryItemSchema = z.object({
   url:      z.string().min(1),
   type:     z.enum(["image", "video", "youtube"]),
@@ -59,6 +70,7 @@ export const createProductSchema = z.object({
       (prices) => new Set(prices.map((p) => p.cardTypeId)).size === prices.length,
       { message: "Types de carte dupliqués dans la tarification" }
     ),
+    cardSettings: cardSettingsSchema,
 });
 
 export const updateProductSchema = createProductSchema.partial().extend({
@@ -73,6 +85,9 @@ export const createCardTypeSchema = z.object({
   image:  z.string().optional(),
   active: z.boolean().default(true),
 });
+
+
+
 
 export const updateCardTypeSchema = createCardTypeSchema.partial();
 

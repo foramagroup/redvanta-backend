@@ -945,6 +945,40 @@ model SmsSetting {
 }
 
 
+model CardTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)
+  platform    String   @db.VarChar(50) // google, facebook, yelp, tripadvisor, trustpilot
+  
+  // Gradient colors (stored as JSON array)
+  gradient    Json     // ["#FFFFFF", "#F1F5F9"]
+  
+  // Colors
+  accentColor  String  @db.VarChar(20)
+  textColor    String  @db.VarChar(20)
+  bandColor1   String  @db.VarChar(20)
+  bandColor2   String  @db.VarChar(20)
+  qrColor      String  @db.VarChar(20)
+  starsColor   String  @db.VarChar(20)
+  iconsColor   String  @db.VarChar(20)
+  
+  // Pattern
+  pattern     String   @db.VarChar(50) @default("none")
+  
+  // Status
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([platform])
+  @@index([isActive])
+  @@index([isDefault])
+  @@map("card_templates")
+}
+
+
 model SuperAdminSetting {
   id        Int      @id @default(autoincrement())
   module    String   @unique @db.VarChar(100)
@@ -1559,6 +1593,7 @@ model Product {
   price     Float
   active    Boolean  @default(true)
   image     String?  // primary image URL / base64
+  cardSettings   Json?    // { width, height, cornerRadius, cornerRadiusEnabled, layouts, reviewPlatform, defaultTemplateId, availableTemplates }
 
   // Relations
   translations    ProductTranslation[]
@@ -1577,6 +1612,8 @@ model Product {
 
   @@map("product")
 }
+
+
 
 model ProductTranslation {
   id              Int     @id @default(autoincrement())

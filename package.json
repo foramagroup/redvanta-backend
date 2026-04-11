@@ -1,5 +1,5 @@
 {
-  "name": "krootal-review-backend",
+  "name": "opinoor-backend",
   "version": "1.0.0",
   "description": "Backend complet Krootal Review – Node.js, Prisma, Stripe, NFC, Affiliates, Reviews automation",
   "main": "server.js",

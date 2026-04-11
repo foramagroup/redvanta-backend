@@ -61,6 +61,7 @@ import { superNfcRouter } from "./routes/superadmin/nfcCards.routes.js";
 import nfcTagRoutes from "./routes/superadmin/nfcTag.routes.js";
 import nfcCardRoutes from "./routes/superadmin/nfcListCard.routes.js";
 import generalSettingsRoutes from './routes/superadmin/generalSetting.routes.js';
+import cardTemplatesRoutes from './routes/superadmin/cardTemplates.routes.js';
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -269,6 +270,7 @@ app.use("/api/customization", customizationRoutes);
   app.use('/api/superadmin/status-settings', statusRoutes);
   app.use("/api/superadmin/billing", billingRoutes);
   app.use('/api/superadmin/general-settings', generalSettingsRoutes);
+  app.use('/api/superadmin/card-templates', cardTemplatesRoutes);
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
     // app.use("/uploads", express.static(uploadDir));
