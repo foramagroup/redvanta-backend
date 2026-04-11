@@ -373,3 +373,147 @@ export const updateSecuritySettings = async (req, res) => {
     });
   }
 };
+
+// ── SUBSCRIPTION ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/superadmin/general-settings/subscription
+ * Retourne l'abonnement plateforme + la liste des plans disponibles
+ */
+export const getSubscription = async (req, res) => {
+  try {
+    const [subscription, plans] = await Promise.all([
+      prisma.subscription.findFirst({ where: { companyId: null } }),
+      prisma.planSetting.findMany({
+        where: { status: 'Active' },
+        orderBy: { price: 'asc' },
+        select: { id: true, name: true, price: true, annual: true, features: true, locationLimit: true }
+      })
+    ]);
+
+    res.json({ success: true, data: { subscription, plans } });
+  } catch (error) {
+    console.error('❌ Error fetching subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error fetching subscription',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * GET /api/superadmin/general-settings/subscription/billing-history
+ * Retourne l'historique des factures récurrentes
+ */
+export const getBillingHistory = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const invoices = await prisma.invoice.findMany({
+      where: { isRecurring: true },
+      orderBy: { invoiceDate: 'desc' },
+      skip,
+      take: parseInt(limit),
+      select: {
+        id: true,
+        invoiceNumber: true,
+        total: true,
+        currency: true,
+        status: true,
+        invoiceDate: true,
+        recurringInterval: true,
+      }
+    });
+
+    res.json({ success: true, data: invoices });
+  } catch (error) {
+    console.error('❌ Error fetching billing history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error fetching billing history',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * PUT /api/superadmin/general-settings/subscription/upgrade
+ * Met à jour l'abonnement plateforme (plan + cycle de facturation)
+ */
+export const upgradePlan = async (req, res) => {
+  try {
+    const { planName, billingCycle, amount } = req.body;
+
+    if (!planName || amount === undefined) {
+      return res.status(400).json({ success: false, error: 'planName and amount are required' });
+    }
+
+    const now = new Date();
+    const nextBilling = billingCycle === 'yearly'
+      ? new Date(now.getFullYear() + 1, now.getMonth(), now.getDate())
+      : new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+
+    let subscription = await prisma.subscription.findFirst({ where: { companyId: null } });
+
+    if (!subscription) {
+      subscription = await prisma.subscription.create({
+        data: {
+          planName,
+          status: 'active',
+          amount: parseFloat(amount),
+          Interval: billingCycle || 'monthly',
+          nextBilling
+        }
+      });
+    } else {
+      subscription = await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          planName,
+          amount: parseFloat(amount),
+          Interval: billingCycle || 'monthly',
+          nextBilling
+        }
+      });
+    }
+
+    res.json({ success: true, message: 'Plan upgraded successfully', data: subscription });
+  } catch (error) {
+    console.error('❌ Error upgrading plan:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error upgrading plan',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * POST /api/superadmin/general-settings/subscription/locations
+ * Calcule le coût supplémentaire et retourne l'URL de redirection vers les add-ons
+ */
+export const addLocationsRequest = async (req, res) => {
+  try {
+    const { quantity = 1 } = req.body ?? {};
+    const qty = Math.max(1, parseInt(quantity) || 1);
+    const costPerLocation = 29;
+
+    res.json({
+      success: true,
+      data: {
+        quantity: qty,
+        additionalMonthlyCost: qty * costPerLocation,
+        redirectUrl: `/dashboard/addons?activate=location&qty_location=${qty}`
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error processing location request:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error processing request',
+      details: error.message
+    });
+  }
+};

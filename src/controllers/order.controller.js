@@ -45,10 +45,10 @@ export const listMyOrders = async (req, res, next) => {
               packageTier: true,
               cardType: true
             }
-          }
-        },
+          },
         payments: true,
         invoice: true,
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -130,3 +130,4 @@ export const getOrderDetails = async (req, res, next) => {
     next(e);
   }
 };
+
