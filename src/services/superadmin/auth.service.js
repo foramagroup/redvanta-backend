@@ -87,7 +87,7 @@ export function formatSuperAdmin(user) {
 }
 
 // ─── Formater le user admin pour la réponse ──────────────────
-export function formatAdmin(user) {
+export function formatAdmin(user, activeCompanyId = null) {
   const globalPermissions = formatPermissions(user.role?.rolepermission ?? []);
   const companies = (user.companies ?? []).map((uc) => {
     const companyPermissions = formatPermissions(uc.role?.rolepermission ?? []);
@@ -134,7 +134,17 @@ export function formatAdmin(user) {
   });
 
   // Company active par défaut = première company dont il est owner
-  const activeCompany = companies.find((c) => c.isOwner) ?? companies[0] ?? null;
+  const normalizedActiveCompanyId =
+    activeCompanyId !== null && activeCompanyId !== undefined
+      ? String(activeCompanyId)
+      : null;
+  const activeCompany =
+    (normalizedActiveCompanyId
+      ? companies.find((c) => String(c.company?.id) === normalizedActiveCompanyId)
+      : null)
+    ?? companies.find((c) => c.isOwner)
+    ?? companies[0]
+    ?? null;
 
   return {
     id:           user.id,
@@ -160,7 +170,6 @@ export function formatAdmin(user) {
 }
 
 // ─── Charger un user pour l'auth ─────────────────────────────
-
 export async function loadUserForAuth(userId, type = "admin") {
   const include = type === "superadmin" ? SUPERADMIN_INCLUDE : ADMIN_INCLUDE;
   return prisma.user.findUnique({ where: { id: userId }, include });
