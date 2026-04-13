@@ -7,7 +7,11 @@ import {
      deleteTemplate
 } from "../../controllers/superadmin/smsTemplateController.js";
 
+import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
+
 const router = express.Router();
+
+router.use(authenticateSuperAdmin, requireSuperAdmin);
 
 router.get("/", getTemplates)
 

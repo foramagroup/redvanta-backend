@@ -29,50 +29,123 @@ function getCompanyId(req) {
 // Mappe les champs DB vers ce que le front attend dans DesignCard / DesignRow
 function formatDesign(d) {
   return {
-    // Identifiants
-    id:          d.id,
-    productId:   d.productId,
+    // ── Identifiants ──────────────────────────────────────
+    id:        d.id,
+    productId: d.productId,
 
-    // Nom affiché (businessName sert de nom de design si pas de champ "name" séparé)
+    // ── Nom & statut ──────────────────────────────────────
     name:         d.businessName ?? `Design #${d.id}`,
     businessName: d.businessName ?? "",
+    status:       mapStatus(d.status),
 
-    // Statut — la vue utilise "active" | "draft" | "archived"
-    // DesignStatus en DB : draft | validated | locked
-    // Mapping : validated → active, locked → active, draft → draft
-    // + on stocke "archived" via un champ séparé qu'on émule avec status
-    status: mapStatus(d.status),
+    // ── Couleurs template (pour DesignCard thumbnail) ─────
+    templateColor1: d.gradient1   ?? d.bgColor    ?? "#0D0D0D",
+    templateColor2: d.gradient2   ?? d.accentColor ?? "#E10600",
 
-    // Couleurs du template pour l'aperçu de la carte dans DesignCard
-    templateColor1: d.gradient1 ?? d.bgColor   ?? "#0D0D0D",
-    templateColor2: d.gradient2 ?? d.accentColor ?? "#E10600",
-
-    // Infos affichées dans DesignRow
+    // ── Infos résumé ──────────────────────────────────────
     template:    d.templateName ?? d.colorMode ?? "Single",
     model:       d.cardModel    ?? "classic",
     orientation: d.orientation  ?? "landscape",
+    platform:    d.platform     ?? "google",
 
-    // Carte NFC liée (si la carte a été commandée)
+    // ── Carte NFC liée ────────────────────────────────────
     linkedCard: d.nfcCards?.length > 0
       ? d.nfcCards[0].uid.slice(0, 8).toUpperCase()
       : null,
 
-    // Dates
+    // ── Dates ─────────────────────────────────────────────
     createdAt: d.createdAt?.toISOString().split("T")[0] ?? null,
     updatedAt: d.updatedAt?.toISOString().split("T")[0] ?? null,
 
-    // Champs complets pour DesignDetailModal
-    slogan:          d.slogan          ?? null,
+    // ══════════════════════════════════════════════════════
+    // TOUS les champs visuels pour CardPreview
+    // ══════════════════════════════════════════════════════
+
+    // Step 1
+    slogan:          d.slogan          ?? "",
     callToAction:    d.callToAction    ?? "Powered by RedVanta",
+    ctaPaddingTop:   d.ctaPaddingTop   ?? 8,
     googlePlaceId:   d.googlePlaceId   ?? null,
     googleReviewUrl: d.googleReviewUrl ?? null,
-    logoUrl:         d.logoUrl         ?? null,
-    bgColor:         d.bgColor         ?? "#0D0D0D",
-    textColor:       d.textColor       ?? "#FFFFFF",
-    accentColor:     d.accentColor     ?? "#E10600",
-    version:         d.version         ?? 1,
-    validatedAt:     d.validatedAt     ?? null,
-    lastAutoSave:    d.lastAutoSave     ?? null,
+    platformUrl:     d.platformUrl     ?? null,
+
+    // Logo
+    logoUrl:      d.logoUrl      ?? null,
+    logoPosition: d.logoPosition ?? "left",
+    logoSize:     d.logoSize     ?? 32,
+
+    // Couleurs
+    colorMode:   d.colorMode   ?? "template",
+    bgColor:     d.bgColor     ?? "#0D0D0D",
+    textColor:   d.textColor   ?? "#FFFFFF",
+    accentColor: d.accentColor ?? "#E10600",   // = qrColor
+    starColor:   d.starColor   ?? "#FBBF24",
+    iconsColor:  d.iconsColor  ?? "#22C55E",
+
+    // Template & Bandes
+    templateName:    d.templateName    ?? null,
+    gradient1:       d.gradient1       ?? "#0D0D0D",
+    gradient2:       d.gradient2       ?? "#1A1A1A",
+    accentBand1:     d.accentBand1     ?? "#E10600",
+    accentBand2:     d.accentBand2     ?? "#FF4444",
+    bandPosition:    d.bandPosition    ?? "bottom",
+    frontBandHeight: d.frontBandHeight ?? 22,
+    backBandHeight:  d.backBandHeight  ?? 12,
+
+    // Icônes
+    showNfcIcon:    d.showNfcIcon    ?? true,
+    showGoogleIcon: d.showGoogleIcon ?? true,
+    nfcIconSize:    d.nfcIconSize    ?? 24,
+    googleLogoSize: d.googleLogoSize ?? 20,
+
+    // Typo Nom
+    businessFont:          d.businessFont          ?? "'Space Grotesk', sans-serif",
+    businessFontSize:      d.businessFontSize      ?? 16,
+    businessFontWeight:    d.businessFontWeight    ?? "700",
+    businessFontSpacing:   d.businessFontSpacing   ?? "normal",
+    businessLineHeight:    d.businessLineHeight    ?? "1.2",
+    businessAlign:         d.businessAlign         ?? "left",
+    businessTextTransform: d.businessTextTransform ?? "none",
+
+    // Typo Slogan
+    sloganFont:          d.sloganFont          ?? "'Space Grotesk', sans-serif",
+    sloganFontSize:      d.sloganFontSize      ?? 12,
+    sloganFontWeight:    d.sloganFontWeight    ?? "400",
+    sloganFontSpacing:   d.sloganFontSpacing   ?? "normal",
+    sloganLineHeight:    d.sloganLineHeight    ?? "1.4",
+    sloganAlign:         d.sloganAlign         ?? "left",
+    sloganTextTransform: d.sloganTextTransform ?? "none",
+
+    // Ombre
+    textShadow: d.textShadow ?? "none",
+
+    // Instructions
+    frontInstruction1: d.frontInstruction1 ?? "",
+    frontInstruction2: d.frontInstruction2 ?? "",
+    backInstruction1:  d.backInstruction1  ?? "",
+    backInstruction2:  d.backInstruction2  ?? "",
+
+    // Typo Instructions
+    instrFont:          d.instrFont          ?? "'Space Grotesk', sans-serif",
+    instrFontSize:      d.instrFontSize      ?? 10,
+    instrFontWeight:    d.instrFontWeight    ?? "400",
+    instrFontSpacing:   d.instrFontSpacing   ?? "normal",
+    instrLineHeight:    d.instrLineHeight    ?? "1.4",
+    instrAlign:         d.instrAlign         ?? "left",
+    instrCheckboxStyle: d.instrCheckboxStyle ?? "checkmark",
+    checkStrokeWidth:   d.checkStrokeWidth   ? Number(d.checkStrokeWidth) : 3.5,
+
+    // QR Code
+    qrCodeStyle: d.qrCodeStyle ?? "top",
+    qrCodeSize:  d.qrCodeSize  ?? 80,
+
+    // Drag-and-drop
+    elementOffsets: d.elementOffsets ?? null,
+
+    // Versioning
+    version:      d.version      ?? 1,
+    validatedAt:  d.validatedAt  ?? null,
+    lastAutoSave: d.lastAutoSave ?? null,
   };
 }
 

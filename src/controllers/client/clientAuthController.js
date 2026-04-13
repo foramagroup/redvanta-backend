@@ -96,7 +96,6 @@ async function getDefaultLanguage() {
 export const signup = async (req, res, next) => {
   const ip = getIp(req);
   const userAgent = req.headers["user-agent"] ?? null;
-
   try {
     const { name, password, companyName, phone, address } = req.validatedBody;
     const email = normalizeEmail(req.validatedBody.email);
@@ -182,8 +181,8 @@ export const signup = async (req, res, next) => {
 
     await logActivity(result.user.id, result.user.name, ip, userAgent, "signup");
 
-    const backendBase = process.env.URL_DEV_BACKEND ||  "http://localhost:4000";
-    const confirmUrl = `${backendBase}/api/client/auth/verify-email?token=${verifyToken}&redirect=1`;
+    const backendBase = process.env.URL_DEV_BACKEND ||  "http://localhost:4000/api";
+    const confirmUrl = `${backendBase}/client/auth/verify-email?token=${verifyToken}&redirect=1`;
     const emailPayload = buildConfirmEmailTemplate({
       name: companyName,
       companyName,

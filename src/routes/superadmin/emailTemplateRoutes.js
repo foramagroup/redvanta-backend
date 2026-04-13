@@ -8,7 +8,11 @@ import  {
     deleteTemplate 
 } from '../../controllers/superadmin/emailTemplateController.js';
 
+import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
+
 const router = express.Router();
+
+router.use(authenticateSuperAdmin, requireSuperAdmin);
 
 router.get('/', getAllTemplates);
 router.post('/', createTemplate);

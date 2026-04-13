@@ -42,6 +42,7 @@ router.post("/resend-verification", authResendLimiter, resendVerification);
 // GET  /api/auth/me
 router.get("/me", authenticateAdmin, requireAdmin, me);
 
+
 // POST /api/auth/switch-company
 router.post("/switch-company", authenticateAdmin, requireAdmin, switchCompany);
 

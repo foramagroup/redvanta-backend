@@ -107,11 +107,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 
-
 // --------------------
 // SECURITY + CORS
 // --------------------
 app.use(helmet());
+app.set('trust proxy', 1);
+
+//587
 
 // CORS setup for React/Next frontend with credentials
 const allowedOrigins = new Set([
@@ -160,7 +162,7 @@ app.use(cookieParser());
 // STATIC FILES
 // --------------------
 app.use(
-  "/uploads",
+  "/api/uploads",
   (req, res, next) => {
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     next();
@@ -170,7 +172,7 @@ app.use(
 
 app.use("/download", express.static(path.join(process.cwd(), "downloads")));
 
-app.use("/public/uploads", 
+app.use("/api/public/uploads", 
   (req, res, next) => {
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     next();

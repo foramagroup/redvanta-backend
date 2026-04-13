@@ -5,7 +5,11 @@ import {
   updatePermissions
 } from "../../controllers/superadmin/roleController.js";
 
+import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
+
 const router = express.Router();
+
+router.use(authenticateSuperAdmin, requireSuperAdmin);
 
 router.get("/", getRoles);
 router.post("/", createRole);

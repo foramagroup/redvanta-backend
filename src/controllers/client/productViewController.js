@@ -24,6 +24,7 @@ function formatProductForClient(product, langId) {
     price:           Number(product.price),
     active:          product.active,
     image:           product.image ?? null,
+    cardSettings:    product.cardSettings ?? {},
  
     // Maps par code langue (ex: { en: "Smart Card", fr: "Carte NFC" })
     title:           titleMap,

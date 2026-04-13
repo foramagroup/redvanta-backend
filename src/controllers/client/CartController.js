@@ -17,6 +17,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import prisma from "../../config/database.js";
+import {productNeedsDesign, resolveDesignDefaults} from "../../helpers/designResolver.helpers.js"
+
 
 const CART_INCLUDE = {
   product: {
@@ -86,14 +88,46 @@ function getCompanyId(req) {
 
 // ─── Créer un design par défaut lié à la company ─────────────
 // Uniquement pour les produits physiques (Type A)
-async function createDefaultDesign(tx, { userId, companyId, productId, company }) {
+async function createDefaultDesign(tx, { userId, companyId, productId, company, cardSettings }) {
+  const defaults = resolveDesignDefaults(cardSettings);
   return tx.design.create({
     data: {
-      userId, companyId, productId,
+      userId,
+      companyId,
+      productId,
+
+      // Infos company
       businessName:    company?.name            ?? null,
-      accentColor:     company?.primaryColor    ?? "#E10600",
+      accentColor:     defaults.accentColor     ?? company?.primaryColor ?? "#E10600",
       googlePlaceId:   company?.googlePlaceId   ?? null,
       googleReviewUrl: company?.googleReviewUrl ?? null,
+
+      // Plateforme
+      platform:    defaults.platform    ?? "google",
+      orientation: defaults.orientation ?? "landscape",
+
+      // Template visuel
+      templateName:    defaults.templateName  ?? null,
+      colorMode:       defaults.colorMode     ?? "template",
+      gradient1:       defaults.gradient1     ?? "#0D0D0D",
+      gradient2:       defaults.gradient2     ?? "#1A1A1A",
+      textColor:       defaults.textColor     ?? "#FFFFFF",
+      accentBand1:     defaults.accentBand1   ?? "#E10600",
+      accentBand2:     defaults.accentBand2   ?? "#E10600",
+      bandPosition:    defaults.bandPosition  ?? "bottom",
+      frontBandHeight: defaults.frontBandHeight ?? 22,
+      backBandHeight:  defaults.backBandHeight  ?? 12,
+
+      // Instructions par défaut
+      frontInstruction1: defaults.frontInstruction1,
+      frontInstruction2: defaults.frontInstruction2,
+      backInstruction1:  defaults.backInstruction1,
+      backInstruction2:  defaults.backInstruction2,
+
+      // Valeurs UI par défaut
+      showNfcIcon:    true,
+      showGoogleIcon: true,
+      callToAction:   "Powered by RedVanta",
     },
   });
 }
@@ -133,7 +167,6 @@ export const addToCart = async (req, res, next) => {
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
     const { productId, packageTierId, quantity, cardTypeId } = req.body;
-
     if (!productId) {
       return res.status(422).json({ success: false, error: "productId requis" });
     }
@@ -197,7 +230,6 @@ export const addToCart = async (req, res, next) => {
         where:  { id: companyId },
         select: { name: true, primaryColor: true, googlePlaceId: true, googleReviewUrl: true },
       });
-
       // Créer le CartItem
       const cartItem = await tx.cartItem.create({
         data: {
@@ -213,15 +245,16 @@ export const addToCart = async (req, res, next) => {
       });
 
       // Type A uniquement → design par défaut
-      if (tier) {
+      if (productNeedsDesign(product)) {
         const design = await createDefaultDesign(tx, {
           userId, companyId, productId: product.id, company,
+          cardSettings: product.cardSettings ?? null,
         });
         await tx.cartItem.update({
           where: { id: cartItem.id },
           data:  { designId: design.id },
         });
-      }
+       }
 
       return tx.cartItem.findUnique({ where: { id: cartItem.id }, include: CART_INCLUDE });
     });
@@ -294,9 +327,9 @@ export const syncCart = async (req, res, next) => {
           },
         });
 
-        if (tier) {
+        if (productNeedsDesign(product)) {
           const design = await createDefaultDesign(tx, {
-            userId, companyId, productId: product.id, company,
+            userId, companyId, productId: product.id, company, cardSettings: product.cardSettings ?? null,
           });
           await tx.cartItem.update({ where: { id: cartItem.id }, data: { designId: design.id } });
         }

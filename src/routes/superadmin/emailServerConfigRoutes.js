@@ -7,7 +7,11 @@ import {
   updateEmailServerSettings,
 } from "../../controllers/superadmin/emailServerConfigController.js";
 
+import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
+
 const router = express.Router();
+
+router.use(authenticateSuperAdmin, requireSuperAdmin);
 
 router.get("/", getEmailServerConfig);
 router.post("/", createEmailServer);

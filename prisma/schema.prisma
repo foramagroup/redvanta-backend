@@ -461,7 +461,9 @@ model dashboardstat {
     ctaPaddingTop   Int?     @default(8)          // ← NOUVEAU : espacement CTA en px
     googlePlaceId   String?
     googleReviewUrl String?
-
+    platform    String?  @default("google")  // google|facebook|instagram|tiktok|tripadvisor|booking|airbnb|custom
+    platformUrl String?                      // URL review/profil pour toutes plateformes non-Google
+ 
     // ── Step 2 : Orientation & Logo ───────────────────────────
     orientation   DesignOrientation @default(landscape)
     logoUrl       String?

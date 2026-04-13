@@ -15,6 +15,12 @@ fs.mkdirSync(LOGOS_DIR, { recursive: true });
 
 // ─── Helpers ──────────────────────────────────────────────────
 
+
+const LINK_INPUT_PLATFORMS = new Set([
+  "facebook", "instagram", "tiktok",
+  "tripadvisor", "booking", "airbnb", "custom"
+]);
+
 function getCompanyId(req) {
   const id = req.user.companyId;
   if (!id) throw Object.assign(new Error("Aucune company active"), { status: 403 });
@@ -28,6 +34,10 @@ function formatDesign(d) {
     status: d.status, version: d.version,
     lastAutoSave: d.lastAutoSave, validatedAt: d.validatedAt,
 
+    // ── Plateforme ─────────────────────────────────────────
+    platform:    d.platform,
+    platformUrl: d.platformUrl,
+
     // Step 1
     businessName:    d.businessName,
     slogan:          d.slogan,
@@ -36,21 +46,17 @@ function formatDesign(d) {
     googlePlaceId:   d.googlePlaceId,
     googleReviewUrl: d.googleReviewUrl,
 
-    // Step 2 — Logo
+    // ... tous les autres champs existants sans modification ...
     orientation:  d.orientation,
     logoUrl:      d.logoUrl,
     logoPosition: d.logoPosition,
     logoSize:     d.logoSize,
-
-    // Step 2 — Couleurs
     colorMode:   d.colorMode,
     bgColor:     d.bgColor,
     textColor:   d.textColor,
-    accentColor: d.accentColor,   // = qrColor côté front
+    accentColor: d.accentColor,
     starColor:   d.starColor,
     iconsColor:  d.iconsColor,
-
-    // Step 2 — Template & Bandes
     templateName:    d.templateName,
     gradient1:       d.gradient1,
     gradient2:       d.gradient2,
@@ -59,14 +65,10 @@ function formatDesign(d) {
     bandPosition:    d.bandPosition,
     frontBandHeight: d.frontBandHeight,
     backBandHeight:  d.backBandHeight,
-
-    // Step 2 — Icônes
     showNfcIcon:    d.showNfcIcon,
     showGoogleIcon: d.showGoogleIcon,
     nfcIconSize:    d.nfcIconSize,
     googleLogoSize: d.googleLogoSize,
-
-    // Step 2 — Typo Nom
     businessFont:          d.businessFont,
     businessFontSize:      d.businessFontSize,
     businessFontWeight:    d.businessFontWeight,
@@ -74,8 +76,6 @@ function formatDesign(d) {
     businessLineHeight:    d.businessLineHeight,
     businessAlign:         d.businessAlign,
     businessTextTransform: d.businessTextTransform,
-
-    // Step 2 — Typo Slogan
     sloganFont:          d.sloganFont,
     sloganFontSize:      d.sloganFontSize,
     sloganFontWeight:    d.sloganFontWeight,
@@ -83,11 +83,7 @@ function formatDesign(d) {
     sloganLineHeight:    d.sloganLineHeight,
     sloganAlign:         d.sloganAlign,
     sloganTextTransform: d.sloganTextTransform,
-
-    // Step 2 — Ombre
     textShadow: d.textShadow,
-
-    // Step 2 — Instructions
     frontInstruction1:  d.frontInstruction1,
     frontInstruction2:  d.frontInstruction2,
     backInstruction1:   d.backInstruction1,
@@ -100,32 +96,29 @@ function formatDesign(d) {
     instrAlign:         d.instrAlign,
     instrCheckboxStyle: d.instrCheckboxStyle,
     checkStrokeWidth:   d.checkStrokeWidth ? Number(d.checkStrokeWidth) : 3.5,
-
-    // Step 2 — QR Code
     qrCodeStyle: d.qrCodeStyle,
     qrCodeSize:  d.qrCodeSize,
-
-    // Step 2 — Modèle
     cardModel: d.cardModel,
-
-    // Step 2 — Drag-and-drop positions
     elementOffsets: d.elementOffsets ?? null,
-
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
   };
 }
 
+
 // ─── Snapshot pour DesignVersion ─────────────────────────────
 // Stocke tous les champs visuels importants pour la comparaison
 function buildSnapshot(d) {
   return {
+    platform:    d.platform,
+    platformUrl: d.platformUrl,
     businessName: d.businessName, slogan: d.slogan,
     callToAction: d.callToAction, ctaPaddingTop: d.ctaPaddingTop,
+    googlePlaceId: d.googlePlaceId, googleReviewUrl: d.googleReviewUrl,
     orientation:  d.orientation,
-    logoUrl:      d.logoUrl,      logoPosition: d.logoPosition, logoSize: d.logoSize,
-    colorMode:    d.colorMode,    bgColor: d.bgColor, textColor: d.textColor,
-    accentColor:  d.accentColor,  starColor: d.starColor, iconsColor: d.iconsColor,
+    logoUrl:      d.logoUrl, logoPosition: d.logoPosition, logoSize: d.logoSize,
+    colorMode:    d.colorMode, bgColor: d.bgColor, textColor: d.textColor,
+    accentColor:  d.accentColor, starColor: d.starColor, iconsColor: d.iconsColor,
     templateName: d.templateName,
     gradient1: d.gradient1, gradient2: d.gradient2,
     accentBand1: d.accentBand1, accentBand2: d.accentBand2,
@@ -191,22 +184,37 @@ export const createDesign = async (req, res, next) => {
     }
 
     const design = await prisma.$transaction(async (tx) => {
-      const company = await tx.company.findUnique({
-        where:  { id: companyId },
-        select: { name: true, primaryColor: true },
-      });
-      // Pré-remplir businessName + accentColor depuis la company
+      const [company, product] = await Promise.all([
+        tx.company.findUnique({
+          where:  { id: companyId },
+          select: { name: true, primaryColor: true },
+        }),
+        tx.product.findUnique({
+          where:  { id: parseInt(productId) },
+          select: { cardSettings: true },
+        }),
+      ]);
+
+      // Résoudre la plateforme depuis Product.cardSettings
+      // cardSettings est un Json : { reviewPlatform: "google"|"facebook"|... }
+      const platform = (product?.cardSettings)?.reviewPlatform ?? "google";
+
       const d = await tx.design.create({
         data: {
-          userId, companyId, productId: parseInt(productId),
-          businessName: company?.name    ?? null,
+          userId,
+          companyId,
+          productId:   parseInt(productId),
+          platform,
+          businessName: company?.name         ?? null,
           accentColor:  company?.primaryColor ?? "#E10600",
         },
       });
+
       await tx.cartItem.update({
         where: { id: parseInt(cartItemId) },
         data:  { designId: d.id },
       });
+
       return d;
     });
 
@@ -220,43 +228,61 @@ export const saveStep1 = async (req, res, next) => {
     const id        = parseInt(req.params.id);
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
-    const { businessName, slogan, callToAction, ctaPaddingTop, googlePlaceId, googleReviewUrl, manualUrl } = req.body;
+    const {
+      businessName, slogan, callToAction, ctaPaddingTop,
+      googlePlaceId, googleReviewUrl,
+      platformUrl,   // ← URL libre pour plateformes non-Google
+      manualUrl,
+    } = req.body;
 
     const design = await prisma.design.findFirst({ where: { id, userId, companyId } });
     if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
     if (design.status === "locked") return res.status(409).json({ success: false, error: "Design verrouillé" });
-    let finalPlaceId = googlePlaceId;
-    if (!finalPlaceId && manualUrl) {
-          finalPlaceId = await findPlaceIdFromUrl(manualUrl);
-    }
-    let place = null;
-    if (finalPlaceId) {
-      place = await getPlaceDetails(finalPlaceId).catch(() => null);
+
+    const isLinkInput = LINK_INPUT_PLATFORMS.has(design.platform ?? "google");
+
+    let updateData = {
+      businessName:  businessName  ?? design.businessName,
+      slogan:        slogan        ?? design.slogan,
+      callToAction:  callToAction  ?? design.callToAction,
+      ctaPaddingTop: ctaPaddingTop ?? design.ctaPaddingTop,
+      lastAutoSave:  new Date(),
+    };
+
+    if (isLinkInput) {
+      // Plateformes non-Google : on stocke juste l'URL dans platformUrl
+      updateData.platformUrl = platformUrl ?? googleReviewUrl ?? design.platformUrl;
+    } else {
+      // Google : résolution Place ID + enrichissement company
+      let finalPlaceId = googlePlaceId;
+      if (!finalPlaceId && manualUrl) {
+        finalPlaceId = await findPlaceIdFromUrl(manualUrl).catch(() => null);
+      }
+
+      let place = null;
+      if (finalPlaceId) {
+        place = await getPlaceDetails(finalPlaceId).catch(() => null);
+      }
+
+      if (place) {
+        await prisma.company.update({
+          where: { id: companyId },
+          data: {
+            googlePlaceId:   finalPlaceId,
+            googleReviewUrl: googleReviewUrl || place.reviewUrl,
+            ...(place.phone   && { phone: place.phone }),
+            ...(place.website && {
+              googleLink: `https://www.google.com/maps/search/?api=1&query=google&query_place_id=${finalPlaceId}`,
+            }),
+          },
+        });
+      }
+
+      updateData.googlePlaceId   = finalPlaceId   ?? design.googlePlaceId;
+      updateData.googleReviewUrl = googleReviewUrl || place?.reviewUrl || design.googleReviewUrl;
     }
 
-    if (place) {
-      await prisma.company.update({
-        where: { id: companyId },
-        data: {
-          googlePlaceId:   finalPlaceId,
-          googleReviewUrl: googleReviewUrl || place.reviewUrl,
-          ...(place.phone   && { phone:   place.phone }),
-          ...(place.website && {
-            googleLink: `https://www.google.com/maps/search/?api=1&query=google&query_place_id=${finalPlaceId}`,
-          }),
-        },
-      });
-    }
-
-    const updated = await saveWithVersion(id, {
-      businessName:    businessName    ?? design.businessName,
-      slogan:          slogan          ?? design.slogan,
-      callToAction:    callToAction    ?? design.callToAction,
-      ctaPaddingTop:   ctaPaddingTop   ?? design.ctaPaddingTop,
-      googlePlaceId:   finalPlaceId   ?? design.googlePlaceId,
-      googleReviewUrl: googleReviewUrl || place?.reviewUrl || design.googleReviewUrl,
-      lastAutoSave:    new Date(),
-    }, design);
+    const updated = await saveWithVersion(id, updateData, design);
 
     res.json({ success: true, message: "Brouillon étape 1 sauvegardé", data: formatDesign(updated) });
   } catch (e) { next(e); }

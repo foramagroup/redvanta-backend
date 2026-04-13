@@ -1,7 +1,7 @@
 // src/routes/superadmin/company.routes.js
 
-import { Router } from "express";
-import { authenticate, authorize, validate } from "../../middleware/index.js";
+import express from "express";
+import { validate } from "../../middleware/index.js";
 import {
   listCompanies,
   getCompany,
@@ -22,7 +22,11 @@ import {
   changeStatusSchema,
 } from "../../validators/superadmin/company.validator.js";
 
-const router = Router();
+import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
+
+const router = express.Router();
+
+router.use(authenticateSuperAdmin, requireSuperAdmin);
 // router.use(authenticate, requireSuperAdmin);
 
 // ─── Stats ───────────────────────────────────────────────────

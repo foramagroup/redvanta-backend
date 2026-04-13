@@ -40,6 +40,7 @@ function format(p) {
     price: Number(p.price),
     active: p.active,
     image: p.image ?? "/placeholder.svg",
+    cardSettings:    p.cardSettings ?? {},
     title,
     slug,
     seoTitle,
@@ -236,6 +237,8 @@ export const updateProduct = async (req, res, next) => {
       success: false,
       message: "Produit introuvable"
     });
+
+    console.dir(body.cardSettings);
 
     if (body.translations) {
       const langCheck = await validateLangIds(body.translations.map((t) => t.langId));

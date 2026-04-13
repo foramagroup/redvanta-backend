@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, authorize, authorizeRole, validate } from "../../middleware/index.js";
+import { validate } from "../../middleware/index.js";
 import {
   listProducts, getProduct, createProduct,
   updateProduct, deleteProduct, toggleProduct,
@@ -11,7 +11,11 @@ import {
 } from "../../validators/superadmin/product.validator.js";
 
 
+import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
+
 const router = express.Router();
+
+router.use(authenticateSuperAdmin, requireSuperAdmin);
 
 
 // Apply auth + superadmin guard to all routes in this file

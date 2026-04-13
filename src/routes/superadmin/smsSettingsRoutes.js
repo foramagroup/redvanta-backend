@@ -1,7 +1,11 @@
 import express from "express";
 import smsSettingsController from '../../controllers/superadmin/smsSettingsController.js';
 
+import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
+
 const router = express.Router();
+
+router.use(authenticateSuperAdmin, requireSuperAdmin);
 
 router.get("/", smsSettingsController.list);
 

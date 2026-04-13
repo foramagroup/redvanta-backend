@@ -19,11 +19,20 @@ export const translationSchema = z.object({
 
 
 export const cardSettingsSchema = z.object({
-  width: z.number().min(1).max(500),
-  height: z.number().min(1).max(500),
+  width:               z.number().min(1).max(500),
+  height:              z.number().min(1).max(500),
   cornerRadiusEnabled: z.boolean(),
-  cornerRadius: z.number().min(0).max(250),
-  defaultTemplateId: z.string(),
+  cornerRadius:        z.number().min(0).max(250),
+  defaultTemplateId:   z.string(),
+  // ── 3 champs manquants ──────────────────────────────────
+  layouts:            z.array(
+                        z.enum(["landscape", "portrait", "square", "circle"])
+                      ).min(1).default(["landscape"]),
+  reviewPlatform:     z.enum([
+                        "google", "facebook", "instagram", "tiktok",
+                        "tripadvisor", "booking", "airbnb", "custom",
+                      ]).default("google"),
+  availableTemplates: z.array(z.string()).default([]),
 }).optional();
 
 

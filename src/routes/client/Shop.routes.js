@@ -29,6 +29,7 @@ const auth = [authenticateAdmin, requireAdmin];
 // PUT    /api/cart/:id          → modifier quantité / cardType
 // DELETE /api/cart/:id          → supprimer un item
 // DELETE /api/cart              → vider le panier
+
 router.get   ("/cart",     ...auth, getCart);
 router.post  ("/cart",     ...auth, addToCart);
 router.post  ("/sync",     ...auth, syncCart);
