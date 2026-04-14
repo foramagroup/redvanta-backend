@@ -11,7 +11,13 @@ import {
   updateMapsSettings,
   updatePlatformsSettings,
   updateSecuritySettings,
-  updateAdvancedSettings
+  updateAdvancedSettings,
+   getSubscription,
+  getInvoices,
+  getAvailablePlans,
+  changePlan,
+  cancelSubscription,
+  reactivateSubscription,
 } from '../controllers/settingsController.js';
 import { authenticateAdmin, requireAdmin } from "../middleware/auth.middleware.js";
 
@@ -63,6 +69,24 @@ router.put('/maps', requireAdmin, updateMapsSettings);
 router.put('/platforms', requireAdmin, updatePlatformsSettings);
 router.put('/security', requireAdmin, updateSecuritySettings);
 router.put('/advanced', requireAdmin, updateAdvancedSettings);
+
+// GET - Récupérer la subscription active
+router.get('/subscription', getSubscription);
+
+// GET - Récupérer l'historique des factures
+router.get('/invoices', getInvoices);
+
+// GET - Liste des plans disponibles
+router.get('/available-plans', getAvailablePlans);
+
+// POST - Changer de plan
+router.post('/change-plan', requireAdmin, changePlan);
+
+// POST - Annuler l'abonnement
+router.post('/cancel-subscription', requireAdmin, cancelSubscription);
+
+// POST - Réactiver l'abonnement
+router.post('/reactivate-subscription', requireAdmin, reactivateSubscription);
 
 // POST - Upload logo (companyId requis dans body)
 router.post('/logo', requireAdmin, upload.single('logo'), uploadLogo);

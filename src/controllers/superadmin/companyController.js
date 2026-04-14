@@ -89,6 +89,7 @@ function buildDefaultSettings(plan) {
     maxApiCalls:       parseInt(plan.apiLimit)  || 1000,
     maxSmsCalls:       parseInt(plan.smsLimit)  || 100,
     allowCustomColor:  ["pro", "agency"].includes(plan.name?.toLowerCase()),
+    maxUser: parseInt(plan?.userLimit ?? "3") || 3,
   };
 }
 
@@ -236,6 +237,33 @@ export const createCompany = async (req, res, next) => {
           isOwner:   true,
         },
       });
+
+
+      if (plan) {
+        const now = new Date();
+        const currentPeriodStart = body.billingDate ? new Date(body.billingDate) : now;
+        const currentPeriodEnd = new Date(currentPeriodStart);
+        currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+        await tx.subscription.create({
+          data: {
+            companyId: company.id,
+            planId: plan.id,
+            status: 'active',
+            interval: 'monthly',
+            baseAmount: plan.price,
+            addonsAmount: 0,
+            totalAmount: plan.price,
+            currentPeriodStart,
+            currentPeriodEnd,
+            nextBillingDate: body.billingNextDate 
+              ? new Date(body.billingNextDate) 
+              : currentPeriodEnd,
+          }
+        });
+      }
+
+
+
 
       return { company, adminUser, isNewUser: !existingAdmin };
     });

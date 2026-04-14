@@ -1079,6 +1079,137 @@ model AddonSetting {
   @@map("addonsetting")
 }
 
+model Addon {
+  id          Int      @id @default(autoincrement())
+  name        String   // "API Access Pro", "White-Label", "Extra Locations"
+  slug        String   @unique // "api-pro", "whitelabel", "extra-locations"
+  description String   @db.Text
+  
+  // Prix
+  price       Float
+  
+  // Type d'add-on
+  type        AddonType // usage_based, feature, capacity
+  
+  // Limites additionnelles (si type = capacity)
+  apiBonus    Int?     @default(0)
+  smsBonus    Int?     @default(0)
+  webhookBonus Int?    @default(0)
+  locationBonus Int?   @default(0)
+  userBonus   Int?     @default(0)
+  
+  // Fonctionnalités (si type = feature)
+  features    Json?    // ["Automation", "Advanced Analytics", ...]
+  
+  // Métadonnées
+  icon        String?  @db.VarChar(50)
+  color       String?  @db.VarChar(20)
+  isPopular   Boolean  @default(false)
+  status      AddonStatus @default(active)
+  displayOrder Int     @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  subscriptionAddons SubscriptionAddon[]
+  
+  @@map("addons")
+}
+
+model SubscriptionAddon {
+  id             Int      @id @default(autoincrement())
+  subscriptionId Int
+  addonId        Int
+  
+  // Montant (peut différer du prix de base si promo)
+  amount         Float
+  
+  // Statut
+  status         AddonStatus @default(active)
+  
+  // Dates
+  activatedAt    DateTime @default(now())
+  deactivatedAt  DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Relations
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  addon          Addon        @relation(fields: [addonId], references: [id], onDelete: Restrict)
+  
+  @@unique([subscriptionId, addonId])
+  @@index([subscriptionId])
+  @@map("subscription_addons")
+}
+
+
+model UsageRecord {
+  id             Int      @id @default(autoincrement())
+  companyId      Int
+  subscriptionId Int?
+  
+  // Type d'usage
+  type           UsageType // api, sms, webhook
+  
+  // Quantité
+  quantity       Int       @default(1)
+  
+  // Métadonnées
+  metadata       Json?     // { endpoint: "/api/reviews", method: "POST", ... }
+  
+  // Date
+  recordedAt     DateTime  @default(now())
+  
+  // Relations
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  
+  @@index([companyId, type, recordedAt])
+  @@index([subscriptionId])
+  @@map("usage_records")
+}
+
+model BillingHistory {
+  id                Int      @id @default(autoincrement())
+  subscriptionId    Int
+  invoiceId         Int?     @unique
+  
+  // Montants
+  baseAmount        Float
+  addonsAmount      Float    @default(0)
+  taxAmount         Float    @default(0)
+  totalAmount       Float
+  
+  // Période facturée
+  periodStart       DateTime
+  periodEnd         DateTime
+  
+  // Paiement
+  status            BillingStatus @default(pending)
+  paidAt            DateTime?
+  paymentMethod     String?  @db.VarChar(100)
+  
+  // Intégration Stripe
+  stripeInvoiceId   String?  @unique @db.VarChar(255)
+  stripePaymentIntentId String? @db.VarChar(255)
+  
+  // Usage billing (pour facturation à l'usage)
+  usageDetails      Json?    // { api: 12500, sms: 342, webhooks: 1823 }
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  subscription      Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  invoice           Invoice?     @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  
+  @@index([subscriptionId])
+  @@index([status])
+  @@map("billing_history")
+}
+
 
 model FeatureFlag {
   id          Int      @id @default(autoincrement())
@@ -1106,19 +1237,30 @@ model permission {
 
 model PlanSetting {
   id            Int      @id @default(autoincrement())
-  name          String
-  price         Int
-  annual        Int
-  apiLimit      String
-  smsLimit      String
-  locationLimit Int
+  name          String   // "Starter", "Growth", "Enterprise"
+  slug          String   @unique // "starter", "growth", "enterprise"
+  price         Int // Prix mensuel
+  annual        Int // Prix annuel (avec réduction)
+
+// Limites du plan
+  apiLimit   Int      @default(1000)
+  smsLimit   Int      @default(100)
+  webhookLimit  Int    @default(500)
+  locationLimit Int   @default(1)
+  userLimit     Int      @default(3)
+ // Fonctionnalités
   trialDays     Int
   trialFeatures String   @db.LongText
-  features      String   @db.LongText
-  status        String   @default("Active")
+  features      Json     // Array de features: ["API Access", "Email Support", ...]
+   // Métadonnées
+  isDefault     Boolean  @default(false)
+  isPopular     Boolean  @default(false)
+  status        PlanStatus @default(Active)
+  displayOrder  Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime
   companies     Company[]
+  subscriptions Subscription[]
   @@map("plansetting")
 }
 
@@ -1393,6 +1535,7 @@ model Invoice {
   items           InvoiceItem[]
   refunds         Refund[]
   payments    Payment[]
+  billingHistory BillingHistory[]
 
   @@index([companyId])
   @@index([status])
@@ -1509,6 +1652,7 @@ model Company {
   invoices     Invoice[]
   payments    Payment[]
   locations   Location[]
+  usageRecords UsageRecord[]
 
  cards    NFCCard[]
  scans    NfcScan[]
@@ -1539,6 +1683,7 @@ model CompanySettings {
    maxLocations      Int      @default(1)
   maxApiCalls       Int      @default(1000)
   maxSmsCalls       Int      @default(100)
+  maxUser     Int      @default(3)
 
   allowCustomColor  Boolean  @default(false)
   apiEnabled        Boolean  @default(true)
@@ -1561,16 +1706,54 @@ updatedAt         DateTime @updatedAt
 
 
 model Subscription {
-  id           Int      @id @default(autoincrement())
-  companyId    Int?      @unique
+  id              Int      @id @default(autoincrement())
+  companyId       Int      @unique
+  planId          Int
   
-  planName     String   @default("Starter")
-  status       String   @default("active") // active, trialing, canceled
-  amount       Float
-  Interval     String   @default("monthly") // monthly, yearly
-  nextBilling  DateTime
-  createdAt    DateTime @default(now())
-  company      Company?  @relation(fields: [companyId], references: [id])
+  // Statut et type
+  status          SubscriptionStatus @default(active)
+  interval        BillingInterval    @default(monthly)
+  
+  // Montants
+  baseAmount      Float              // Prix du plan de base
+  addonsAmount    Float    @default(0) // Total des add-ons
+  totalAmount     Float              // baseAmount + addonsAmount
+  
+  // Facturation
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  nextBillingDate    DateTime
+  lastBillingDate    DateTime?
+  
+  // Trial
+  trialStart      DateTime?
+  trialEnd        DateTime?
+  
+  // Annulation
+  cancelAt        DateTime?
+  canceledAt      DateTime?
+  cancelReason    String?  @db.Text
+  
+  // Intégration Stripe
+  stripeSubscriptionId String? @unique @db.VarChar(255)
+  stripeCustomerId     String? @db.VarChar(255)
+  
+  // Métadonnées
+  metadata        Json?    // Données supplémentaires
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan            PlanSetting     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  addons          SubscriptionAddon[]
+  usageRecords    UsageRecord[]
+  billingHistory  BillingHistory[]
+  
+  @@index([companyId])
+  @@index([status])
+  @@index([nextBillingDate])
   @@map("subscriptions")
 }
 
@@ -1897,5 +2080,48 @@ enum AnalyticsEventType {
   RATING_SELECTED
   GOOGLE_REDIRECT
   FEEDBACK_SUBMITTED
+}
+enum PlanStatus {
+  Active
+  inactive
+  archived
+}
+
+enum SubscriptionStatus {
+  active      // Abonnement actif
+  trialing    // En période d'essai
+  past_due    // Paiement en retard
+  canceled    // Annulé
+  incomplete  // Paiement incomplet
+  paused      // En pause
+}
+
+enum BillingInterval {
+  monthly
+  yearly
+}
+enum AddonType {
+  usage_based  // Basé sur l'utilisation (API calls supplémentaires)
+  feature      // Fonctionnalité (White-label, Automation)
+  capacity     // Capacité (Extra locations, Extra users)
+}
+
+enum AddonStatus {
+  active
+  inactive
+  archived
+}
+enum UsageType {
+  api
+  sms
+  webhook
+  storage
+}
+enum BillingStatus {
+  pending
+  paid
+  failed
+  refunded
+  canceled
 }
 

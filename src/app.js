@@ -30,6 +30,7 @@ import orderTrackAdminRoutes from "./routes/orderTrack.routes.js";
 import  myDesignAdminRoutes  from "./routes/myDesign.routes.js";
 import  adminSettingsRoutes  from "./routes/settingsRoutes.js";
 import analyticsEventsRoutes from './routes/analyticsEvents.routes.js';
+import billingAdminRoutes from './routes/billing.routes.js';
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -241,6 +242,9 @@ app.use("/api/customization", customizationRoutes);
   
   //ges order Tracking
   app.use('/api/admin/order-tracking', orderTrackAdminRoutes);
+  
+  //ges billing 
+  app.use('/api/admin/billing', billingAdminRoutes)
 
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);

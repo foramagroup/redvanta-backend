@@ -758,3 +758,520 @@ export const updateAdvancedSettings = async (req, res) => {
     });
   }
 };
+
+
+/**
+ * GET /api/admin/general-settings/subscription
+ * Récupère la subscription active de la company
+ */
+export const getSubscription = async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    
+    // Récupérer la subscription avec plan et addons
+    const subscription = await prisma.subscription.findUnique({
+      where: { companyId: parseInt(companyId) },
+      include: {
+        plan: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            price: true,
+            annual: true,
+            apiLimit: true,
+            smsLimit: true,
+            webhookLimit: true,
+            locationLimit: true,
+            userLimit: true,
+            features: true,
+          }
+        },
+        addons: {
+          where: { status: 'active' },
+          include: {
+            addon: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                description: true,
+                price: true,
+                type: true,
+                locationBonus: true,
+                apiBonus: true,
+                smsBonus: true,
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        error: 'No active subscription found'
+      });
+    }
+    
+    // Compter les locations utilisées
+    const locationCount = await prisma.location.count({
+      where: { companyId: parseInt(companyId) }
+    });
+    
+    // Calculer les limites totales (plan + addons)
+    const totalLocationLimit = subscription.plan.locationLimit + 
+      subscription.addons.reduce((sum, a) => sum + (a.addon.locationBonus || 0), 0);
+    
+    const totalApiLimit = subscription.plan.apiLimit + 
+      subscription.addons.reduce((sum, a) => sum + (a.addon.apiBonus || 0), 0);
+    
+    const totalSmsLimit = subscription.plan.smsLimit + 
+      subscription.addons.reduce((sum, a) => sum + (a.addon.smsBonus || 0), 0);
+    
+    res.json({
+      success: true,
+      data: {
+        id: subscription.id,
+        planName: subscription.plan.name,
+        planSlug: subscription.plan.slug,
+        status: subscription.status,
+        interval: subscription.interval,
+        amount: subscription.baseAmount,
+        addonsAmount: subscription.addonsAmount,
+        totalAmount: subscription.totalAmount,
+        nextBilling: subscription.nextBillingDate,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        trialStart: subscription.trialStart,
+        trialEnd: subscription.trialEnd,
+        locationCount,
+        locationLimit: totalLocationLimit,
+        apiLimit: totalApiLimit,
+        smsLimit: totalSmsLimit,
+        webhookLimit: subscription.plan.webhookLimit,
+        activeAddons: subscription.addons.map(a => ({
+          id: a.addon.id,
+          name: a.addon.name,
+          slug: a.addon.slug,
+          price: a.amount,
+          type: a.addon.type,
+        })),
+        features: subscription.plan.features || [],
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error fetching subscription',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * GET /api/admin/general-settings/invoices?limit=10
+ * Récupère l'historique des factures
+ */
+export const getInvoices = async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    const limit = parseInt(req.query.limit) || 50;
+    
+    // Récupérer la subscription pour avoir son ID
+    const subscription = await prisma.subscription.findUnique({
+      where: { companyId: parseInt(companyId) },
+      select: { id: true }
+    });
+    
+    if (!subscription) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+    
+    // Récupérer les factures depuis billing_history
+    const billingHistory = await prisma.billingHistory.findMany({
+      where: { subscriptionId: subscription.id },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        subscription: {
+          include: { plan: true }
+        }
+      }
+    });
+    
+    // Formater les données
+    const invoices = billingHistory.map(bh => ({
+      id: bh.id,
+      invoiceNumber: `INV-${bh.id.toString().padStart(6, '0')}`,
+      invoiceDate: bh.createdAt,
+      dueDate: bh.periodEnd,
+      periodStart: bh.periodStart,
+      periodEnd: bh.periodEnd,
+      baseAmount: bh.baseAmount,
+      addonsAmount: bh.addonsAmount,
+      taxAmount: bh.taxAmount,
+      total: bh.totalAmount,
+      currency: 'USD',
+      status: bh.status,
+      paidAt: bh.paidAt,
+      paymentMethod: bh.paymentMethod,
+      stripeInvoiceId: bh.stripeInvoiceId,
+      items: [
+        {
+          service: `${bh.subscription.plan?.name || 'Plan'} Subscription`,
+          description: `Billing period: ${bh.periodStart.toLocaleDateString()} - ${bh.periodEnd.toLocaleDateString()}`,
+          quantity: 1,
+          unitPrice: bh.baseAmount,
+          total: bh.baseAmount,
+        }
+      ]
+    }));
+    
+    res.json({
+      success: true,
+      data: invoices,
+      total: invoices.length
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching invoices:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error fetching invoices',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * GET /api/admin/general-settings/available-plans
+ * Liste tous les plans disponibles pour upgrade
+ */
+export const getAvailablePlans = async (req, res) => {
+  try {
+    const companyId = getCompanyId(req);
+    
+    // Récupérer le plan actuel
+    const currentSubscription = await prisma.subscription.findUnique({
+      where: { companyId: parseInt(companyId) },
+      select: { planId: true }
+    });
+    
+    // Récupérer tous les plans actifs
+    const plans = await prisma.planSetting.findMany({
+      where: { status: "Active" },
+      orderBy: { displayOrder: 'asc' }
+    });
+    
+    
+    const formattedPlans = plans.map(plan => ({
+      id: plan.id,
+      name: plan.name,
+      slug: plan.slug,
+      price: plan.price,
+      annual: plan.annual,
+      features: plan.features,
+      apiLimit: plan.apiLimit,
+      smsLimit: plan.smsLimit,
+      webhookLimit: plan.webhookLimit,
+      locationLimit: plan.locationLimit,
+      userLimit: plan.userLimit,
+      isPopular: plan.isPopular,
+      isCurrent: currentSubscription?.planId === plan.id,
+    }));
+    
+    res.json({
+      success: true,
+      data: formattedPlans
+    });
+    
+  } catch (error) {
+    console.error('❌ Error fetching plans:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error fetching plans',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * POST /api/admin/general-settings/change-plan
+ * Changer de plan (upgrade/downgrade)
+ */
+export const changePlan = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const companyId = getCompanyId(req);
+    const { planId, interval = 'monthly' } = req.body;
+    
+    if (!planId) {
+      return res.status(400).json({
+        success: false,
+        error: 'planId is required'
+      });
+    }
+    
+    // Vérifier les permissions
+    const { hasPermission } = await checkPermissions(
+      userId,
+      parseInt(companyId),
+      req.user.isSuperadmin
+    );
+    
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only company owner can change plan'
+      });
+    }
+    
+    // Récupérer le nouveau plan
+    const newPlan = await prisma.planSetting.findUnique({
+      where: { id: parseInt(planId) }
+    });
+    
+    if (!newPlan || newPlan.status !== 'Active') {
+      return res.status(404).json({
+        success: false,
+        error: 'Plan not found or inactive'
+      });
+    }
+    
+    // Récupérer la subscription actuelle
+    const currentSubscription = await prisma.subscription.findUnique({
+      where: { companyId: parseInt(companyId) }
+    });
+    
+    if (!currentSubscription) {
+      return res.status(404).json({
+        success: false,
+        error: 'No active subscription found'
+      });
+    }
+    
+    // Calculer le nouveau montant
+    const newBaseAmount = interval === 'yearly' ? newPlan.annual : newPlan.price;
+    const newTotalAmount = newBaseAmount + currentSubscription.addonsAmount;
+    
+    // Calculer les nouvelles dates de période
+    const now = new Date();
+    const newPeriodEnd = new Date(now);
+    if (interval === 'yearly') {
+      newPeriodEnd.setFullYear(newPeriodEnd.getFullYear() + 1);
+    } else {
+      newPeriodEnd.setMonth(newPeriodEnd.getMonth() + 1);
+    }
+    
+    // Mettre à jour la subscription dans une transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Mettre à jour subscription
+      const updatedSubscription = await tx.subscription.update({
+        where: { id: currentSubscription.id },
+        data: {
+          planId: newPlan.id,
+          interval,
+          baseAmount: newBaseAmount,
+          totalAmount: newTotalAmount,
+          currentPeriodStart: now,
+          currentPeriodEnd: newPeriodEnd,
+          nextBillingDate: newPeriodEnd,
+        }
+      });
+      
+      // Mettre à jour les settings de la company
+      await tx.companySettings.update({
+        where: { companyId: parseInt(companyId) },
+        data: {
+          maxLocations: newPlan.locationLimit,
+          maxApiCalls: newPlan.apiLimit,
+          maxSmsCalls: newPlan.smsLimit,
+        }
+      });
+      
+      // Mettre à jour la company
+      await tx.company.update({
+        where: { id: parseInt(companyId) },
+        data: {
+          planId: newPlan.id,
+          billingAmount: `$${newTotalAmount}`,
+          mrr: newBaseAmount,
+        }
+      });
+      
+      // Créer un enregistrement de billing history
+      await tx.billingHistory.create({
+        data: {
+          subscriptionId: updatedSubscription.id,
+          baseAmount: newBaseAmount,
+          addonsAmount: currentSubscription.addonsAmount,
+          taxAmount: 0,
+          totalAmount: newTotalAmount,
+          periodStart: now,
+          periodEnd: newPeriodEnd,
+          status: 'pending',
+        }
+      });
+      
+      return updatedSubscription;
+    });
+    
+    res.json({
+      success: true,
+      message: `Plan changed to ${newPlan.name} successfully`,
+      data: {
+        subscription: result,
+        newPlan: {
+          name: newPlan.name,
+          price: newBaseAmount,
+          interval,
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error changing plan:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error changing plan',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * POST /api/admin/general-settings/cancel-subscription
+ * Annuler l'abonnement
+ */
+export const cancelSubscription = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const companyId = getCompanyId(req);
+    const { cancelReason } = req.body;
+    
+    // Vérifier les permissions
+    const { hasPermission } = await checkPermissions(
+      userId,
+      parseInt(companyId),
+      req.user.isSuperadmin
+    );
+    
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only company owner can cancel subscription'
+      });
+    }
+    
+    const subscription = await prisma.subscription.findUnique({
+      where: { companyId: parseInt(companyId) }
+    });
+    
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        error: 'No active subscription found'
+      });
+    }
+    
+    // Marquer pour annulation à la fin de la période
+    const updated = await prisma.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        cancelAt: subscription.currentPeriodEnd,
+        cancelReason: cancelReason || 'User requested cancellation',
+      }
+    });
+    
+    res.json({
+      success: true,
+      message: 'Subscription will be canceled at the end of the billing period',
+      data: {
+        cancelAt: updated.cancelAt,
+        currentPeriodEnd: updated.currentPeriodEnd,
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error canceling subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error canceling subscription',
+      details: error.message
+    });
+  }
+};
+
+/**
+ * POST /api/admin/general-settings/reactivate-subscription
+ * Réactiver un abonnement annulé
+ */
+export const reactivateSubscription = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const companyId = getCompanyId(req);
+    
+    // Vérifier les permissions
+    const { hasPermission } = await checkPermissions(
+      userId,
+      parseInt(companyId),
+      req.user.isSuperadmin
+    );
+    
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only company owner can reactivate subscription'
+      });
+    }
+    
+    const subscription = await prisma.subscription.findUnique({
+      where: { companyId: parseInt(companyId) }
+    });
+    
+    if (!subscription) {
+      return res.status(404).json({
+        success: false,
+        error: 'No subscription found'
+      });
+    }
+    
+    if (!subscription.cancelAt) {
+      return res.status(400).json({
+        success: false,
+        error: 'Subscription is not canceled'
+      });
+    }
+    
+    // Annuler la demande d'annulation
+    const updated = await prisma.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        cancelAt: null,
+        cancelReason: null,
+        status: 'active',
+      }
+    });
+    
+    res.json({
+      success: true,
+      message: 'Subscription reactivated successfully',
+      data: updated
+    });
+    
+  } catch (error) {
+    console.error('❌ Error reactivating subscription:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error reactivating subscription',
+      details: error.message
+    });
+  }
+};

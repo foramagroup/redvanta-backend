@@ -10,6 +10,7 @@ import {
 import { sendMail }                   from "../../services/client/mail.service.js";
 import { buildConfirmEmailTemplate }  from "../../templates/client/confirmEmail.template.js";
 import { loadUserByEmail, loadUserForAuth, formatAdmin } from "../../services/superadmin/auth.service.js";
+import { createSubscriptionForCompany } from '../../helpers/subscription.helpers.js';
 
 
 const SALT_ROUNDS = 12;
@@ -164,6 +165,7 @@ export const signup = async (req, res, next) => {
           maxLocations: defaultPlan?.locationLimit ?? 1,
           maxApiCalls: parseInt(defaultPlan?.apiLimit ?? "1000") || 1000,
           maxSmsCalls: parseInt(defaultPlan?.smsLimit ?? "100") || 100,
+          maxUser: parseInt(defaultPlan?.userLimit ?? "3") || 3,
           allowCustomColor: false,
         },
       });
@@ -176,6 +178,15 @@ export const signup = async (req, res, next) => {
           isOwner: true,
         },
       });
+
+        if (defaultPlan) {
+          await createSubscriptionForCompany(tx, company.id, defaultPlan.id, {
+            status: 'trialing',
+            interval: 'monthly',
+            trialDays: defaultPlan.trialDays || 14,
+          });
+        }
+
 
       return { user, company };
     });
