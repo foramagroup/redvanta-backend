@@ -11,7 +11,7 @@ export const getSettings = async (req, res) => {
             include: { supplier: true, region: true }, 
             orderBy: { createdAt: 'desc' }
         });
-          res.json({
+        res.json({
             platformSetting,
             smsSettings
         });
@@ -23,7 +23,7 @@ export const getSettings = async (req, res) => {
 export const updateSettings = async (req, res) => {
     try {
         const {
-            platform_name,
+            companyName,
             default_email_sender,
             sms_setting_id,
             rate_limit,
@@ -38,7 +38,7 @@ export const updateSettings = async (req, res) => {
             smsRelation = { disconnect: true };
         }
         const baseData = {
-            platform_name,
+            companyName,
             default_email_sender,
             rate_limit: Number(rate_limit),
             is_maIntenance: Boolean(is_maintenance), 

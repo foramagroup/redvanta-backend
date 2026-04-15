@@ -221,7 +221,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/auth", clientAuthRoutes);
   app.use("/api/client/places", placesRoutes);
   app.use("/api/client/orders", orderClientRoutes);
-  app.use("/r",        scanRouter);
+  app.use("api/r",        scanRouter);
   app.use("/review",   reviewRouter);
   startSuspendUnverifiedJob();
 

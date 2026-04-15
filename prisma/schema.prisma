@@ -91,12 +91,17 @@ model UserCompany {
 model PlatformSetting {
   id        Int      @id @default(autoincrement())
   
+  sms_setting_id Int? @unique
+  default_email_sender String?
+  rate_limit Int @default(0)
+  is_maIntenance Boolean @default(false)
+
   // General
-  companyName    String   @default("REDVANTA Inc.")
-  companyEmail   String   @default("contact@redvanta.com")
+  companyName    String?   @default("REDVANTA Inc.")
+  companyEmail   String?   @default("contact@redvanta.com")
   companyPhone   String?
-  companyCountry String   @default("United States")
-  countryCode    String   @default("+1")
+  companyCountry String ?  @default("United States")
+  countryCode    String?   @default("+1")
   companyAddress String?  @db.Text
   vatNumber      String?
   tradeNumber    String?
@@ -104,8 +109,8 @@ model PlatformSetting {
   // Branding
   logoUrl        String?
   logoScale      Int      @default(100)
-  primaryColor   String   @default("#E10600")
-  secondaryColor String   @default("#1A1A1A")
+  primaryColor   String?   @default("#E10600")
+  secondaryColor String?   @default("#1A1A1A")
   
   // reCAPTCHA
   captchaEnabled Boolean  @default(false)
@@ -132,6 +137,8 @@ model PlatformSetting {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+   smsSetting   SmsSetting?  @relation(fields: [sms_setting_id], references: [id])
   
   @@map("platform_settings")
 }
@@ -940,6 +947,7 @@ model SmsSetting {
   updatedAt        DateTime          @default(now()) @db.Timestamp(0)
   region           SmsRegion         @relation(fields: [region_id], references: [id], onDelete: Cascade, map: "fk_sms_region")
   supplier         SmsSupplier       @relation(fields: [supplier_id], references: [id], onDelete: Cascade, map: "fk_sms_supplier")
+  platformSetting PlatformSetting?
 
   @@index([region_id], map: "fk_sms_region")
   @@index([supplier_id], map: "fk_sms_supplier")
