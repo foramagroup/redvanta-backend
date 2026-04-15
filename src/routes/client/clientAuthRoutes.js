@@ -13,6 +13,8 @@ import {
   login,
   verifyEmail,
   resendVerification,
+  verifyCode,           
+  resendVerificationCode,
   me,
   switchCompany,
   logout,
@@ -30,6 +32,12 @@ router.post("/signup", authSignupLimiter, validate(signupSchema), signup);
 
 // POST /api/auth/login   — connexion admin client
 router.post("/login", authLoginLimiter, validate(loginSchema), login);
+
+//  Vérification du code OTP
+router.post('/verify-code', verifyCode);
+
+//  Renvoyer le code
+router.post('/resend-code', resendVerificationCode);
 
 // GET  /api/auth/verify-email?token=xxx  — confirmation email (lien du mail)
 router.get("/verify-email", authVerifyLimiter, verifyEmail);

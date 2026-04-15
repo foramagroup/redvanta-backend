@@ -1,5 +1,106 @@
 import prisma from "../../config/database.js";
 
+
+
+
+function formatTemplate(template) {
+  return {
+    id: template.id.toString(),
+    name: template.name,
+    platform: template.platform,
+    
+    // Content
+    businessName: template.businessName,
+    slogan: template.slogan,
+    cta: template.cta,
+    logoUrl: template.logoUrl,
+    
+    // Layout
+    orientation: template.orientation,
+    bandPosition: template.bandPosition,
+    frontBandHeight: template.frontBandHeight,
+    backBandHeight: template.backBandHeight,
+    
+    // Logo and QR
+    logoPosition: template.logoPosition,
+    logoSize: template.logoSize,
+    qrPosition: template.qrPosition,
+    qrSize: template.qrSize,
+    
+    // Typography - Name
+    nameFont: template.nameFont,
+    nameFontSize: template.nameFontSize,
+    nameFontWeight: template.nameFontWeight,
+    nameLetterSpacing: template.nameLetterSpacing,
+    nameTextTransform: template.nameTextTransform,
+    nameLineHeight: template.nameLineHeight,
+    nameTextAlign: template.nameTextAlign,
+    
+    // Typography - Slogan
+    sloganFont: template.sloganFont,
+    sloganFontSize: template.sloganFontSize,
+    sloganFontWeight: template.sloganFontWeight,
+    sloganLetterSpacing: template.sloganLetterSpacing,
+    sloganTextTransform: template.sloganTextTransform,
+    sloganLineHeight: template.sloganLineHeight,
+    sloganTextAlign: template.sloganTextAlign,
+    
+    // Typography - Instructions
+    instructionFont: template.instructionFont,
+    instructionFontSize: template.instructionFontSize,
+    instructionFontWeight: template.instructionFontWeight,
+    instructionLetterSpacing: template.instructionLetterSpacing,
+    instructionLineHeight: template.instructionLineHeight,
+    instructionTextAlign: template.instructionTextAlign,
+    
+    // Instructions text
+    frontLine1: template.frontLine1,
+    frontLine2: template.frontLine2,
+    backLine1: template.backLine1,
+    backLine2: template.backLine2,
+    
+    // Icons
+    checkStrokeWidth: template.checkStrokeWidth / 10, // Convertir 35 -> 3.5
+    nfcIconSize: template.nfcIconSize,
+    googleIconSize: template.googleIconSize,
+    showNfcIcon: template.showNfcIcon,
+    showGoogleIcon: template.showGoogleIcon,
+    
+    // Visual
+    textShadow: template.textShadow,
+    ctaPaddingTop: template.ctaPaddingTop,
+    
+    // Model and mode
+    model: template.model,
+    colorMode: template.colorMode,
+    
+    // Element offsets
+    elementOffsets: template.elementOffsets,
+    
+    // Colors
+    gradient: Array.isArray(template.gradient) 
+      ? template.gradient 
+      : JSON.parse(template.gradient),
+    accentColor: template.accentColor,
+    textColor: template.textColor,
+    bandColor1: template.bandColor1,
+    bandColor2: template.bandColor2,
+    qrColor: template.qrColor,
+    starsColor: template.starsColor,
+    iconsColor: template.iconsColor,
+    
+    // Pattern and status
+    pattern: template.pattern,
+    isActive: template.isActive,
+    isDefault: template.isDefault,
+    isCardSetting: template.isCardSetting,
+    
+    // Dates
+    createdAt: template.createdAt.toISOString().split('T')[0],
+    updatedAt: template.updatedAt.toISOString().split('T')[0]
+  };
+}
+
 /**
  * GET /api/superadmin/card-templates
  * Récupère tous les templates
@@ -8,17 +109,15 @@ export const getAllTemplates = async (req, res) => {
   try {
     const { platform, isActive, search } = req.query;
     const where = {};
-    // Filtre par plateforme
+
     if (platform && platform !== 'all') {
       where.platform = platform;
     }
 
-    // Filtre par statut
     if (isActive !== undefined && isActive !== 'all') {
       where.isActive = isActive === 'true' || isActive === 'active';
     }
 
-    // Recherche
     if (search && search.trim()) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -34,32 +133,10 @@ export const getAllTemplates = async (req, res) => {
       ]
     });
 
-    // Formater les templates pour le frontend
-    const formattedTemplates = templates.map(template => ({
-      id: template.id.toString(),
-      name: template.name,
-      platform: template.platform,
-      gradient: Array.isArray(template.gradient) 
-        ? template.gradient 
-        : JSON.parse(template.gradient),
-      accentColor: template.accentColor,
-      textColor: template.textColor,
-      bandColor1: template.bandColor1,
-      bandColor2: template.bandColor2,
-      qrColor: template.qrColor,
-      starsColor: template.starsColor,
-      iconsColor: template.iconsColor,
-      pattern: template.pattern,
-      isActive: template.isActive,
-      isDefault: template.isDefault,
-      createdAt: template.createdAt.toISOString().split('T')[0],
-      updatedAt: template.updatedAt.toISOString().split('T')[0]
-    }));
-
     res.json({
       success: true,
-      data: formattedTemplates,
-      total: formattedTemplates.length
+      data: templates.map(formatTemplate),
+      total: templates.length
     });
   } catch (error) {
     console.error('❌ Error fetching templates:', error);
@@ -129,49 +206,35 @@ export const getTemplateById = async (req, res) => {
  */
 export const createTemplate = async (req, res) => {
   try {
-    const {
-      name,
-      platform,
-      gradient,
-      accentColor,
-      textColor,
-      bandColor1,
-      bandColor2,
-      qrColor,
-      starsColor,
-      iconsColor,
-      pattern,
-      isActive,
-      isDefault
-    } = req.body;
+    const data = req.body;
 
-    // Validation
-    if (!name || !name.trim()) {
+    // Validation basique
+    if (!data.name || !data.name.trim()) {
       return res.status(400).json({
         success: false,
         error: 'Template name is required'
       });
     }
 
-    if (!platform) {
+    if (!data.platform) {
       return res.status(400).json({
         success: false,
         error: 'Platform is required'
       });
     }
 
-    if (!gradient || !Array.isArray(gradient) || gradient.length < 2) {
+    if (!data.gradient || !Array.isArray(data.gradient) || data.gradient.length < 2) {
       return res.status(400).json({
         success: false,
         error: 'Gradient must be an array with at least 2 colors'
       });
     }
 
-    // Si isDefault = true, désactiver tous les autres templates par défaut pour cette plateforme
-    if (isDefault) {
+    // Si isDefault = true, désactiver les autres templates par défaut
+    if (data.isDefault) {
       await prisma.cardTemplate.updateMany({
         where: {
-          platform,
+          platform: data.platform,
           isDefault: true
         },
         data: {
@@ -182,30 +245,100 @@ export const createTemplate = async (req, res) => {
 
     const template = await prisma.cardTemplate.create({
       data: {
-        name: name.trim(),
-        platform,
-        gradient: JSON.stringify(gradient),
-        accentColor: accentColor || '#4285F4',
-        textColor: textColor || '#1a1a1a',
-        bandColor1: bandColor1 || accentColor || '#4285F4',
-        bandColor2: bandColor2 || accentColor || '#4285F4',
-        qrColor: qrColor || accentColor || '#4285F4',
-        starsColor: starsColor || '#FBBF24',
-        iconsColor: iconsColor || accentColor || '#4285F4',
-        pattern: pattern || 'none',
-        isActive: isActive !== undefined ? isActive : true,
-        isDefault: isDefault || false
+        // Basic
+        name: data.name.trim(),
+        platform: data.platform,
+        
+        // Content
+        businessName: data.businessName || data.name,
+        slogan: data.slogan || null,
+        cta: data.cta || 'Powered by RedVanta',
+        logoUrl: data.logoUrl || null,
+        
+        // Layout
+        orientation: data.orientation || 'landscape',
+        bandPosition: data.bandPosition || 'bottom',
+        frontBandHeight: data.frontBandHeight || 22,
+        backBandHeight: data.backBandHeight || 12,
+        
+        // Logo and QR
+        logoPosition: data.logoPosition || 'left',
+        logoSize: data.logoSize || 32,
+        qrPosition: data.qrPosition || 'right',
+        qrSize: data.qrSize || 80,
+        
+        // Typography - Name
+        nameFont: data.nameFont || "'Space Grotesk', sans-serif",
+        nameFontSize: data.nameFontSize || 16,
+        nameFontWeight: data.nameFontWeight || '700',
+        nameLetterSpacing: data.nameLetterSpacing || 'normal',
+        nameTextTransform: data.nameTextTransform || 'none',
+        nameLineHeight: data.nameLineHeight || '1.2',
+        nameTextAlign: data.nameTextAlign || 'left',
+        
+        // Typography - Slogan
+        sloganFont: data.sloganFont || "'Space Grotesk', sans-serif",
+        sloganFontSize: data.sloganFontSize || 12,
+        sloganFontWeight: data.sloganFontWeight || '400',
+        sloganLetterSpacing: data.sloganLetterSpacing || 'normal',
+        sloganTextTransform: data.sloganTextTransform || 'none',
+        sloganLineHeight: data.sloganLineHeight || '1.4',
+        sloganTextAlign: data.sloganTextAlign || 'left',
+        
+        // Typography - Instructions
+        instructionFont: data.instructionFont || "'Space Grotesk', sans-serif",
+        instructionFontSize: data.instructionFontSize || 10,
+        instructionFontWeight: data.instructionFontWeight || '400',
+        instructionLetterSpacing: data.instructionLetterSpacing || 'normal',
+        instructionLineHeight: data.instructionLineHeight || '1.4',
+        instructionTextAlign: data.instructionTextAlign || 'left',
+        
+        // Instructions text
+        frontLine1: data.frontLine1 || 'Approach your phone to the card',
+        frontLine2: data.frontLine2 || 'Tap to leave a review',
+        backLine1: data.backLine1 || 'Scan the QR code with your camera',
+        backLine2: data.backLine2 || 'Write a review on our profile page',
+        
+        // Icons
+        checkStrokeWidth: Math.round((data.checkStrokeWidth || 3.5) * 10), // 3.5 -> 35
+        nfcIconSize: data.nfcIconSize || 24,
+        googleIconSize: data.googleIconSize || 20,
+        showNfcIcon: data.showNfcIcon !== false,
+        showGoogleIcon: data.showGoogleIcon !== false,
+        
+        // Visual
+        textShadow: data.textShadow || 'none',
+        ctaPaddingTop: data.ctaPaddingTop || 8,
+        
+        // Model and mode
+        model: data.model || 'classic',
+        colorMode: data.colorMode || 'template',
+        
+        // Element offsets
+        elementOffsets: data.elementOffsets || null,
+        
+        // Colors
+        gradient: JSON.stringify(data.gradient),
+        accentColor: data.accentColor || '#4285F4',
+        textColor: data.textColor || '#1a1a1a',
+        bandColor1: data.bandColor1 || data.accentColor || '#4285F4',
+        bandColor2: data.bandColor2 || data.accentColor || '#4285F4',
+        qrColor: data.qrColor || data.accentColor || '#4285F4',
+        starsColor: data.starsColor || '#FBBF24',
+        iconsColor: data.iconsColor || data.accentColor || '#4285F4',
+        
+        // Pattern and status
+        pattern: data.pattern || 'none',
+        isActive: data.isActive !== undefined ? data.isActive : true,
+        isCardSetting: data.isCardSetting !== undefined ? data.isCardSetting : false,
+        isDefault: data.isDefault || false
       }
     });
 
     res.status(201).json({
       success: true,
       message: 'Template created successfully',
-      data: {
-        id: template.id.toString(),
-        name: template.name,
-        platform: template.platform
-      }
+      data: formatTemplate(template)
     });
   } catch (error) {
     console.error('❌ Error creating template:', error);
@@ -217,6 +350,7 @@ export const createTemplate = async (req, res) => {
   }
 };
 
+
 /**
  * PUT /api/superadmin/card-templates/:id
  * Met à jour un template
@@ -224,23 +358,8 @@ export const createTemplate = async (req, res) => {
 export const updateTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      name,
-      platform,
-      gradient,
-      accentColor,
-      textColor,
-      bandColor1,
-      bandColor2,
-      qrColor,
-      starsColor,
-      iconsColor,
-      pattern,
-      isActive,
-      isDefault
-    } = req.body;
+    const data = req.body;
 
-    // Vérifier que le template existe
     const existing = await prisma.cardTemplate.findUnique({
       where: { id: parseInt(id) }
     });
@@ -252,11 +371,11 @@ export const updateTemplate = async (req, res) => {
       });
     }
 
-    // Si isDefault = true, désactiver tous les autres templates par défaut pour cette plateforme
-    if (isDefault && platform) {
+    // Si isDefault = true, désactiver les autres
+    if (data.isDefault && data.platform) {
       await prisma.cardTemplate.updateMany({
         where: {
-          platform,
+          platform: data.platform,
           isDefault: true,
           id: { not: parseInt(id) }
         },
@@ -267,19 +386,94 @@ export const updateTemplate = async (req, res) => {
     }
 
     const updateData = {};
-    if (name) updateData.name = name.trim();
-    if (platform) updateData.platform = platform;
-    if (gradient) updateData.gradient = JSON.stringify(gradient);
-    if (accentColor) updateData.accentColor = accentColor;
-    if (textColor) updateData.textColor = textColor;
-    if (bandColor1) updateData.bandColor1 = bandColor1;
-    if (bandColor2) updateData.bandColor2 = bandColor2;
-    if (qrColor) updateData.qrColor = qrColor;
-    if (starsColor) updateData.starsColor = starsColor;
-    if (iconsColor) updateData.iconsColor = iconsColor;
-    if (pattern !== undefined) updateData.pattern = pattern;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    if (isDefault !== undefined) updateData.isDefault = isDefault;
+    
+    // Basic
+    if (data.name) updateData.name = data.name.trim();
+    if (data.platform) updateData.platform = data.platform;
+    
+    // Content
+    if (data.businessName !== undefined) updateData.businessName = data.businessName;
+    if (data.slogan !== undefined) updateData.slogan = data.slogan;
+    if (data.cta !== undefined) updateData.cta = data.cta;
+    if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl;
+    
+    // Layout
+    if (data.orientation) updateData.orientation = data.orientation;
+    if (data.bandPosition) updateData.bandPosition = data.bandPosition;
+    if (data.frontBandHeight !== undefined) updateData.frontBandHeight = data.frontBandHeight;
+    if (data.backBandHeight !== undefined) updateData.backBandHeight = data.backBandHeight;
+    
+    // Logo and QR
+    if (data.logoPosition) updateData.logoPosition = data.logoPosition;
+    if (data.logoSize !== undefined) updateData.logoSize = data.logoSize;
+    if (data.qrPosition) updateData.qrPosition = data.qrPosition;
+    if (data.qrSize !== undefined) updateData.qrSize = data.qrSize;
+    
+    // Typography - Name
+    if (data.nameFont) updateData.nameFont = data.nameFont;
+    if (data.nameFontSize !== undefined) updateData.nameFontSize = data.nameFontSize;
+    if (data.nameFontWeight) updateData.nameFontWeight = data.nameFontWeight;
+    if (data.nameLetterSpacing) updateData.nameLetterSpacing = data.nameLetterSpacing;
+    if (data.nameTextTransform) updateData.nameTextTransform = data.nameTextTransform;
+    if (data.nameLineHeight) updateData.nameLineHeight = data.nameLineHeight;
+    if (data.nameTextAlign) updateData.nameTextAlign = data.nameTextAlign;
+    
+    // Typography - Slogan
+    if (data.sloganFont) updateData.sloganFont = data.sloganFont;
+    if (data.sloganFontSize !== undefined) updateData.sloganFontSize = data.sloganFontSize;
+    if (data.sloganFontWeight) updateData.sloganFontWeight = data.sloganFontWeight;
+    if (data.sloganLetterSpacing) updateData.sloganLetterSpacing = data.sloganLetterSpacing;
+    if (data.sloganTextTransform) updateData.sloganTextTransform = data.sloganTextTransform;
+    if (data.sloganLineHeight) updateData.sloganLineHeight = data.sloganLineHeight;
+    if (data.sloganTextAlign) updateData.sloganTextAlign = data.sloganTextAlign;
+    
+    // Typography - Instructions
+    if (data.instructionFont) updateData.instructionFont = data.instructionFont;
+    if (data.instructionFontSize !== undefined) updateData.instructionFontSize = data.instructionFontSize;
+    if (data.instructionFontWeight) updateData.instructionFontWeight = data.instructionFontWeight;
+    if (data.instructionLetterSpacing) updateData.instructionLetterSpacing = data.instructionLetterSpacing;
+    if (data.instructionLineHeight) updateData.instructionLineHeight = data.instructionLineHeight;
+    if (data.instructionTextAlign) updateData.instructionTextAlign = data.instructionTextAlign;
+    
+    // Instructions text
+    if (data.frontLine1 !== undefined) updateData.frontLine1 = data.frontLine1;
+    if (data.frontLine2 !== undefined) updateData.frontLine2 = data.frontLine2;
+    if (data.backLine1 !== undefined) updateData.backLine1 = data.backLine1;
+    if (data.backLine2 !== undefined) updateData.backLine2 = data.backLine2;
+    
+    // Icons
+    if (data.checkStrokeWidth !== undefined) updateData.checkStrokeWidth = Math.round(data.checkStrokeWidth * 10);
+    if (data.nfcIconSize !== undefined) updateData.nfcIconSize = data.nfcIconSize;
+    if (data.googleIconSize !== undefined) updateData.googleIconSize = data.googleIconSize;
+    if (data.showNfcIcon !== undefined) updateData.showNfcIcon = data.showNfcIcon;
+    if (data.showGoogleIcon !== undefined) updateData.showGoogleIcon = data.showGoogleIcon;
+    
+    // Visual
+    if (data.textShadow) updateData.textShadow = data.textShadow;
+    if (data.ctaPaddingTop !== undefined) updateData.ctaPaddingTop = data.ctaPaddingTop;
+    
+    // Model and mode
+    if (data.model) updateData.model = data.model;
+    if (data.colorMode) updateData.colorMode = data.colorMode;
+    
+    // Element offsets
+    if (data.elementOffsets !== undefined) updateData.elementOffsets = data.elementOffsets;
+    
+    // Colors
+    if (data.gradient) updateData.gradient = JSON.stringify(data.gradient);
+    if (data.accentColor) updateData.accentColor = data.accentColor;
+    if (data.textColor) updateData.textColor = data.textColor;
+    if (data.bandColor1) updateData.bandColor1 = data.bandColor1;
+    if (data.bandColor2) updateData.bandColor2 = data.bandColor2;
+    if (data.qrColor) updateData.qrColor = data.qrColor;
+    if (data.starsColor) updateData.starsColor = data.starsColor;
+    if (data.iconsColor) updateData.iconsColor = data.iconsColor;
+    
+    // Pattern and status
+    if (data.pattern !== undefined) updateData.pattern = data.pattern;
+    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.isCardSetting !== undefined) updateData.isCardSetting = data.isCardSetting;
+    if (data.isDefault !== undefined) updateData.isDefault = data.isDefault;
 
     const template = await prisma.cardTemplate.update({
       where: { id: parseInt(id) },
@@ -289,10 +483,7 @@ export const updateTemplate = async (req, res) => {
     res.json({
       success: true,
       message: 'Template updated successfully',
-      data: {
-        id: template.id.toString(),
-        name: template.name
-      }
+      data: formatTemplate(template)
     });
   } catch (error) {
     console.error('❌ Error updating template:', error);
@@ -369,20 +560,95 @@ export const duplicateTemplate = async (req, res) => {
     }
 
     const duplicate = await prisma.cardTemplate.create({
-      data: {
-        name: `${original.name} (Copy)`,
+       data: {
+        // Basic
+        name: original.name.trim(),
         platform: original.platform,
-        gradient: original.gradient,
-        accentColor: original.accentColor,
-        textColor: original.textColor,
-        bandColor1: original.bandColor1,
-        bandColor2: original.bandColor2,
-        qrColor: original.qrColor,
-        starsColor: original.starsColor,
-        iconsColor: original.iconsColor,
-        pattern: original.pattern,
-        isActive: original.isActive,
-        isDefault: false // Les copies ne sont jamais par défaut
+        
+        // Content
+        businessName: original.businessName || original.name,
+        slogan: original.slogan || null,
+        cta: original.cta || 'Powered by RedVanta',
+        logoUrl: original.logoUrl || null,
+        
+        // Layout
+        orientation: original.orientation || 'landscape',
+        bandPosition: original.bandPosition || 'bottom',
+        frontBandHeight: original.frontBandHeight || 22,
+        backBandHeight: original.backBandHeight || 12,
+        
+        // Logo and QR
+        logoPosition: original.logoPosition || 'left',
+        logoSize: original.logoSize || 32,
+        qrPosition: original.qrPosition || 'right',
+        qrSize: original.qrSize || 80,
+        
+        // Typography - Name
+        nameFont: original.nameFont || "'Space Grotesk', sans-serif",
+        nameFontSize: original.nameFontSize || 16,
+        nameFontWeight: original.nameFontWeight || '700',
+        nameLetterSpacing: original.nameLetterSpacing || 'normal',
+        nameTextTransform: original.nameTextTransform || 'none',
+        nameLineHeight: original.nameLineHeight || '1.2',
+        nameTextAlign: original.nameTextAlign || 'left',
+        
+        // Typography - Slogan
+        sloganFont: original.sloganFont || "'Space Grotesk', sans-serif",
+        sloganFontSize: original.sloganFontSize || 12,
+        sloganFontWeight: original.sloganFontWeight || '400',
+        sloganLetterSpacing: original.sloganLetterSpacing || 'normal',
+        sloganTextTransform: original.sloganTextTransform || 'none',
+        sloganLineHeight: original.sloganLineHeight || '1.4',
+        sloganTextAlign: original.sloganTextAlign || 'left',
+        
+        // Typography - Instructions
+        instructionFont: original.instructionFont || "'Space Grotesk', sans-serif",
+        instructionFontSize: original.instructionFontSize || 10,
+        instructionFontWeight: original.instructionFontWeight || '400',
+        instructionLetterSpacing: original.instructionLetterSpacing || 'normal',
+        instructionLineHeight: original.instructionLineHeight || '1.4',
+        instructionTextAlign: original.instructionTextAlign || 'left',
+        
+        // Instructions text
+        frontLine1: original.frontLine1 || 'Approach your phone to the card',
+        frontLine2: original.frontLine2 || 'Tap to leave a review',
+        backLine1: original.backLine1 || 'Scan the QR code with your camera',
+        backLine2: original.backLine2 || 'Write a review on our profile page',
+        
+        // Icons
+        checkStrokeWidth: Math.round((original.checkStrokeWidth || 3.5) * 10), // 3.5 -> 35
+        nfcIconSize: original.nfcIconSize || 24,
+        googleIconSize: original.googleIconSize || 20,
+        showNfcIcon: original.showNfcIcon !== false,
+        showGoogleIcon: original.showGoogleIcon !== false,
+        
+        // Visual
+        textShadow: original.textShadow || 'none',
+        ctaPaddingTop: original.ctaPaddingTop || 8,
+        
+        // Model and mode
+        model: original.model || 'classic',
+        colorMode: original.colorMode || 'template',
+        
+        // Element offsets
+        elementOffsets: original.elementOffsets || null,
+        
+        // Colors
+        gradient: JSON.stringify(original.gradient),
+        accentColor: original.accentColor || '#4285F4',
+        textColor: original.textColor || '#1a1a1a',
+        bandColor1: original.bandColor1 || original.accentColor || '#4285F4',
+        bandColor2: original.bandColor2 || original.accentColor || '#4285F4',
+        qrColor: original.qrColor || original.accentColor || '#4285F4',
+        starsColor: original.starsColor || '#FBBF24',
+        iconsColor: original.iconsColor || original.accentColor || '#4285F4',
+        
+        // Pattern and status
+        pattern: original.pattern || 'none',
+        isActive: original.isActive !== undefined ? original.isActive : true,
+        isCardSetting: original.isCardSetting !== undefined ? original.isCardSetting : false,
+        
+        isDefault: false
       }
     });
 
@@ -487,6 +753,49 @@ export const getTemplateStats = async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Error fetching template stats',
+      details: error.message
+    });
+  }
+};
+
+
+/**
+ * PATCH /api/superadmin/card-templates/:id/toggle-card-setting
+ * Active/Désactive la disponibilité du template pour les paramètres de carte
+ */
+export const toggleCardSetting = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const template = await prisma.cardTemplate.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Template not found'
+      });
+    }
+    const updated = await prisma.cardTemplate.update({
+      where: { id: parseInt(id) },
+      data: {
+        isCardSetting: !template.isCardSetting
+      }
+    });
+    res.json({
+      success: true,
+      message: `Template ${updated.isCardSetting ? 'added to' : 'removed from'} card settings`,
+      data: {
+        id: updated.id.toString(),
+        isCardSetting: updated.isCardSetting
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error toggling card setting:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error toggling card setting',
       details: error.message
     });
   }

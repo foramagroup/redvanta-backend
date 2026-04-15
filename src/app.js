@@ -10,6 +10,7 @@ import bodyParser from "body-parser";
 import path from "path";
 import { fileURLToPath } from "url";
 
+
 // --- Routers ---
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -86,6 +87,7 @@ import { requireSuperadmin } from "./middleware/requireSuperadmin.js";
 
 //----jobs----
 import { startSuspendUnverifiedJob } from "./jobs/client/suspendUnverified.job.js";
+import { suspendUnverifiedAccounts } from './jobs/client/suspendUnverifiedAccounts.job.js';
 
 
 
@@ -221,9 +223,9 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/auth", clientAuthRoutes);
   app.use("/api/client/places", placesRoutes);
   app.use("/api/client/orders", orderClientRoutes);
-  app.use("api/r",        scanRouter);
+  app.use("/api/r",        scanRouter);
   app.use("/review",   reviewRouter);
-  startSuspendUnverifiedJob();
+  suspendUnverifiedAccounts();
 
 
 // *************Ges Routes Admin***************

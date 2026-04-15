@@ -33,6 +33,16 @@ model User {
   emailVerifiedAt  DateTime?
   emailVerifyToken String?         @unique @db.VarChar(255)
   emailVerifyExp   DateTime?
+
+
+  emailVerifyCode     String?   @db.VarChar(6)   //Code à 6 chiffres
+  emailVerifyCodeExp  DateTime?                  //Expiration du code
+  emailVerifyAttempts Int       @default(0)      //Nombre de tentatives
+
+  accountSuspendedAt DateTime?                  // Date de suspension
+  suspensionReason   String?   @db.VarChar(255) // Raison suspension
+
+
   roleId           Int?
   twoFa            Boolean?        @default(false)
   lastLogin        DateTime?       @db.DateTime(0)
@@ -958,33 +968,104 @@ model SmsSetting {
 model CardTemplate {
   id          Int      @id @default(autoincrement())
   name        String   @db.VarChar(255)
-  platform    String   @db.VarChar(50) // google, facebook, yelp, tripadvisor, trustpilot
+  platform    String   @db.VarChar(50)
+  
+  // Content
+  businessName String?  @db.VarChar(255) 
+  slogan       String?  @db.VarChar(255)
+  cta          String   @default("Powered by RedVanta") @db.VarChar(255)
+  logoUrl      String?  @db.Text 
+  
+  // Layout
+  orientation      String  @default("landscape") @db.VarChar(20)
+  bandPosition     String  @default("bottom") @db.VarChar(20) 
+  frontBandHeight  Int     @default(22) 
+  backBandHeight   Int     @default(12) 
+  
+  // Logo and QR
+  logoPosition String  @default("left") @db.VarChar(30) 
+  logoSize     Int     @default(32) 
+  qrPosition   String  @default("right") @db.VarChar(20) 
+  qrSize       Int     @default(80) 
+  
+  // Typography - Name/Business
+  nameFont           String @default("'Space Grotesk', sans-serif") @db.VarChar(100) 
+  nameFontSize       Int    @default(16) 
+  nameFontWeight     String @default("700") @db.VarChar(10) 
+  nameLetterSpacing  String @default("normal") @db.VarChar(20) 
+  nameTextTransform  String @default("none") @db.VarChar(20) 
+  nameLineHeight     String @default("1.2") @db.VarChar(10) 
+  nameTextAlign      String @default("left") @db.VarChar(20) 
+  
+  // Typography - Slogan
+  sloganFont          String @default("'Space Grotesk', sans-serif") @db.VarChar(100) 
+  sloganFontSize      Int    @default(12) 
+  sloganFontWeight    String @default("400") @db.VarChar(10) 
+  sloganLetterSpacing String @default("normal") @db.VarChar(20) 
+  sloganTextTransform String @default("none") @db.VarChar(20) 
+  sloganLineHeight    String @default("1.4") @db.VarChar(10) 
+  sloganTextAlign     String @default("left") @db.VarChar(20) 
+  
+  // Typography - Instructions
+  instructionFont          String @default("'Space Grotesk', sans-serif") @db.VarChar(100) 
+  instructionFontSize      Int    @default(10) 
+  instructionFontWeight    String @default("400") @db.VarChar(10) 
+  instructionLetterSpacing String @default("normal") @db.VarChar(20) 
+  instructionLineHeight    String @default("1.4") @db.VarChar(10) 
+  instructionTextAlign     String @default("left") @db.VarChar(20) 
+  
+  // Instructions text
+  frontLine1 String @default("Approach your phone to the card") @db.VarChar(255) 
+  frontLine2 String @default("Tap to leave a review") @db.VarChar(255) 
+  backLine1  String @default("Scan the QR code with your camera") @db.VarChar(255) 
+  backLine2  String @default("Write a review on our profile page") @db.VarChar(255) 
+  
+  // Icon settings
+  checkStrokeWidth Int     @default(35)  // Stocké comme 35 = 3.5
+  nfcIconSize      Int     @default(24) 
+  googleIconSize   Int     @default(20) 
+  showNfcIcon      Boolean @default(true) 
+  showGoogleIcon   Boolean @default(true) 
+  
+  // Visual effects
+  textShadow     String @default("none") @db.VarChar(20) 
+  ctaPaddingTop  Int    @default(8) 
+  
+  // Model and mode
+  model      String @default("classic") @db.VarChar(20)
+  colorMode  String @default("template") @db.VarChar(20) 
+  
+  // Element offsets
+  elementOffsets Json? 
   
   // Gradient colors (stored as JSON array)
   gradient    Json     // ["#FFFFFF", "#F1F5F9"]
   
   // Colors
-  accentColor  String  @db.VarChar(20)
-  textColor    String  @db.VarChar(20)
-  bandColor1   String  @db.VarChar(20)
-  bandColor2   String  @db.VarChar(20)
+  accentColor  String  @db.VarChar(20) 
+  textColor    String  @db.VarChar(20) 
+  bandColor1   String  @db.VarChar(20) 
+  bandColor2   String  @db.VarChar(20) 
   qrColor      String  @db.VarChar(20)
   starsColor   String  @db.VarChar(20)
-  iconsColor   String  @db.VarChar(20)
+  iconsColor   String  @db.VarChar(20) 
   
   // Pattern
   pattern     String   @db.VarChar(50) @default("none")
   
   // Status
-  isActive    Boolean  @default(true)
+  isActive    Boolean  @default(true) 
   isDefault   Boolean  @default(false)
+  isCardSetting   Boolean  @default(false)
   
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) 
+  updatedAt   DateTime @updatedAt 
   
   @@index([platform])
   @@index([isActive])
   @@index([isDefault])
+  @@index([orientation])
+  @@index([model])
   @@map("card_templates")
 }
 

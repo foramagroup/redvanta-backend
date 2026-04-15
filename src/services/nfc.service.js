@@ -8,7 +8,7 @@ import prisma from "../config/database.js";
 import { v4 as uuidv4 } from "uuid";
 import { generateAllQrCodes, deriveQrUrls, deleteQrFiles } from "./qrcode.service.js";
 
-const APP_URL = process.env.URL_PROD_BACKEND || "http://localhost:4000";
+const APP_URL = process.env.URL_PROD_BACKEND || "http://localhost:4000/api";
 
 // ─── Payload encodée dans le QR + puce NFC ───────────────────
 // JAMAIS le lien Google directement — toujours l'URL de redirection interne

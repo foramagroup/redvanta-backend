@@ -173,7 +173,12 @@ export const handleScan = async (req, res, next) => {
     // Aucune lib push / Service Worker nécessaire — c'est le comportement
     // natif d'Android NFC avec une URL HTTP redirect.
 
-    return res.redirect(302, `${process.env.FRONTEND_URL}/review/${card.company?.name}`);
+   const companySlug = card.company?.name
+  .toLowerCase()
+  .trim()
+  .replace(/\s+/g, '-')
+
+    return res.redirect(302, `${process.env.URL_PROD_FRONTEND}/review/${companySlug}`);
   } catch (e) { next(e); }
 };
 

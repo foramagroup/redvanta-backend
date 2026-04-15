@@ -11,10 +11,14 @@ import { sendMail }                   from "../../services/client/mail.service.j
 import { buildConfirmEmailTemplate }  from "../../templates/client/confirmEmail.template.js";
 import { loadUserByEmail, loadUserForAuth, formatAdmin } from "../../services/superadmin/auth.service.js";
 import { createSubscriptionForCompany } from '../../helpers/subscription.helpers.js';
+import { generateOtpCode, getOtpExpiration } from '../../helpers/otp.helpers.js';
+import { buildVerificationCodeTemplate } from '../../templates/client/verificationCode.template.js';
 
 
 const SALT_ROUNDS = 12;
-const VERIFY_HOURS = 48; // délai avant suspension
+const VERIFY_HOURS = 48;
+const OTP_EXPIRATION_DAYS = 3;
+const MAX_VERIFICATION_ATTEMPTS = 5;
 
 function normalizeEmail(email) {
   return typeof email === "string" ? email.trim().toLowerCase() : "";
@@ -102,6 +106,7 @@ export const signup = async (req, res, next) => {
     const { name, password, companyName, phone, address } = req.validatedBody;
     const email = normalizeEmail(req.validatedBody.email);
 
+    // Vérifier unicité
     const [userExists, companyExists] = await Promise.all([
       prisma.user.findUnique({ where: { email } }),
       prisma.company.findUnique({ where: { email } }),
@@ -110,7 +115,7 @@ export const signup = async (req, res, next) => {
     if (userExists || companyExists) {
       return res.status(409).json({
         success: false,
-        error: "Un compte existe deja avec cet email. Veuillez vous connecter.",
+        error: "Un compte existe déjà avec cet email. Veuillez vous connecter.",
         code: "EMAIL_EXISTS",
       });
     }
@@ -122,11 +127,13 @@ export const signup = async (req, res, next) => {
     ]);
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const verifyToken = generateVerifyToken();
-    const verifyTokenHash = hashVerifyToken(verifyToken);
-    const verifyExp = new Date(Date.now() + VERIFY_HOURS * 60 * 60 * 1000);
+    
+    // GÉNÉRER CODE OTP
+    const verificationCode = generateOtpCode();
+    const codeExpiration = getOtpExpiration(OTP_EXPIRATION_DAYS);
 
     const result = await prisma.$transaction(async (tx) => {
+      // Créer l'utilisateur
       const user = await tx.user.create({
         data: {
           email,
@@ -136,11 +143,13 @@ export const signup = async (req, res, next) => {
           isAdmin: true,
           isSuperadmin: false,
           roleId: adminRole?.id ?? null,
-          emailVerifyToken: verifyTokenHash,
-          emailVerifyExp: verifyExp,
+          emailVerifyCode: verificationCode,
+          emailVerifyCodeExp: codeExpiration,
+          emailVerifyAttempts: 0,
         },
       });
 
+      // Créer la company
       const company = await tx.company.create({
         data: {
           name: companyName,
@@ -148,7 +157,7 @@ export const signup = async (req, res, next) => {
           phone: phone || null,
           address: address || null,
           type: "direct",
-          status: "active",
+          status: "active", // Restera active jusqu'à suspension
           planId: defaultPlan?.id ?? null,
           defaultLanguageId: defaultLang?.id ?? null,
           billingAmount: defaultPlan ? `$${defaultPlan.price}` : "$0",
@@ -156,6 +165,7 @@ export const signup = async (req, res, next) => {
         },
       });
 
+      // Créer les settings
       await tx.companySettings.create({
         data: {
           companyId: company.id,
@@ -170,6 +180,7 @@ export const signup = async (req, res, next) => {
         },
       });
 
+      // Lien UserCompany
       await tx.userCompany.create({
         data: {
           userId: user.id,
@@ -179,45 +190,48 @@ export const signup = async (req, res, next) => {
         },
       });
 
-        if (defaultPlan) {
-          await createSubscriptionForCompany(tx, company.id, defaultPlan.id, {
-            status: 'trialing',
-            interval: 'monthly',
-            trialDays: defaultPlan.trialDays || 14,
-          });
-        }
-
+      // Créer la subscription (en trial)
+      if (defaultPlan) {
+        await createSubscriptionForCompany(tx, company.id, defaultPlan.id, {
+          status: 'trialing',
+          interval: 'monthly',
+          trialDays: defaultPlan.trialDays || 14,
+        });
+      }
 
       return { user, company };
     });
 
     await logActivity(result.user.id, result.user.name, ip, userAgent, "signup");
 
-    const backendBase = process.env.URL_DEV_BACKEND ||  "http://localhost:4000";
-    const confirmUrl = `${backendBase}/api/client/auth/verify-email?token=${verifyToken}&redirect=1`;
-    const emailPayload = buildConfirmEmailTemplate({
+    //  ENVOYER EMAIL AVEC CODE OTP
+    const emailPayload = buildVerificationCodeTemplate({
       name: companyName,
       companyName,
-      confirmUrl,
-      expiresHours: VERIFY_HOURS,
+      verificationCode,
+      expiresHours: OTP_EXPIRATION_DAYS * 24,
     });
 
     sendMail({ to: email, ...emailPayload }).catch((err) => {
-      console.error(`[signup] Email confirmation error -> ${email}:`, err.message);
+      console.error(`[signup] Email verification code error -> ${email}:`, err.message);
     });
 
-    const fullUser = await loadUserForAuth(result.user.id, "admin");
-
+    //  Il doit d'abord vérifier
     return res.status(201).json({
       success: true,
-      message: "Compte cree. Verifiez votre email avant d'acceder au dashboard.",
+      message: "Compte créé avec succès. Un code de vérification a été envoyé à votre email.",
       emailVerified: false,
-      verifyDeadline: verifyExp,
-      user: formatAdmin(fullUser, result.company.id),
+      codeExpiration: codeExpiration,
+      email: email, // Pour redirection vers page de vérification
+      requiresVerification: true,
     });
   } catch (e) {
     if (e.code === "P2002") {
-      return res.status(409).json({ success: false, error: "Email deja utilise", code: "EMAIL_EXISTS" });
+      return res.status(409).json({ 
+        success: false, 
+        error: "Email déjà utilisé", 
+        code: "EMAIL_EXISTS" 
+      });
     }
     next(e);
   }
@@ -244,6 +258,45 @@ export const login = async (req, res, next) => {
       return res.status(401).json({ success: false, error: "Email ou mot de passe incorrect", code: "INVALID_CREDENTIALS" });
     }
 
+     if (user.accountSuspendedAt) {
+      await logActivity(user.id, user.name, ip, userAgent, "failed_suspended");
+      return res.status(403).json({
+        success: false,
+        error: "Votre compte a été suspendu. Veuillez contacter le support.",
+        code: "ACCOUNT_SUSPENDED",
+        suspendedAt: user.accountSuspendedAt,
+        reason: user.suspensionReason
+      });
+    }
+
+    const emailVerified = !!user.emailVerifiedAt;
+    if (!emailVerified) {
+      await logActivity(user.id, user.name, ip, userAgent, "failed_unverified");
+      if (user.emailVerifyCodeExp && new Date() > new Date(user.emailVerifyCodeExp)) {
+        // Suspendre le compte
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            accountSuspendedAt: new Date(),
+            suspensionReason: "Code de vérification expiré"
+          }
+        });
+        return res.status(403).json({
+          success: false,
+          error: "Votre code de vérification a expiré. Votre compte a été suspendu.",
+          code: "CODE_EXPIRED_SUSPENDED"
+        });
+      }
+      return res.status(403).json({
+        success: false,
+        error: "Veuillez vérifier votre email avant de vous connecter.",
+        code: "EMAIL_NOT_VERIFIED",
+        email: user.email,
+        codeExpiration: user.emailVerifyCodeExp,
+        requiresVerification: true
+      });
+    }
+
     const activeLinks = user.companies?.filter((uc) => ["active", "trial"].includes(uc.company?.status)) ?? [];
     const defaultLink = user.companies?.find((uc) => uc.isOwner && ["active", "trial"].includes(uc.company?.status)) ?? activeLinks[0] ?? user.companies?.[0];
 
@@ -252,15 +305,7 @@ export const login = async (req, res, next) => {
       return res.status(403).json({ success: false, error: "Aucune entreprise associee a ce compte.", code: "NO_COMPANY" });
     }
 
-    const emailVerified = !!user.emailVerifiedAt;
-    if (!emailVerified) {
-      await logActivity(user.id, user.name, ip, userAgent, "failed");
-      return res.status(403).json({
-        success: false,
-        error: "Veuillez confirmer votre email avant de vous connecter.",
-        code: "EMAIL_NOT_VERIFIED",
-      });
-    }
+    
 
     const token = generateToken({
       userId: user.id,
@@ -375,6 +420,271 @@ export const verifyEmail = async (req, res, next) => {
       success: true,
       message: "Email confirme avec succes. Vous etes maintenant connecte.",
     });
+  } catch (e) {
+    next(e);
+  }
+};
+
+
+/**
+ * POST /api/client/auth/verify-code
+ * Vérifier le code OTP envoyé par email
+ */
+export const verifyCode = async (req, res, next) => {
+  const ip = getIp(req);
+  const userAgent = req.headers["user-agent"] ?? null;
+  try {
+    const { email, code } = req.body;
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!code || code.length !== 6) {
+      return res.status(400).json({
+        success: false,
+        error: "Code invalide. Le code doit contenir 6 chiffres.",
+        code: "INVALID_CODE_FORMAT"
+      });
+    }
+
+    // Récupérer l'utilisateur
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: {
+        companies: {
+          include: {
+            company: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "Utilisateur introuvable",
+        code: "USER_NOT_FOUND"
+      });
+    }
+
+    // Vérifier si le compte est suspendu
+    if (user.accountSuspendedAt) {
+      return res.status(403).json({
+        success: false,
+        error: "Votre compte a été suspendu. Veuillez contacter le support.",
+        code: "ACCOUNT_SUSPENDED",
+        suspendedAt: user.accountSuspendedAt,
+        reason: user.suspensionReason
+      });
+    }
+
+    // Vérifier si déjà vérifié
+    if (user.emailVerifiedAt) {
+      return res.status(400).json({
+        success: false,
+        error: "Votre email est déjà vérifié. Vous pouvez vous connecter.",
+        code: "ALREADY_VERIFIED"
+      });
+    }
+
+    // Vérifier le nombre de tentatives
+    if (user.emailVerifyAttempts >= MAX_VERIFICATION_ATTEMPTS) {
+      // Suspendre le compte après trop de tentatives
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          accountSuspendedAt: new Date(),
+          suspensionReason: "Trop de tentatives de vérification échouées"
+        }
+      });
+
+      await logActivity(user.id, user.name, ip, userAgent, "account_suspended_attempts");
+
+      return res.status(403).json({
+        success: false,
+        error: "Trop de tentatives échouées. Votre compte a été suspendu pour des raisons de sécurité.",
+        code: "TOO_MANY_ATTEMPTS"
+      });
+    }
+
+    // Vérifier si le code a expiré
+    if (!user.emailVerifyCodeExp || new Date() > new Date(user.emailVerifyCodeExp)) {
+      // Suspendre le compte si code expiré
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          accountSuspendedAt: new Date(),
+          suspensionReason: "Code de vérification expiré"
+        }
+      });
+
+      await logActivity(user.id, user.name, ip, userAgent, "account_suspended_expired");
+
+      return res.status(403).json({
+        success: false,
+        error: "Votre code de vérification a expiré. Votre compte a été suspendu.",
+        code: "CODE_EXPIRED",
+        canRequestNew: true // Permettre de demander un nouveau code
+      });
+    }
+
+    // Vérifier le code
+    if (user.emailVerifyCode !== code.trim()) {
+      // Incrémenter les tentatives
+      const newAttempts = user.emailVerifyAttempts + 1;
+      
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerifyAttempts: newAttempts
+        }
+      });
+
+      await logActivity(user.id, user.name, ip, userAgent, "verification_failed");
+
+      return res.status(400).json({
+        success: false,
+        error: "Code incorrect. Veuillez réessayer.",
+        code: "INVALID_CODE",
+        attemptsRemaining: MAX_VERIFICATION_ATTEMPTS - newAttempts,
+        attemptsUsed: newAttempts
+      });
+    }
+
+    // ✅ CODE VALIDE - Vérifier le compte
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerifyCode: null,
+        emailVerifyCodeExp: null,
+        emailVerifyAttempts: 0,
+      }
+    });
+
+    await logActivity(user.id, user.name, ip, userAgent, "email_verified");
+
+    // Récupérer la company pour la connexion
+    const companyLink = user.companies.find(uc => uc.isOwner) || user.companies[0];
+
+    if (!companyLink) {
+      return res.status(403).json({
+        success: false,
+        error: "Aucune entreprise associée à ce compte",
+        code: "NO_COMPANY"
+      });
+    }
+
+    // ✅ CONNECTER L'UTILISATEUR
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      isAdmin: true,
+      isSuperadmin: false,
+      companyId: companyLink.company.id,
+      emailVerified: true,
+    });
+
+    res.cookie("admin_token", token, getCookieOptions("admin_token"));
+
+    const fullUser = await loadUserForAuth(user.id, "admin");
+
+    return res.json({
+      success: true,
+      message: "Email vérifié avec succès. Vous êtes maintenant connecté.",
+      emailVerified: true,
+      user: formatAdmin(fullUser, companyLink.company.id),
+      redirectTo: req.body.returnUrl || "/dashboard" // Redirection personnalisée
+    });
+
+  } catch (e) {
+    next(e);
+  }
+};
+
+
+/**
+ * POST /api/client/auth/resend-code
+ * Renvoyer un nouveau code de vérification
+ */
+export const resendVerificationCode = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: "Email requis"
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: {
+        companies: {
+          include: {
+            company: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      // Ne pas révéler si l'email existe ou non (sécurité)
+      return res.json({
+        success: true,
+        message: "Si un compte existe avec cet email, un nouveau code a été envoyé."
+      });
+    }
+
+    // Vérifier si déjà vérifié
+    if (user.emailVerifiedAt) {
+      return res.json({
+        success: true,
+        message: "Si un compte existe avec cet email, un nouveau code a été envoyé."
+      });
+    }
+
+    // Vérifier si le compte est suspendu
+    if (user.accountSuspendedAt) {
+      return res.status(403).json({
+        success: false,
+        error: "Votre compte a été suspendu. Veuillez contacter le support.",
+        code: "ACCOUNT_SUSPENDED"
+      });
+    }
+
+    // ✅ GÉNÉRER NOUVEAU CODE
+    const newCode = generateOtpCode();
+    const newExpiration = getOtpExpiration(OTP_EXPIRATION_DAYS);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifyCode: newCode,
+        emailVerifyCodeExp: newExpiration,
+        emailVerifyAttempts: 0, // Reset les tentatives
+      }
+    });
+
+    // Récupérer la company pour le nom
+    const companyLink = user.companies.find(uc => uc.isOwner) || user.companies[0];
+
+    // Envoyer l'email
+    const emailPayload = buildVerificationCodeTemplate({
+      name: user.name || email,
+      companyName: companyLink?.company?.name || "votre entreprise",
+      verificationCode: newCode,
+      expiresHours: OTP_EXPIRATION_DAYS * 24,
+    });
+
+    await sendMail({ to: email, ...emailPayload });
+
+    return res.json({
+      success: true,
+      message: "Un nouveau code de vérification a été envoyé à votre email.",
+      codeExpiration: newExpiration
+    });
+
   } catch (e) {
     next(e);
   }
