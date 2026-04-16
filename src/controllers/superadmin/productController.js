@@ -100,6 +100,76 @@ async function enrichWithLangCode(body) {
   };
 }
 
+
+
+
+
+/**
+ * GET /api/superadmin/products/available-templates
+ * Récupérer UNIQUEMENT les templates marqués pour les produits (isCardSetting = true)
+ */
+export const getAvailableTemplatesForProducts = async (req, res) => {
+  try {
+    const { platform } = req.query; 
+
+    const where = {
+      isActive: true,
+      isCardSetting: true 
+    };
+
+    // Filtrage optionnel par plateforme
+    if (platform && platform !== 'all') {
+      where.platform = platform;
+    }
+    const templates = await prisma.cardTemplate.findMany({
+      where,
+      orderBy: [
+        { isDefault: 'desc' },
+        { platform: 'asc' },
+        { name: 'asc' }
+      ],
+      select: {
+        id: true,
+        name: true,
+        platform: true,
+        gradient: true,
+        pattern: true,
+        accentColor: true,
+        textColor: true,
+        model: true,
+        orientation: true,
+        isDefault: true,
+        isCardSetting: true,
+        createdAt: true
+      }
+    });
+
+    const groupedByPlatform = templates.reduce((acc, template) => {
+      if (!acc[template.platform]) {
+        acc[template.platform] = [];
+      }
+      acc[template.platform].push(template);
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      data: templates,
+      grouped: groupedByPlatform,
+      total: templates.length
+    });
+  } catch (error) {
+    console.error('❌ Error fetching available templates:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch available templates',
+      details: error.message
+    });
+  }
+};
+
+
+
 export const listProducts = async (req, res, next) => {
   try {
     const data = await prisma.product.findMany({
@@ -112,269 +182,339 @@ export const listProducts = async (req, res, next) => {
   }
 };
 
-export const getProduct = async (req, res, next) => {
+/**
+ * GET /api/superadmin/products/:id
+ * Récupérer un produit avec ses templates
+ */
+export const getProduct = async (req, res) => {
   try {
-    const id = +req.params.id;
-    const p = await prisma.product.findUnique({
-      where: { id },
-      include: INCLUDE
-    });
-    if (!p) return res.status(404).json({
-      success: false,
-      message: "Produit introuvable"
-    });
-    res.json({ success: true, data: format(p) });
-  } catch (e) {
-    next(e);
-  }
-};
+    const { id } = req.params;
 
-export const createProduct = async (req, res, next) => {
-  try {
-    const body = req.validatedBody;
-
-    const langCheck = await validateLangIds(body.translations.map((t) => t.langId));
-    if (!langCheck.ok) return res.status(422).json({
-      success: false,
-      message: langCheck.message
-    });
-
-    for (const t of body.translations) {
-      const exist = await prisma.productTranslation.findUnique({
-        where: { langId_slug: { langId: t.langId, slug: t.slug } },
-      });
-      if (exist) return res.status(409).json({
-        success: false,
-        message: `Slug "${t.slug}" déjà utilisé (langId: ${t.langId})`,
-      });
-    }
-
-    const enriched = await enrichWithLangCode(body);
-    const { mainImage, gallery, metaImages } = await processProductFiles(enriched);
-
-    // Valider et préparer cardSettings
-    const cardSettings = body.cardSettings 
-      ? {
-          width: Number(body.cardSettings.width) || DEFAULT_CARD_SETTINGS.width,
-          height: Number(body.cardSettings.height) || DEFAULT_CARD_SETTINGS.height,
-          cornerRadiusEnabled: Boolean(body.cardSettings.cornerRadiusEnabled),
-          cornerRadius: Number(body.cardSettings.cornerRadius) || 0,
-          layouts: Array.isArray(body.cardSettings.layouts) 
-            ? body.cardSettings.layouts 
-            : DEFAULT_CARD_SETTINGS.layouts,
-          reviewPlatform: body.cardSettings.reviewPlatform || DEFAULT_CARD_SETTINGS.reviewPlatform,
-          defaultTemplateId: body.cardSettings.defaultTemplateId || DEFAULT_CARD_SETTINGS.defaultTemplateId,
-          availableTemplates: Array.isArray(body.cardSettings.availableTemplates)
-            ? body.cardSettings.availableTemplates
-            : DEFAULT_CARD_SETTINGS.availableTemplates,
-        }
-      : DEFAULT_CARD_SETTINGS;
-
-    const p = await prisma.product.create({
-      data: {
-        price: body.price,
-        active: body.active,
-        image: mainImage?.url ?? null,
-        cardSettings: cardSettings, // Prisma stockera automatiquement en JSON
+    const product = await prisma.product.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        defaultTemplate: true,
         translations: {
-          create: body.translations.map((t) => {
-            const code = enriched.translations.find((u) => u.langId === t.langId)?.lang;
-            return {
-              langId: t.langId,
-              title: t.title,
-              slug: t.slug,
-              seoTitle: t.seoTitle ?? null,
-              metaDescription: t.metaDescription ?? null,
-              metaImage: metaImages[code] ?? null,
-            };
-          }),
+          include: { language: true }
         },
         galleryItems: {
-          create: gallery.map((g) => ({
-            url: g.url,
-            type: g.type,
-            poster: g.posterUrl ?? null,
-            position: g.position
-          }))
+          orderBy: { position: 'asc' }
         },
         packageTiers: {
-          create: body.packageTiers
+          orderBy: { qty: 'asc' }
         },
         cardTypePrices: {
-          create: body.cardTypePrices.map((c) => ({
-            cardTypeId: c.cardTypeId,
-            price: c.price
-          }))
-        },
-      },
-      include: INCLUDE,
+          include: { cardType: true }
+        }
+      }
     });
 
-    res.status(201).json({ success: true, data: format(p) });
-  } catch (e) {
-    if (e.code === "P2002") return res.status(409).json({
-      success: false,
-      message: "Slug ou entrée dupliqué"
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        error: 'Product not found'
+      });
+    }
+
+    // ✅ Récupérer les templates disponibles (seulement ceux avec isCardSetting = true)
+    const availableTemplateIds = product.availableTemplateIds 
+      ? JSON.parse(JSON.stringify(product.availableTemplateIds))
+      : [];
+
+    let availableTemplates = [];
+    if (availableTemplateIds.length > 0) {
+      availableTemplates = await prisma.cardTemplate.findMany({
+        where: {
+          id: { in: availableTemplateIds.map(id => parseInt(id)) },
+          isActive: true,
+          isCardSetting: true // ✅ FILTRE
+        },
+        select: {
+          id: true,
+          name: true,
+          platform: true,
+          gradient: true,
+          pattern: true,
+          accentColor: true,
+          textColor: true,
+          model: true,
+          isDefault: true
+        }
+      });
+    }
+
+    // ✅ Si aucun template sélectionné, prendre les templates par défaut de la plateforme
+    if (availableTemplates.length === 0 && product.reviewPlatform) {
+      availableTemplates = await prisma.cardTemplate.findMany({
+        where: {
+          platform: product.reviewPlatform,
+          isActive: true,
+          isCardSetting: true, // ✅ FILTRE
+          isDefault: true
+        },
+        select: {
+          id: true,
+          name: true,
+          platform: true,
+          gradient: true,
+          pattern: true,
+          accentColor: true,
+          textColor: true,
+          model: true,
+          isDefault: true
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...product,
+        availableTemplates,
+        cardSettings: product.cardSettings || {
+          width: 85.6,
+          height: 53.98,
+          cornerRadius: 3,
+          cornerRadiusEnabled: true
+        }
+      }
     });
-    if (e.code === "P2003") return res.status(422).json({
+  } catch (error) {
+    console.error('❌ Error fetching product:', error);
+    res.status(500).json({
       success: false,
-      message: "Référence de langue invalide"
+      error: 'Failed to fetch product',
+      details: error.message
     });
-    next(e);
   }
 };
 
-export const updateProduct = async (req, res, next) => {
+/**
+ * POST /api/superadmin/products
+ * Créer un produit
+ */
+export const createProduct = async (req, res) => {
   try {
-    const id = +req.params.id;
-    const body = req.validatedBody;
+    const {
+      price,
+      active,
+      image,
+      defaultTemplateId,
+      availableTemplateIds,
+      reviewPlatform,
+      cardSettings,
+      translations,
+      galleryItems,
+      packageTiers,
+      cardTypePrices
+    } = req.body;
+
+    // Validation
+    if (!price || price <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid price is required'
+      });
+    }
+
+    if (!translations || translations.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one translation is required'
+      });
+    }
+
+    // ✅ Vérifier que le template par défaut a isCardSetting = true
+    if (defaultTemplateId) {
+      const template = await prisma.cardTemplate.findUnique({
+        where: { id: parseInt(defaultTemplateId) }
+      });
+
+      if (!template) {
+        return res.status(400).json({
+          success: false,
+          error: 'Default template not found'
+        });
+      }
+
+      if (!template.isCardSetting) {
+        return res.status(400).json({
+          success: false,
+          error: 'Selected template is not available for products'
+        });
+      }
+    }
+
+    // ✅ Vérifier que tous les templates disponibles ont isCardSetting = true
+    if (availableTemplateIds && availableTemplateIds.length > 0) {
+      const templates = await prisma.cardTemplate.findMany({
+        where: {
+          id: { in: availableTemplateIds.map(id => parseInt(id)) }
+        }
+      });
+
+      const invalidTemplates = templates.filter(t => !t.isCardSetting);
+      if (invalidTemplates.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Some selected templates are not available for products',
+          invalidTemplateIds: invalidTemplates.map(t => t.id)
+        });
+      }
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        price: parseFloat(price),
+        active: active !== false,
+        image: image || null,
+        defaultTemplateId: defaultTemplateId ? parseInt(defaultTemplateId) : null,
+        availableTemplateIds: availableTemplateIds || [],
+        reviewPlatform: reviewPlatform || 'google',
+        cardSettings: cardSettings || {
+          width: 85.6,
+          height: 53.98,
+          cornerRadius: 3,
+          cornerRadiusEnabled: true
+        },
+        translations: {
+          create: translations.map(t => ({
+            langId: parseInt(t.langId),
+            title: t.title,
+            slug: t.slug,
+            seoTitle: t.seoTitle || null,
+            metaDescription: t.metaDescription || null,
+            metaImage: t.metaImage || null
+          }))
+        },
+        galleryItems: galleryItems ? {
+          create: galleryItems.map((item, index) => ({
+            url: item.url,
+            type: item.type,
+            poster: item.poster || null,
+            position: item.position !== undefined ? item.position : index
+          }))
+        } : undefined,
+        packageTiers: packageTiers ? {
+          create: packageTiers.map(tier => ({
+            qty: parseInt(tier.qty),
+            price: parseFloat(tier.price)
+          }))
+        } : undefined,
+        cardTypePrices: cardTypePrices ? {
+          create: cardTypePrices.map(ctp => ({
+            cardTypeId: parseInt(ctp.cardTypeId),
+            price: parseFloat(ctp.price)
+          }))
+        } : undefined
+      },
+      include: {
+        defaultTemplate: true,
+        translations: true,
+        galleryItems: true,
+        packageTiers: true,
+        cardTypePrices: true
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Product created successfully',
+      data: product
+    });
+  } catch (error) {
+    console.error('❌ Error creating product:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create product',
+      details: error.message
+    });
+  }
+};
+
+
+
+/**
+ * PUT /api/superadmin/products/:id
+ * Mettre à jour un produit
+ */
+export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      price,
+      active,
+      image,
+      defaultTemplateId,
+      availableTemplateIds,
+      reviewPlatform,
+      cardSettings
+    } = req.body;
 
     const existing = await prisma.product.findUnique({
-      where: { id },
-      include: INCLUDE
-    });
-    if (!existing) return res.status(404).json({
-      success: false,
-      message: "Produit introuvable"
+      where: { id: parseInt(id) }
     });
 
-    console.dir(body.cardSettings);
-
-    if (body.translations) {
-      const langCheck = await validateLangIds(body.translations.map((t) => t.langId));
-      if (!langCheck.ok) return res.status(422).json({
+    if (!existing) {
+      return res.status(404).json({
         success: false,
-        message: langCheck.message
+        error: 'Product not found'
+      });
+    }
+
+    // Vérifier le template si fourni
+    if (defaultTemplateId) {
+      const template = await prisma.cardTemplate.findUnique({
+        where: { id: parseInt(defaultTemplateId) }
       });
 
-      for (const t of body.translations) {
-        const conflict = await prisma.productTranslation.findFirst({
-          where: {
-            langId: t.langId,
-            slug: t.slug,
-            NOT: { productId: id }
-          },
-        });
-        if (conflict) return res.status(409).json({
+      if (!template) {
+        return res.status(400).json({
           success: false,
-          message: `Slug "${t.slug}" déjà utilisé (langId: ${t.langId})`,
+          error: 'Default template not found'
         });
       }
     }
 
-    const enriched = body.translations ? await enrichWithLangCode(body) : body;
-    const { mainImage, gallery, metaImages } = await processProductFiles(enriched);
-
-    if (mainImage?.url && mainImage.url !== existing.image) {
-      deleteLocalFile(existing.image);
+    const updateData = {};
+    if (price !== undefined) updateData.price = parseFloat(price);
+    if (active !== undefined) updateData.active = active;
+    if (image !== undefined) updateData.image = image;
+    if (defaultTemplateId !== undefined) {
+      updateData.defaultTemplateId = defaultTemplateId ? parseInt(defaultTemplateId) : null;
     }
+    if (availableTemplateIds !== undefined) updateData.availableTemplateIds = availableTemplateIds;
+    if (reviewPlatform !== undefined) updateData.reviewPlatform = reviewPlatform;
+    if (cardSettings !== undefined) updateData.cardSettings = cardSettings;
 
-    // Préparer cardSettings pour la mise à jour
-    let cardSettingsUpdate = {};
-    if (body.cardSettings !== undefined) {
-      cardSettingsUpdate.cardSettings = {
-        width: Number(body.cardSettings.width) || DEFAULT_CARD_SETTINGS.width,
-        height: Number(body.cardSettings.height) || DEFAULT_CARD_SETTINGS.height,
-        cornerRadiusEnabled: Boolean(body.cardSettings.cornerRadiusEnabled),
-        cornerRadius: Number(body.cardSettings.cornerRadius) || 0,
-        layouts: Array.isArray(body.cardSettings.layouts) 
-          ? body.cardSettings.layouts 
-          : DEFAULT_CARD_SETTINGS.layouts,
-        reviewPlatform: body.cardSettings.reviewPlatform || DEFAULT_CARD_SETTINGS.reviewPlatform,
-        defaultTemplateId: body.cardSettings.defaultTemplateId || DEFAULT_CARD_SETTINGS.defaultTemplateId,
-        availableTemplates: Array.isArray(body.cardSettings.availableTemplates)
-          ? body.cardSettings.availableTemplates
-          : DEFAULT_CARD_SETTINGS.availableTemplates,
-      };
-    }
-
-    const updated = await prisma.$transaction(async (tx) => {
-      await tx.product.update({
-        where: { id },
-        data: {
-          ...(body.price !== undefined && { price: body.price }),
-          ...(body.active !== undefined && { active: body.active }),
-          ...(mainImage?.url && { image: mainImage.url }),
-          ...cardSettingsUpdate,
-        },
-      });
-
-      if (body.translations) {
-        existing.translations.forEach((t) => deleteLocalFile(t.metaImage));
-        await tx.productTranslation.deleteMany({ where: { productId: id } });
-        await tx.productTranslation.createMany({
-          data: body.translations.map((t) => {
-            const code = enriched.translations.find((u) => u.langId === t.langId)?.lang;
-            return {
-              productId: id,
-              langId: t.langId,
-              title: t.title,
-              slug: t.slug,
-              seoTitle: t.seoTitle ?? null,
-              metaDescription: t.metaDescription ?? null,
-              metaImage: metaImages[code] ?? null,
-            };
-          }),
-        });
+    const product = await prisma.product.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: {
+        defaultTemplate: true,
+        translations: true,
+        galleryItems: true,
+        packageTiers: true,
+        cardTypePrices: true
       }
-
-      if (body.gallery !== undefined) {
-        existing.galleryItems.forEach((g) => {
-          if (g.type !== "youtube") deleteLocalFile(g.url);
-          deleteLocalFile(g.poster);
-        });
-        await tx.productGalleryItem.deleteMany({ where: { productId: id } });
-        await tx.productGalleryItem.createMany({
-          data: gallery.map((g) => ({
-            productId: id,
-            url: g.url,
-            type: g.type,
-            poster: g.posterUrl ?? null,
-            position: g.position
-          })),
-        });
-      }
-
-      if (body.packageTiers !== undefined) {
-        await tx.productPackageTier.deleteMany({ where: { productId: id } });
-        await tx.productPackageTier.createMany({
-          data: body.packageTiers.map((t) => ({
-            productId: id,
-            ...t
-          }))
-        });
-      }
-
-      if (body.cardTypePrices !== undefined) {
-        await tx.cardTypePrice.deleteMany({ where: { productId: id } });
-        await tx.cardTypePrice.createMany({
-          data: body.cardTypePrices.map((c) => ({
-            productId: id,
-            cardTypeId: c.cardTypeId,
-            price: c.price
-          })),
-        });
-      }
-
-      return tx.product.findUnique({
-        where: { id },
-        include: INCLUDE
-      });
     });
 
-    res.json({ success: true, data: format(updated) });
-  } catch (e) {
-    if (e.code === "P2002") return res.status(409).json({
+    res.json({
+      success: true,
+      message: 'Product updated successfully',
+      data: product
+    });
+  } catch (error) {
+    console.error('❌ Error updating product:', error);
+    res.status(500).json({
       success: false,
-      message: "Slug ou entrée dupliqué"
+      error: 'Failed to update product',
+      details: error.message
     });
-    if (e.code === "P2003") return res.status(422).json({
-      success: false,
-      message: "Référence de langue invalide"
-    });
-    next(e);
   }
 };
+
+
 
 export const deleteProduct = async (req, res, next) => {
   try {

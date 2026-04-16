@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import prisma from "../../config/database.js";
-import {productNeedsDesign, resolveDesignDefaults} from "../../helpers/designResolver.helpers.js"
+import {productNeedsDesign} from "../../helpers/designResolver.helpers.js"
 
 
 const CART_INCLUDE = {
@@ -86,10 +86,104 @@ function getCompanyId(req) {
   return parseInt(id);
 }
 
+
+
+// ─── Résoudre les valeurs par défaut depuis le template DB ───
+/**
+ * ✅ NOUVELLE FONCTION - Remplace resolveDesignDefaults
+ * Récupère les valeurs par défaut depuis le template de la base de données
+ */
+async function resolveDesignDefaultsFromTemplate(tx, { productId, companyId, company, cardSettings }) {
+  let template = null;
+
+  // 1. Essayer de récupérer le template par défaut du produit
+  if (productId) {
+    const product = await tx.product.findUnique({
+      where: { id: productId },
+      include: { defaultTemplate: true },
+    });
+    template = product?.defaultTemplate;
+  }
+
+  // 2. Fallback: chercher un template par défaut pour la plateforme
+  if (!template) {
+    const platform = cardSettings?.reviewPlatform || "google";
+    template = await tx.cardTemplate.findFirst({
+      where: {
+        platform,
+        isActive: true,
+        isDefault: true,
+        isCardSetting: true,
+      },
+    });
+  }
+
+  // 3. Si aucun template trouvé, utiliser des valeurs par défaut génériques
+  if (!template) {
+    console.warn(`⚠️ No template found for product ${productId} - using generic defaults`);
+    return {
+      platform: "google",
+      orientation: "landscape",
+      templateName: null,
+      colorMode: "template",
+      gradient1: "#0D0D0D",
+      gradient2: "#1A1A1A",
+      textColor: "#FFFFFF",
+      accentColor: company?.primaryColor || "#E10600",
+      accentBand1: company?.primaryColor || "#E10600",
+      accentBand2: company?.primaryColor || "#E10600",
+      bandPosition: "bottom",
+      frontBandHeight: 22,
+      backBandHeight: 12,
+      frontInstruction1: "Approach your phone to the card",
+      frontInstruction2: "Tap to leave a review",
+      backInstruction1: "Scan the QR code with your camera",
+      backInstruction2: "Write a review on our profile page",
+    };
+  }
+  // 4. ✅ Extraire les valeurs du template DB
+  const gradientArray = template.gradient ? JSON.parse(template.gradient) : ["#0D0D0D", "#1A1A1A"];
+  return {
+    // Platform & orientation
+    platform: template.platform,
+    orientation: template.orientation,
+
+    // Template visual
+    templateName: template.name,
+    colorMode: template.colorMode || "template",
+    gradient1: gradientArray[0] || "#0D0D0D",
+    gradient2: gradientArray[1] || "#1A1A1A",
+    textColor: template.textColor,
+    accentColor: template.accentColor,
+    accentBand1: template.bandColor1,
+    accentBand2: template.bandColor2,
+
+    // Layout
+    bandPosition: template.bandPosition,
+    frontBandHeight: template.frontBandHeight,
+    backBandHeight: template.backBandHeight,
+
+    // Instructions
+    frontInstruction1: template.frontLine1,
+    frontInstruction2: template.frontLine2,
+    backInstruction1: template.backLine1,
+    backInstruction2: template.backLine2,
+  };
+}
+
+
+
 // ─── Créer un design par défaut lié à la company ─────────────
 // Uniquement pour les produits physiques (Type A)
 async function createDefaultDesign(tx, { userId, companyId, productId, company, cardSettings }) {
-  const defaults = resolveDesignDefaults(cardSettings);
+  // ✅ Utiliser le template DB au lieu de resolveDesignDefaults
+  const defaults = await resolveDesignDefaultsFromTemplate(tx, {
+    productId,
+    companyId,
+    company,
+    cardSettings,
+  });
+
   return tx.design.create({
     data: {
       userId,
@@ -97,40 +191,42 @@ async function createDefaultDesign(tx, { userId, companyId, productId, company, 
       productId,
 
       // Infos company
-      businessName:    company?.name            ?? null,
-      accentColor:     defaults.accentColor     ?? company?.primaryColor ?? "#E10600",
-      googlePlaceId:   company?.googlePlaceId   ?? null,
+      businessName: company?.name ?? null,
+      accentColor: defaults.accentColor ?? company?.primaryColor ?? "#E10600",
+      googlePlaceId: company?.googlePlaceId ?? null,
       googleReviewUrl: company?.googleReviewUrl ?? null,
 
       // Plateforme
-      platform:    defaults.platform    ?? "google",
+      platform: defaults.platform ?? "google",
       orientation: defaults.orientation ?? "landscape",
 
       // Template visuel
-      templateName:    defaults.templateName  ?? null,
-      colorMode:       defaults.colorMode     ?? "template",
-      gradient1:       defaults.gradient1     ?? "#0D0D0D",
-      gradient2:       defaults.gradient2     ?? "#1A1A1A",
-      textColor:       defaults.textColor     ?? "#FFFFFF",
-      accentBand1:     defaults.accentBand1   ?? "#E10600",
-      accentBand2:     defaults.accentBand2   ?? "#E10600",
-      bandPosition:    defaults.bandPosition  ?? "bottom",
+      templateName: defaults.templateName ?? null,
+      colorMode: defaults.colorMode ?? "template",
+      gradient1: defaults.gradient1 ?? "#0D0D0D",
+      gradient2: defaults.gradient2 ?? "#1A1A1A",
+      textColor: defaults.textColor ?? "#FFFFFF",
+      accentBand1: defaults.accentBand1 ?? "#E10600",
+      accentBand2: defaults.accentBand2 ?? "#E10600",
+      bandPosition: defaults.bandPosition ?? "bottom",
       frontBandHeight: defaults.frontBandHeight ?? 22,
-      backBandHeight:  defaults.backBandHeight  ?? 12,
+      backBandHeight: defaults.backBandHeight ?? 12,
 
       // Instructions par défaut
       frontInstruction1: defaults.frontInstruction1,
       frontInstruction2: defaults.frontInstruction2,
-      backInstruction1:  defaults.backInstruction1,
-      backInstruction2:  defaults.backInstruction2,
+      backInstruction1: defaults.backInstruction1,
+      backInstruction2: defaults.backInstruction2,
 
       // Valeurs UI par défaut
-      showNfcIcon:    true,
+      showNfcIcon: true,
       showGoogleIcon: true,
-      callToAction:   "Powered by RedVanta",
+      callToAction: "Powered by RedVanta",
     },
   });
 }
+
+
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/cart
@@ -138,22 +234,26 @@ async function createDefaultDesign(tx, { userId, companyId, productId, company, 
 
 export const getCart = async (req, res, next) => {
   try {
-    const userId    = req.user.userId;
+    const userId = req.user.userId;
     const companyId = getCompanyId(req);
 
     const items = await prisma.cartItem.findMany({
-      where: { userId, companyId }, include: CART_INCLUDE, orderBy: { createdAt: "asc" },
+      where: { userId, companyId },
+      include: CART_INCLUDE,
+      orderBy: { createdAt: "asc" },
     });
 
-    const formatted  = items.map(formatItem);
-    const subtotal   = formatted.reduce((s, i) => s + i.lineTotal, 0);
+    const formatted = items.map(formatItem);
+    const subtotal = formatted.reduce((s, i) => s + i.lineTotal, 0);
     const totalCards = formatted.reduce((s, i) => s + (i.totalCards ?? 0), 0);
 
     res.json({
       success: true,
       data: { items: formatted, itemCount: items.length, totalCards, subtotal, companyId },
     });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -164,18 +264,23 @@ export const getCart = async (req, res, next) => {
 
 export const addToCart = async (req, res, next) => {
   try {
-    const userId    = req.user.userId;
+    const userId = req.user.userId;
     const companyId = getCompanyId(req);
     const { productId, packageTierId, quantity, cardTypeId } = req.body;
+
     if (!productId) {
       return res.status(422).json({ success: false, error: "productId requis" });
     }
 
-    // Charger le produit avec ses tiers
+    // Charger le produit avec ses tiers ET son template par défaut
     const product = await prisma.product.findUnique({
-      where:   { id: parseInt(productId) },
-      include: { packageTiers: { orderBy: { qty: "asc" } } },
+      where: { id: parseInt(productId) },
+      include: {
+        packageTiers: { orderBy: { qty: "asc" } },
+        defaultTemplate: true, // ✅ NOUVEAU
+      },
     });
+
     if (!product || !product.active) {
       return res.status(404).json({ success: false, error: "Produit introuvable ou inactif" });
     }
@@ -187,9 +292,11 @@ export const addToCart = async (req, res, next) => {
       // Produit tiered sans tier fourni → retourner les options
       return res.status(422).json({
         success: false,
-        error:   "Ce produit requiert un packageTierId — choisissez un palier de quantité",
+        error: "Ce produit requiert un packageTierId — choisissez un palier de quantité",
         availableTiers: product.packageTiers.map((t) => ({
-          id: t.id, qty: t.qty, price: Number(t.price),
+          id: t.id,
+          qty: t.qty,
+          price: Number(t.price),
         })),
       });
     }
@@ -212,55 +319,62 @@ export const addToCart = async (req, res, next) => {
 
     if (tier) {
       // Type A
-      unitPrice   = Number(tier.price);
-      totalCards  = tier.qty;
+      unitPrice = Number(tier.price);
+      totalCards = tier.qty;
       resolvedQty = tier.qty;
-      lineTotal   = totalCards * unitPrice;
+      lineTotal = totalCards * unitPrice;
     } else {
       // Type B
       resolvedQty = Math.max(1, parseInt(quantity) || 1);
-      unitPrice   = Number(product.price);
-      totalCards  = 0;
-      lineTotal   = resolvedQty * unitPrice;
+      unitPrice = Number(product.price);
+      totalCards = 0;
+      lineTotal = resolvedQty * unitPrice;
     }
 
     // ── Transaction ───────────────────────────────────────────
     const item = await prisma.$transaction(async (tx) => {
       const company = await tx.company.findUnique({
-        where:  { id: companyId },
+        where: { id: companyId },
         select: { name: true, primaryColor: true, googlePlaceId: true, googleReviewUrl: true },
       });
+
       // Créer le CartItem
       const cartItem = await tx.cartItem.create({
         data: {
-          userId, companyId,
-          productId:     product.id,
-          packageTierId: tier?.id   ?? null,
+          userId,
+          companyId,
+          productId: product.id,
+          packageTierId: tier?.id ?? null,
           totalCards,
-          quantity:      resolvedQty,
+          quantity: resolvedQty,
           unitPrice,
           lineTotal,
-          cardTypeId:    cardTypeId || null,
+          cardTypeId: cardTypeId || null,
         },
       });
 
       // Type A uniquement → design par défaut
       if (productNeedsDesign(product)) {
         const design = await createDefaultDesign(tx, {
-          userId, companyId, productId: product.id, company,
+          userId,
+          companyId,
+          productId: product.id,
+          company,
           cardSettings: product.cardSettings ?? null,
         });
         await tx.cartItem.update({
           where: { id: cartItem.id },
-          data:  { designId: design.id },
+          data: { designId: design.id },
         });
-       }
+      }
 
       return tx.cartItem.findUnique({ where: { id: cartItem.id }, include: CART_INCLUDE });
     });
 
     res.status(201).json({ success: true, data: formatItem(item) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -270,7 +384,7 @@ export const addToCart = async (req, res, next) => {
 
 export const syncCart = async (req, res, next) => {
   try {
-    const userId    = req.user.userId;
+    const userId = req.user.userId;
     const companyId = req.user.companyId;
     const { items } = req.body;
 
@@ -280,7 +394,7 @@ export const syncCart = async (req, res, next) => {
 
     const result = await prisma.$transaction(async (tx) => {
       const company = await tx.company.findUnique({
-        where:  { id: parseInt(companyId) },
+        where: { id: parseInt(companyId) },
         select: { name: true, primaryColor: true, googlePlaceId: true, googleReviewUrl: true },
       });
 
@@ -290,8 +404,11 @@ export const syncCart = async (req, res, next) => {
         const { productId, packageTierId, quantity, cardTypeId } = localItem;
 
         const product = await tx.product.findFirst({
-          where:   { id: parseInt(productId), active: true },
-          include: { packageTiers: true },
+          where: { id: parseInt(productId), active: true },
+          include: {
+            packageTiers: true,
+            defaultTemplate: true, // ✅ NOUVEAU
+          },
         });
         if (!product) continue;
 
@@ -303,33 +420,39 @@ export const syncCart = async (req, res, next) => {
           if (!packageTierId) continue; // requis pour ce type
           tier = product.packageTiers.find((t) => t.id === parseInt(packageTierId));
           if (!tier) continue;
-          unitPrice   = Number(tier.price);
-          totalCards  = tier.qty;
+          unitPrice = Number(tier.price);
+          totalCards = tier.qty;
           resolvedQty = tier.qty;
-          lineTotal   = totalCards * unitPrice;
+          lineTotal = totalCards * unitPrice;
         } else {
           if (!product.price) continue;
           resolvedQty = Math.max(1, parseInt(quantity) || 1);
-          unitPrice   = Number(product.price);
-          totalCards  = 0;
-          lineTotal   = resolvedQty * unitPrice;
+          unitPrice = Number(product.price);
+          totalCards = 0;
+          lineTotal = resolvedQty * unitPrice;
         }
 
         const cartItem = await tx.cartItem.create({
           data: {
-            userId, companyId,
-            productId:     product.id,
+            userId,
+            companyId,
+            productId: product.id,
             packageTierId: tier?.id ?? null,
             totalCards,
-            quantity:      resolvedQty,
-            unitPrice, lineTotal,
+            quantity: resolvedQty,
+            unitPrice,
+            lineTotal,
             cardTypeId: cardTypeId || null,
           },
         });
 
         if (productNeedsDesign(product)) {
           const design = await createDefaultDesign(tx, {
-            userId, companyId, productId: product.id, company, cardSettings: product.cardSettings ?? null,
+            userId,
+            companyId,
+            productId: product.id,
+            company,
+            cardSettings: product.cardSettings ?? null,
           });
           await tx.cartItem.update({ where: { id: cartItem.id }, data: { designId: design.id } });
         }
@@ -341,8 +464,16 @@ export const syncCart = async (req, res, next) => {
     });
 
     res.status(201).json({ success: true, count: result.length, message: "Panier synchronisé avec succès" });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 };
+
+// ─────────────────────────────────────────────────────────────
+// PUT /api/cart/:id
+// Type A : changer de tier | Type B : changer la quantité
+// Les deux : changer le cardType
+// ─────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────
 // PUT /api/cart/:id
@@ -352,13 +483,13 @@ export const syncCart = async (req, res, next) => {
 
 export const updateCartItem = async (req, res, next) => {
   try {
-    const id        = parseInt(req.params.id);
-    const userId    = req.user.userId;
+    const id = parseInt(req.params.id);
+    const userId = req.user.userId;
     const companyId = getCompanyId(req);
     const { packageTierId, quantity, cardTypeId } = req.body;
 
     const existing = await prisma.cartItem.findFirst({
-      where:   { id, userId, companyId },
+      where: { id, userId, companyId },
       include: { packageTier: true, product: { include: { packageTiers: true } } },
     });
     if (!existing) return res.status(404).json({ success: false, error: "Item introuvable" });
@@ -372,10 +503,10 @@ export const updateCartItem = async (req, res, next) => {
       if (!tier) return res.status(422).json({ success: false, error: "Palier introuvable" });
       updateData = {
         packageTierId: tier.id,
-        totalCards:    tier.qty,
-        quantity:      tier.qty,
-        unitPrice:     Number(tier.price),
-        lineTotal:     tier.qty * Number(tier.price),
+        totalCards: tier.qty,
+        quantity: tier.qty,
+        unitPrice: Number(tier.price),
+        lineTotal: tier.qty * Number(tier.price),
       };
     }
 
@@ -398,26 +529,30 @@ export const updateCartItem = async (req, res, next) => {
     }
 
     const updated = await prisma.cartItem.update({
-      where: { id }, data: updateData, include: CART_INCLUDE,
+      where: { id },
+      data: updateData,
+      include: CART_INCLUDE,
     });
 
     res.json({ success: true, data: formatItem(updated) });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
 // DELETE /api/cart/:id
 // Supprime l'item + le design draft associé (Type A uniquement)
 // ─────────────────────────────────────────────────────────────
-
 export const removeFromCart = async (req, res, next) => {
   try {
-    const id        = parseInt(req.params.id);
-    const userId    = req.user.userId;
+    const id = parseInt(req.params.id);
+    const userId = req.user.userId;
     const companyId = getCompanyId(req);
 
     const existing = await prisma.cartItem.findFirst({
-      where: { id, userId, companyId }, include: { design: true },
+      where: { id, userId, companyId },
+      include: { design: true },
     });
     if (!existing) return res.status(404).json({ success: false, error: "Item introuvable" });
 
@@ -434,7 +569,9 @@ export const removeFromCart = async (req, res, next) => {
     });
 
     res.json({ success: true, message: "Item supprimé du panier" });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -443,9 +580,11 @@ export const removeFromCart = async (req, res, next) => {
 
 export const clearCart = async (req, res, next) => {
   try {
-    const userId    = req.user.userId;
+    const userId = req.user.userId;
     const companyId = getCompanyId(req);
     await prisma.cartItem.deleteMany({ where: { userId, companyId } });
     res.json({ success: true, message: "Panier vidé" });
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 };

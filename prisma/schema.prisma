@@ -1060,6 +1060,8 @@ model CardTemplate {
   
   createdAt   DateTime @default(now()) 
   updatedAt   DateTime @updatedAt 
+
+  products    Product[] @relation("ProductDefaultTemplate")
   
   @@index([platform])
   @@index([isActive])
@@ -1867,7 +1869,13 @@ model Product {
   price     Float
   active    Boolean  @default(true)
   image     String?  // primary image URL / base64
-  cardSettings   Json?    // { width, height, cornerRadius, cornerRadiusEnabled, layouts, reviewPlatform, defaultTemplateId, availableTemplates }
+  defaultTemplateId     Int?     
+  defaultTemplate       CardTemplate? @relation("ProductDefaultTemplate", fields: [defaultTemplateId], references: [id], onDelete: SetNull)
+  cardSettings   Json?  // { width, height, cornerRadius, cornerRadiusEnabled }
+
+  availableTemplateIds  Json?   
+  
+  reviewPlatform        String   @default("google") @db.VarChar(50) 
 
   // Relations
   translations    ProductTranslation[]

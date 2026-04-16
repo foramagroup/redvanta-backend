@@ -2,7 +2,7 @@ import express from "express";
 import { validate } from "../../middleware/index.js";
 import {
   listProducts, getProduct, createProduct,
-  updateProduct, deleteProduct, toggleProduct,
+  updateProduct, deleteProduct, toggleProduct, getAvailableTemplatesForProducts
 } from "../../controllers/superadmin/productController.js";
 
 
@@ -30,7 +30,7 @@ router.use(authenticateSuperAdmin, requireSuperAdmin);
 // );
 
 
-
+router.get('/available-templates', getAvailableTemplatesForProducts);
 
 router.get("/", listProducts);
 
