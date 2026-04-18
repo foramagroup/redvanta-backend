@@ -118,8 +118,8 @@ export const getAllTemplates = async (req, res) => {
 
     if (search && search.trim()) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { platform: { contains: search, mode: 'insensitive' } }
+        { name: { contains: search } },
+        { platform: { contains: search } }
       ];
     }
 

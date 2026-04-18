@@ -60,6 +60,8 @@ export const createProductSchema = z.object({
   price:  z.number().min(0),
   active: z.boolean().default(true),
   image:  z.string().optional(),
+  defaultTemplateId:   z.union([z.string(), z.number()]).nullable().optional(),
+  availableTemplateIds: z.array(z.union([z.string(), z.number()])).optional(),
   translations: z.array(translationSchema)
     .min(1, "Au moins une traduction est requise")
     .refine(
