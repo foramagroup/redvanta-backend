@@ -113,10 +113,12 @@ export const signup = async (req, res, next) => {
     ]);
 
     if (userExists || companyExists) {
-      return res.status(409).json({
+        return res.status(409).json({
         success: false,
         error: "Un compte existe déjà avec cet email. Veuillez vous connecter.",
         code: "EMAIL_EXISTS",
+        redirectTo: "/login", 
+        message: "Connectez-vous puis ajoutez votre nouvelle entreprise"
       });
     }
 
@@ -133,7 +135,9 @@ export const signup = async (req, res, next) => {
     const codeExpiration = getOtpExpiration(OTP_EXPIRATION_DAYS);
 
     const result = await prisma.$transaction(async (tx) => {
+
       // Créer l'utilisateur
+
       const user = await tx.user.create({
         data: {
           email,
@@ -803,6 +807,180 @@ export const logout = async (req, res, next) => {
     res.clearCookie("admin_token", getCookieOptions("admin_token"));
     return res.json({ success: true, message: "Déconnecté avec succès" });
   } catch (e) { next(e); }
+};
+
+
+// ─── POST /api/client/auth/add-company ────────────────────────
+/**
+ * Ajouter une nouvelle company à un compte utilisateur existant
+ * Nécessite d'être authentifié
+ */
+export const addCompany = async (req, res, next) => {
+  const ip = getIp(req);
+  const userAgent = req.headers["user-agent"] ?? null;
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: "Non authentifié",
+        code: "UNAUTHORIZED"
+      });
+    }
+
+    const { companyName, address, phone } = req.validatedBody || req.body;
+
+    if (!companyName || !companyName.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "MISSING COMPANY NAME",
+        code: "MISSING_COMPANY_NAME"
+      });
+    }
+
+    // Récupérer l'utilisateur avec son email
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "USER NOT FOUND",
+        code: "USER_NOT_FOUND"
+      });
+    }
+
+    // Vérifier si une company existe déjà avec cet email
+    const existingCompany = await prisma.company.findUnique({
+      where: { email: user.email }
+    });
+
+    if (existingCompany) {
+      // Vérifier si l'utilisateur est déjà lié à cette company
+      const existingLink = await prisma.userCompany.findUnique({
+        where: {
+          userId_companyId: {
+            userId: user.id,
+            companyId: existingCompany.id
+          }
+        }
+      });
+
+      if (existingLink) {
+        return res.status(409).json({
+          success: false,
+          error: "ALREADY LINKED",
+          code: "ALREADY_LINKED"
+        });
+      }
+    }
+
+    // Récupérer les valeurs par défaut
+    const [defaultPlan, adminRole, defaultLang] = await Promise.all([
+      getDefaultPlan(),
+      getAdminRole(),
+      getDefaultLanguage(),
+    ]);
+
+    // Transaction pour créer la company + lien + subscription
+    const result = await prisma.$transaction(async (tx) => {
+      // Créer la nouvelle company
+      const company = await tx.company.create({
+        data: {
+          name: companyName.trim(),
+          email: user.email,
+          phone: phone?.trim() || null,
+          address: address?.trim() || null,
+          type: "direct",
+          status: "active",
+          planId: defaultPlan?.id ?? null,
+          defaultLanguageId: defaultLang?.id ?? null,
+          billingAmount: defaultPlan ? `$${defaultPlan.price}` : "$0",
+          mrr: 0,
+        },
+      });
+
+      // Créer les settings de la company
+      await tx.companySettings.create({
+        data: {
+          companyId: company.id,
+          timezone: "UTC",
+          currency: "USD",
+          notificationEmail: true,
+          maxLocations: defaultPlan?.locationLimit ?? 1,
+          maxApiCalls: parseInt(defaultPlan?.apiLimit ?? "1000") || 1000,
+          maxSmsCalls: parseInt(defaultPlan?.smsLimit ?? "100") || 100,
+          maxUser: parseInt(defaultPlan?.userLimit ?? "3") || 3,
+          allowCustomColor: false,
+        },
+      });
+
+      // Créer le lien UserCompany (isOwner = true)
+      const userCompanyLink = await tx.userCompany.create({
+        data: {
+          userId: user.id,
+          companyId: company.id,
+          roleId: adminRole?.id ?? null,
+          isOwner: true,
+        },
+      });
+
+      // Créer la subscription (en trial)
+      if (defaultPlan) {
+        await createSubscriptionForCompany(tx, company.id, defaultPlan.id, {
+          status: 'trialing',
+          interval: 'monthly',
+          trialDays: defaultPlan.trialDays || 14,
+        });
+      }
+
+      return { company, userCompanyLink };
+    });
+
+    await logActivity(userId, user.name, ip, userAgent, "company_added");
+
+    // Générer un nouveau token avec la nouvelle company active
+    const newToken = generateToken({
+      userId: user.id,
+      email: user.email,
+      isAdmin: true,
+      isSuperadmin: false,
+      companyId: result.company.id,
+      emailVerified: !!user.emailVerifiedAt,
+    });
+
+    // Blacklist l'ancien token si présent
+    if (req.token) {
+      await blacklistToken(req.token);
+    }
+
+    // Définir le nouveau cookie
+    res.cookie("admin_token", newToken, getCookieOptions("admin_token"));
+
+    // Recharger l'utilisateur complet pour la réponse
+    const fullUser = await loadUserForAuth(user.id, "admin");
+
+    return res.status(201).json({
+      success: true,
+      message: `Entreprise "${result.company.name}" créée avec succès`,
+      company: {
+        id: result.company.id,
+        name: result.company.name,
+        email: result.company.email,
+        address: result.company.address,
+        phone: result.company.phone,
+        status: result.company.status,
+      },
+      user: formatAdmin(fullUser, result.company.id),
+      redirectTo: "/dashboard"
+    });
+
+  } catch (e) {
+    console.error("Error adding company:", e);
+    next(e);
+  }
 };
 
 

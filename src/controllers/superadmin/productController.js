@@ -1,4 +1,71 @@
 import prisma from "../../config/database.js";
+
+function formatTemplateForProduct(template) {
+  return {
+    id: template.id.toString(),
+    name: template.name,
+    platform: template.platform,
+    businessName: template.businessName,
+    slogan: template.slogan,
+    cta: template.cta,
+    logoUrl: template.logoUrl,
+    orientation: template.orientation,
+    bandPosition: template.bandPosition,
+    frontBandHeight: template.frontBandHeight,
+    backBandHeight: template.backBandHeight,
+    logoPosition: template.logoPosition,
+    logoSize: template.logoSize,
+    qrPosition: template.qrPosition,
+    qrSize: template.qrSize,
+    nameFont: template.nameFont,
+    nameFontSize: template.nameFontSize,
+    nameFontWeight: template.nameFontWeight,
+    nameLetterSpacing: template.nameLetterSpacing,
+    nameTextTransform: template.nameTextTransform,
+    nameLineHeight: template.nameLineHeight,
+    nameTextAlign: template.nameTextAlign,
+    sloganFont: template.sloganFont,
+    sloganFontSize: template.sloganFontSize,
+    sloganFontWeight: template.sloganFontWeight,
+    sloganLetterSpacing: template.sloganLetterSpacing,
+    sloganTextTransform: template.sloganTextTransform,
+    sloganLineHeight: template.sloganLineHeight,
+    sloganTextAlign: template.sloganTextAlign,
+    instructionFont: template.instructionFont,
+    instructionFontSize: template.instructionFontSize,
+    instructionFontWeight: template.instructionFontWeight,
+    instructionLetterSpacing: template.instructionLetterSpacing,
+    instructionLineHeight: template.instructionLineHeight,
+    instructionTextAlign: template.instructionTextAlign,
+    frontLine1: template.frontLine1,
+    frontLine2: template.frontLine2,
+    backLine1: template.backLine1,
+    backLine2: template.backLine2,
+    checkStrokeWidth: template.checkStrokeWidth / 10,
+    nfcIconSize: template.nfcIconSize,
+    googleIconSize: template.googleIconSize,
+    showNfcIcon: template.showNfcIcon,
+    showGoogleIcon: template.showGoogleIcon,
+    textShadow: template.textShadow,
+    ctaPaddingTop: template.ctaPaddingTop,
+    model: template.model,
+    colorMode: template.colorMode,
+    elementOffsets: template.elementOffsets,
+    gradient: Array.isArray(template.gradient) ? template.gradient : JSON.parse(template.gradient),
+    accentColor: template.accentColor,
+    textColor: template.textColor,
+    bandColor1: template.bandColor1,
+    bandColor2: template.bandColor2,
+    qrColor: template.qrColor,
+    starsColor: template.starsColor,
+    iconsColor: template.iconsColor,
+    pattern: template.pattern,
+    isActive: template.isActive,
+    isDefault: template.isDefault,
+    isCardSetting: template.isCardSetting,
+    createdAt: template.createdAt.toISOString().split('T')[0],
+  };
+}
 import {
   processProductFiles,
   deleteProductFiles,
@@ -128,23 +195,11 @@ export const getAvailableTemplatesForProducts = async (req, res) => {
         { platform: 'asc' },
         { name: 'asc' }
       ],
-      select: {
-        id: true,
-        name: true,
-        platform: true,
-        gradient: true,
-        pattern: true,
-        accentColor: true,
-        textColor: true,
-        model: true,
-        orientation: true,
-        isDefault: true,
-        isCardSetting: true,
-        createdAt: true
-      }
     });
 
-    const groupedByPlatform = templates.reduce((acc, template) => {
+    const formatted = templates.map(formatTemplateForProduct);
+
+    const groupedByPlatform = formatted.reduce((acc, template) => {
       if (!acc[template.platform]) {
         acc[template.platform] = [];
       }
@@ -154,9 +209,9 @@ export const getAvailableTemplatesForProducts = async (req, res) => {
 
     res.json({
       success: true,
-      data: templates,
+      data: formatted,
       grouped: groupedByPlatform,
-      total: templates.length
+      total: formatted.length
     });
   } catch (error) {
     console.error('❌ Error fetching available templates:', error);
@@ -403,24 +458,18 @@ export const createProduct = async (req, res) => {
         } : undefined,
         cardTypePrices: cardTypePrices ? {
           create: cardTypePrices.map(ctp => ({
-            cardTypeId: parseInt(ctp.cardTypeId),
+            cardTypeId: String(ctp.cardTypeId),
             price: parseFloat(ctp.price)
           }))
         } : undefined
       },
-      include: {
-        defaultTemplate: true,
-        translations: true,
-        galleryItems: true,
-        packageTiers: true,
-        cardTypePrices: true
-      }
+      include: INCLUDE
     });
 
     res.status(201).json({
       success: true,
       message: 'Product created successfully',
-      data: product
+      data: format(product)
     });
   } catch (error) {
     console.error('❌ Error creating product:', error);
@@ -448,7 +497,10 @@ export const updateProduct = async (req, res) => {
       defaultTemplateId,
       availableTemplateIds,
       reviewPlatform,
-      cardSettings
+      cardSettings,
+      translations,
+      packageTiers,
+      cardTypePrices,
     } = req.body;
 
     const existing = await prisma.product.findUnique({
@@ -487,22 +539,57 @@ export const updateProduct = async (req, res) => {
     if (reviewPlatform !== undefined) updateData.reviewPlatform = reviewPlatform;
     if (cardSettings !== undefined) updateData.cardSettings = cardSettings;
 
+    // Update translations (delete + recreate)
+    if (translations && translations.length > 0) {
+      await prisma.productTranslation.deleteMany({ where: { productId: parseInt(id) } });
+      updateData.translations = {
+        create: translations.map(t => ({
+          langId: parseInt(t.langId),
+          title: t.title,
+          slug: t.slug,
+          seoTitle: t.seoTitle || null,
+          metaDescription: t.metaDescription || null,
+          metaImage: t.metaImage || null,
+        }))
+      };
+    }
+
+    // Update packageTiers (delete + recreate)
+    if (packageTiers !== undefined) {
+      await prisma.productPackageTier.deleteMany({ where: { productId: parseInt(id) } });
+      if (packageTiers.length > 0) {
+        updateData.packageTiers = {
+          create: packageTiers.map(tier => ({
+            qty: parseInt(tier.qty),
+            price: parseFloat(tier.price)
+          }))
+        };
+      }
+    }
+
+    // Update cardTypePrices (delete + recreate)
+    if (cardTypePrices !== undefined) {
+      await prisma.cardTypePrice.deleteMany({ where: { productId: parseInt(id) } });
+      if (cardTypePrices.length > 0) {
+        updateData.cardTypePrices = {
+          create: cardTypePrices.map(ctp => ({
+            cardTypeId: String(ctp.cardTypeId),
+            price: parseFloat(ctp.price)
+          }))
+        };
+      }
+    }
+
     const product = await prisma.product.update({
       where: { id: parseInt(id) },
       data: updateData,
-      include: {
-        defaultTemplate: true,
-        translations: true,
-        galleryItems: true,
-        packageTiers: true,
-        cardTypePrices: true
-      }
+      include: INCLUDE
     });
 
     res.json({
       success: true,
       message: 'Product updated successfully',
-      data: product
+      data: format(product)
     });
   } catch (error) {
     console.error('❌ Error updating product:', error);

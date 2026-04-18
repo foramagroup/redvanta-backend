@@ -32,6 +32,7 @@ import  myDesignAdminRoutes  from "./routes/myDesign.routes.js";
 import  adminSettingsRoutes  from "./routes/settingsRoutes.js";
 import analyticsEventsRoutes from './routes/analyticsEvents.routes.js';
 import billingAdminRoutes from './routes/billing.routes.js';
+import nfcCardsRoutes from "./routes/nfcCards.routes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -247,6 +248,9 @@ app.use("/api/customization", customizationRoutes);
   
   //ges billing 
   app.use('/api/admin/billing', billingAdminRoutes)
+
+  //ges NFCcard
+  app.use("/api/admin/nfc-cards", nfcCardsRoutes);
 
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);

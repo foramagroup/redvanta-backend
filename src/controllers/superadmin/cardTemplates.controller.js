@@ -1,8 +1,6 @@
 import prisma from "../../config/database.js";
 
 
-
-
 function formatTemplate(template) {
   return {
     id: template.id.toString(),
@@ -169,26 +167,7 @@ export const getTemplateById = async (req, res) => {
 
     res.json({
       success: true,
-      data: {
-        id: template.id.toString(),
-        name: template.name,
-        platform: template.platform,
-        gradient: Array.isArray(template.gradient) 
-          ? template.gradient 
-          : JSON.parse(template.gradient),
-        accentColor: template.accentColor,
-        textColor: template.textColor,
-        bandColor1: template.bandColor1,
-        bandColor2: template.bandColor2,
-        qrColor: template.qrColor,
-        starsColor: template.starsColor,
-        iconsColor: template.iconsColor,
-        pattern: template.pattern,
-        isActive: template.isActive,
-        isDefault: template.isDefault,
-        createdAt: template.createdAt.toISOString().split('T')[0],
-        updatedAt: template.updatedAt.toISOString().split('T')[0]
-      }
+      data: formatTemplate(template)
     });
   } catch (error) {
     console.error('❌ Error fetching template:', error);
@@ -800,3 +779,5 @@ export const toggleCardSetting = async (req, res) => {
     });
   }
 };
+
+

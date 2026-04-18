@@ -7,7 +7,8 @@ import {
   deleteTemplate,
   duplicateTemplate,
   toggleTemplate,
-  getTemplateStats
+  getTemplateStats,
+  toggleCardSetting
 } from '../../controllers/superadmin/cardTemplates.controller.js';
 import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
 
@@ -39,5 +40,8 @@ router.patch('/:id/toggle', toggleTemplate);
 
 // DELETE - Supprimer un template
 router.delete('/:id', deleteTemplate);
+
+// PATCH - Toggle card setting availability
+router.patch('/:id/toggle-card-setting', toggleCardSetting);
 
 export default router;

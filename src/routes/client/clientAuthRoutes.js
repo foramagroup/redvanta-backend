@@ -17,14 +17,14 @@ import {
   resendVerificationCode,
   me,
   switchCompany,
+  addCompany,
   logout,
 } from "../../controllers/client/clientAuthController.js";
-import { signupSchema, loginSchema } from "../../validators/client/clientauth.validator.js";
+import { signupSchema, loginSchema, addCompanySchema } from "../../validators/client/clientauth.validator.js";
 
 const router = Router();
 
 // ─── Routes publiques ─────────────────────────────────────────
-
 
 
 // POST /api/auth/signup  — inscription + création company + connexion auto
@@ -53,6 +53,9 @@ router.get("/me", authenticateAdmin, requireAdmin, me);
 
 // POST /api/auth/switch-company
 router.post("/switch-company", authenticateAdmin, requireAdmin, switchCompany);
+
+
+router.post("/add-company", authenticateAdmin, validate(addCompanySchema), addCompany);
 
 // POST /api/auth/logout
 router.post("/logout", authenticateAdmin, logout);
