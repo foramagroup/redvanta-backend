@@ -168,6 +168,9 @@ async function enrichWithLangCode(body) {
 }
 
 
+
+
+
 /**
  * GET /api/superadmin/products/available-templates
  * Récupérer UNIQUEMENT les templates marqués pour les produits (isCardSetting = true)

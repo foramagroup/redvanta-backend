@@ -5,9 +5,22 @@ import prisma from "../config/database.js";
 
 
 export async function generateInvoiceNumber() {
-  const year  = new Date().getFullYear();
-  const count = await prisma.invoice.count();
-  return `INV-${year}-${String(count + 1).padStart(6, "0")}`;
+  const year = new Date().getFullYear();
+  const lastInvoice = await prisma.invoice.findFirst({
+    orderBy: { id: 'desc' },
+    select: { invoiceNumber: true }
+  });
+  let nextNumber = 1;
+  if (lastInvoice && lastInvoice.invoiceNumber) {
+    // On extrait le nombre du format "INV-2026-000042"
+    const parts = lastInvoice.invoiceNumber.split('-');
+    const lastSequence = parseInt(parts[parts.length - 1]);
+    
+    if (!isNaN(lastSequence)) {
+      nextNumber = lastSequence + 1;
+    }
+  }
+  return `INV-${year}-${String(nextNumber).padStart(6, "0")}`;
 }
 
 
@@ -186,6 +199,7 @@ export function formatInvoice(inv) {
 
 export async function createUnpaidInvoice(order) {
   const invoiceNumber = await generateInvoiceNumber();
+  console.log(invoiceNumber);
   const items = (order.items ?? []).map((i) => {
     const sub = Number(i.totalPrice);
     return {

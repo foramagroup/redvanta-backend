@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+  width="1071" height="1436" viewBox="0 0 1071 1436">
+<defs>
+  
+  <linearGradient id="rectoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%" stop-color="#FFFFFF"/>
+    <stop offset="70%" stop-color="#FAFAFA"/>
+  </linearGradient>
+  <linearGradient id="versoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%" stop-color="#FAFAFA"/>
+    <stop offset="100%" stop-color="#FFFFFF"/>
+  </linearGradient>
+  <linearGradient id="bandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#D4AF37"/>
+    <stop offset="100%" stop-color="#D4AF37"/>
+  </linearGradient>
+  <clipPath id="cr">
+    <rect x="30" y="30" width="1011" height="638" rx="16"/>
+  </clipPath>
+  <clipPath id="cv">
+    <rect x="30" y="748" width="1011" height="638" rx="16"/>
+  </clipPath>
+</defs>
+
+<text x="30" y="20" font-family="Arial,sans-serif" font-size="20" fill="#555">RECTO</text>
+<g clip-path="url(#cr)">
+  
+  <!-- Fond recto -->
+  <rect x="30" y="30" width="1011" height="638" fill="url(#rectoGrad)"/>
+
+  <!-- Band (frontBandHeight=22%, bandPosition=bottom) -->
+  <rect x="30" y="528" width="1011" height="140"
+    fill="url(#bandGrad)" opacity="0.9"/>
+
+  <!-- NFC icon (showNfcIcon=true, nfcIconSize=24) -->
+  <g transform="translate(973, 50) scale(2.000)"
+    fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"
+    opacity="0.3">
+    <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/>
+    <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/>
+    <path d="M12.91 4.1a16.09 16.09 0 0 1 0 15.8"/>
+  </g>
+
+  <!-- Google icon dans le band, dessiné APRÈS pour z-order (showGoogleIcon=true) -->
+  <g transform="translate(985, 578) scale(1.667)" opacity="1">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>
+
+  <!-- Business Name (businessFont, businessFontSize, businessFontWeight, businessFontSpacing, businessTextTransform) -->
+  <text x="70" y="213"
+    font-family="'Space Grotesk', sans-serif" font-size="32"
+    font-weight="700"
+    letter-spacing="0em"
+    
+    fill="#1a1a1a"
+    text-anchor="start">VirtualTest</text>
+
+  <!-- Slogan (sloganFont, sloganFontSize, sloganFontWeight, sloganFontSpacing, sloganTextTransform) -->
+  <text x="70" y="245"
+    font-family="'Space Grotesk', sans-serif" font-size="24"
+    font-weight="400"
+    letter-spacing="0em"
+    
+    fill="#1a1a1a" opacity="0.70">slogan</text>
+
+  <!-- Stars (starColor) -->
+  <polygon points="84.00,257.00 87.14,266.67 97.31,266.67 89.09,272.65 92.23,282.33 84.00,276.35 75.77,282.33 78.91,272.65 70.69,266.67 80.86,266.67" fill="#F59E0B"/><polygon points="116.00,257.00 119.14,266.67 129.31,266.67 121.09,272.65 124.23,282.33 116.00,276.35 107.77,282.33 110.91,272.65 102.69,266.67 112.86,266.67" fill="#F59E0B"/><polygon points="148.00,257.00 151.14,266.67 161.31,266.67 153.09,272.65 156.23,282.33 148.00,276.35 139.77,282.33 142.91,272.65 134.69,266.67 144.86,266.67" fill="#F59E0B"/><polygon points="180.00,257.00 183.14,266.67 193.31,266.67 185.09,272.65 188.23,282.33 180.00,276.35 171.77,282.33 174.91,272.65 166.69,266.67 176.86,266.67" fill="#F59E0B"/><polygon points="212.00,257.00 215.14,266.67 225.31,266.67 217.09,272.65 220.23,282.33 212.00,276.35 203.77,282.33 206.91,272.65 198.69,266.67 208.86,266.67" fill="#F59E0B"/>
+
+  <!-- Instructions (instrFont, instrFontSize, instrFontWeight, instrFontSpacing, iconsColor, checkStrokeWidth) -->
+  
+  <circle cx="82" cy="329" r="13.200000000000001" fill="#22C55E" opacity="0.15"/>
+  <polyline
+    points="74.8,329 80.8,338.6 90.4,323"
+    fill="none" stroke="#22C55E"
+    stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="110" y="341"
+    font-family="'Space Grotesk', sans-serif" font-size="20"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#1a1a1a" opacity="0.90">Approach your phone to the card</text>
+  
+  <circle cx="82" cy="365" r="13.200000000000001" fill="#22C55E" opacity="0.15"/>
+  <polyline
+    points="74.8,365 80.8,374.6 90.4,359"
+    fill="none" stroke="#22C55E"
+    stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="110" y="377"
+    font-family="'Space Grotesk', sans-serif" font-size="20"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#1a1a1a" opacity="0.90">Tap to leave a review</text>
+
+  <!-- CTA (callToAction, ctaPaddingTop) : bas-gauche, au-dessus du band -->
+  <text x="70" y="512"
+    font-family="'Space Grotesk', sans-serif" font-size="18"
+    font-weight="500"
+    fill="#1a1a1a" opacity="0.75">Powered by RedVanta</text>
+
+</g>
+
+<line x1="30" y1="708" x2="1041" y2="708"
+      stroke="#333" stroke-width="1" stroke-dasharray="8 5" opacity="0.5"/>
+
+<text x="30" y="738" font-family="Arial,sans-serif" font-size="20" fill="#555">VERSO</text>
+<g clip-path="url(#cv)">
+  
+  <!-- Fond verso -->
+  <rect x="30" y="748" width="1011" height="638" fill="url(#versoGrad)"/>
+
+  <!-- Band (backBandHeight=12%, bandPosition=bottom) -->
+  <rect x="30" y="1309" width="1011" height="77"
+    fill="url(#bandGrad)" opacity="0.9"/>
+
+  <!-- Google icon dans le band, dessiné APRÈS (showGoogleIcon=true, googleLogoSize=20) -->
+  <g transform="translate(985, 1327) scale(1.667)" opacity="1">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>
+
+  <!-- QR Code (qrCodeSize=80, qrCodeStyle=right, accentColor=#E10600) -->
+  <rect x="670" y="903" width="160" height="160" rx="8" fill="#FFFFFF"/>
+  <rect x="670" y="903" width="45" height="11" fill="#FFFFFF"/>
+  <rect x="670" y="903" width="11" height="45" fill="#FFFFFF"/>
+  <rect x="785" y="903" width="45" height="11" fill="#FFFFFF"/>
+  <rect x="819" y="903" width="11" height="45" fill="#FFFFFF"/>
+  <rect x="670" y="1052" width="45" height="11" fill="#FFFFFF"/>
+  <rect x="670" y="1018" width="11" height="45" fill="#FFFFFF"/>
+  <rect x="785" y="1052" width="45" height="11" fill="#FFFFFF"/>
+  <rect x="819" y="1018" width="11" height="45" fill="#FFFFFF"/>
+  <svg x="686" y="919"
+       width="128" height="128"
+       viewBox="0 0 128 128"
+       preserveAspectRatio="xMidYMid meet"><svg viewBox="0 0 45 45" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">
+    <path fill="#FFFFFF" d="M0 0h45v45H0z"/><path stroke="#E10600" d="M0 0.5h7m1 0h2m1 0h1m4 0h1m5 0h1m4 0h5m1 0h1m2 0h1m1 0h7M0 1.5h1m5 0h1m1 0h1m2 0h2m1 0h3m3 0h1m1 0h2m1 0h1m9 0h1m2 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m1 0h1m3 0h3m1 0h1m2 0h2m1 0h2m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m4 0h1m1 0h2m1 0h1m3 0h1m2 0h3m1 0h1m1 0h1m5 0h2m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m4 0h1m1 0h1m2 0h2m2 0h5m1 0h2m2 0h2m2 0h3m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m1 0h2m1 0h1m1 0h1m2 0h3m1 0h1m3 0h2m3 0h1m3 0h1m4 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h6m2 0h5m3 0h1m6 0h2m1 0h3M2 8.5h3m1 0h1m1 0h1m4 0h1m1 0h4m1 0h5m2 0h1m2 0h1m3 0h2m1 0h3m2 0h3M4 9.5h1m4 0h1m1 0h1m2 0h5m1 0h1m2 0h2m1 0h1m1 0h1m1 0h3m3 0h1m5 0h1m1 0h1M2 10.5h1m1 0h1m1 0h2m3 0h7m3 0h1m2 0h5m4 0h2m1 0h3m4 0h1M2 11.5h1m1 0h1m2 0h1m3 0h2m1 0h2m1 0h3m1 0h4m2 0h2m1 0h4m2 0h1m2 0h2m1 0h1M0 12.5h3m1 0h3m2 0h2m1 0h2m2 0h3m1 0h1m4 0h1m1 0h2m1 0h1m2 0h1m5 0h1m1 0h1m1 0h1M0 13.5h1m2 0h1m4 0h8m2 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h1m2 0h1m3 0h2M3 14.5h1m2 0h1m4 0h2m1 0h1m1 0h2m2 0h1m3 0h3m2 0h1m4 0h2m1 0h3m2 0h1M0 15.5h2m1 0h3m1 0h2m2 0h1m1 0h3m5 0h2m1 0h6m2 0h1m1 0h3m1 0h5M0 16.5h3m3 0h2m3 0h3m2 0h3m4 0h4m1 0h1m6 0h1m2 0h1m2 0h1m1 0h1M0 17.5h2m2 0h1m4 0h1m2 0h6m1 0h1m2 0h3m2 0h3m2 0h2m2 0h1m2 0h1m1 0h1m2 0h1M1 18.5h1m2 0h1m1 0h1m2 0h2m1 0h3m3 0h4m4 0h2m2 0h1m3 0h1m1 0h3m2 0h1m1 0h1M0 19.5h1m3 0h2m4 0h1m1 0h1m3 0h1m1 0h2m2 0h4m1 0h1m2 0h1m1 0h1m3 0h2m2 0h3M0 20.5h9m2 0h1m1 0h2m2 0h10m2 0h3m4 0h6m2 0h1M0 21.5h1m3 0h1m3 0h4m2 0h2m3 0h2m3 0h1m1 0h1m1 0h1m1 0h4m1 0h2m3 0h1m1 0h1m1 0h1M1 22.5h4m1 0h1m1 0h2m4 0h1m4 0h2m1 0h1m1 0h2m2 0h3m3 0h1m1 0h1m1 0h1m1 0h2m1 0h1M1 23.5h1m1 0h2m3 0h3m4 0h3m2 0h1m3 0h2m1 0h1m2 0h1m2 0h1m2 0h1m3 0h1m1 0h1M2 24.5h7m1 0h3m3 0h9m4 0h4m2 0h7m1 0h2M4 25.5h2m1 0h2m4 0h3m2 0h3m1 0h1m1 0h1m1 0h4m2 0h2m1 0h1m2 0h2m1 0h2m1 0h1M1 26.5h1m2 0h1m1 0h1m1 0h3m4 0h3m1 0h2m2 0h2m2 0h3m1 0h2m1 0h3m2 0h1m2 0h2M0 27.5h1m2 0h1m5 0h1m1 0h2m1 0h2m2 0h1m5 0h1m1 0h1m1 0h1m3 0h1m1 0h2m1 0h2m3 0h1M0 28.5h1m1 0h2m2 0h4m4 0h2m2 0h3m1 0h2m2 0h1m2 0h1m1 0h1m1 0h1m3 0h2m1 0h2M2 29.5h3m3 0h1m2 0h4m1 0h1m2 0h2m1 0h2m1 0h2m1 0h4m3 0h3m4 0h3M1 30.5h4m1 0h3m4 0h1m1 0h2m1 0h2m1 0h1m1 0h2m1 0h2m2 0h5m4 0h1m1 0h1M1 31.5h2m4 0h3m1 0h1m3 0h1m2 0h4m2 0h5m3 0h2m1 0h4m2 0h3M0 32.5h3m3 0h2m2 0h1m3 0h2m1 0h1m2 0h1m1 0h4m1 0h2m2 0h1m1 0h1m5 0h2m2 0h2M1 33.5h2m1 0h2m1 0h1m2 0h1m3 0h3m1 0h1m1 0h1m4 0h4m4 0h1m2 0h3m2 0h4M4 34.5h1m1 0h1m2 0h6m6 0h5m2 0h3m2 0h3m1 0h1m1 0h2m1 0h1M1 35.5h4m4 0h1m1 0h1m2 0h6m4 0h1m2 0h1m1 0h4m2 0h2m1 0h2m1 0h2m1 0h1M0 36.5h1m2 0h2m1 0h4m1 0h1m3 0h1m3 0h6m1 0h1m1 0h4m2 0h1m1 0h6M8 37.5h1m3 0h2m1 0h4m1 0h1m3 0h2m1 0h1m3 0h3m1 0h2m3 0h1m1 0h1m1 0h1M0 38.5h7m3 0h2m1 0h3m1 0h4m1 0h1m1 0h1m2 0h1m2 0h3m1 0h3m1 0h1m1 0h2m1 0h1M0 39.5h1m5 0h1m7 0h1m3 0h1m1 0h1m3 0h2m2 0h1m3 0h3m1 0h1m3 0h3M0 40.5h1m1 0h3m1 0h1m1 0h1m1 0h4m1 0h1m3 0h7m1 0h1m1 0h3m4 0h6m1 0h2M0 41.5h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h2m1 0h1m3 0h9m1 0h3m1 0h1m2 0h1m1 0h1m1 0h3M0 42.5h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h2m2 0h7m1 0h1m1 0h7m1 0h1m1 0h2m1 0h2M0 43.5h1m5 0h1m2 0h2m1 0h1m4 0h3m1 0h2m1 0h2m1 0h1m5 0h1m2 0h1m4 0h2M0 44.5h7m3 0h1m2 0h3m1 0h1m2 0h2m2 0h1m2 0h1m2 0h1m4 0h2m1 0h2m3 0h1"/>
+  </svg></svg>
+
+  <!-- Business Name (businessFont, businessFontSize, businessFontWeight) -->
+  <text x="444" y="962"
+    font-family="'Space Grotesk', sans-serif" font-size="24"
+    font-weight="700"
+    fill="#1a1a1a" text-anchor="middle">VirtualTest</text>
+
+  <!-- Slogan (sloganFont, sloganFontSize, sloganFontWeight) -->
+  <text x="444" y="990"
+    font-family="'Space Grotesk', sans-serif" font-size="20"
+    font-weight="400"
+    fill="#1a1a1a" opacity="0.70" text-anchor="middle">slogan</text>
+
+  <!-- Stars (starColor) -->
+  <polygon points="390.00,998.00 392.47,1005.60 400.46,1005.60 394.00,1010.30 396.47,1017.90 390.00,1013.20 383.53,1017.90 386.00,1010.30 379.54,1005.60 387.53,1005.60" fill="#F59E0B"/><polygon points="416.00,998.00 418.47,1005.60 426.46,1005.60 420.00,1010.30 422.47,1017.90 416.00,1013.20 409.53,1017.90 412.00,1010.30 405.54,1005.60 413.53,1005.60" fill="#F59E0B"/><polygon points="442.00,998.00 444.47,1005.60 452.46,1005.60 446.00,1010.30 448.47,1017.90 442.00,1013.20 435.53,1017.90 438.00,1010.30 431.54,1005.60 439.53,1005.60" fill="#F59E0B"/><polygon points="468.00,998.00 470.47,1005.60 478.46,1005.60 472.00,1010.30 474.47,1017.90 468.00,1013.20 461.53,1017.90 464.00,1010.30 457.54,1005.60 465.53,1005.60" fill="#F59E0B"/><polygon points="494.00,998.00 496.47,1005.60 504.46,1005.60 498.00,1010.30 500.47,1017.90 494.00,1013.20 487.53,1017.90 490.00,1010.30 483.54,1005.60 491.53,1005.60" fill="#F59E0B"/>
+
+  <!-- Instructions (backInstruction1/2, instrFont, instrFontSize, iconsColor, checkStrokeWidth) -->
+  
+  <circle cx="373.06" cy="1107" r="13.200000000000001" fill="#22C55E" opacity="0.15"/>
+  <polyline
+    points="365.86,1107 371.86,1116.6 381.46,1101"
+    fill="none" stroke="#22C55E"
+    stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="401.06" y="1119"
+    font-family="'Space Grotesk', sans-serif" font-size="18"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#1a1a1a" opacity="0.90">Scan the QR code with your camera</text>
+  
+  <circle cx="368.38" cy="1143" r="13.200000000000001" fill="#22C55E" opacity="0.15"/>
+  <polyline
+    points="361.18,1143 367.18,1152.6 376.78,1137"
+    fill="none" stroke="#22C55E"
+    stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="396.38" y="1155"
+    font-family="'Space Grotesk', sans-serif" font-size="18"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#1a1a1a" opacity="0.90">Write a review on our profile page</text>
+
+  <!-- CTA (callToAction, ctaPaddingTop) : centré, au-dessus du band -->
+  <text x="535.5" y="1293"
+    font-family="'Space Grotesk', sans-serif" font-size="18"
+    font-weight="500"
+    fill="#1a1a1a" opacity="0.70" text-anchor="middle">Powered by RedVanta</text>
+
+</g>
+</svg>

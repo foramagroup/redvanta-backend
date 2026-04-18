@@ -190,10 +190,11 @@ export const createOrder = async (req, res, next) => {
           stripeClientSecret:    stripeClientSecret ?? null,
           items: {
             create: cartItems.map((item) => ({
+              
               productId:     item.productId,
               packageTierId: item.packageTierId,
-              totalCards:    item.totalCards,
-              quantity:      item.totalCards,
+              totalCards:    item.packageTierId == null?item.quantity:item.totalCards,
+              quantity:      item.packageTierId == null?item.quantity:item.totalCards,
               unitPrice:     Number(item.unitPrice),
               totalPrice:    Number(item.lineTotal),
               designId:      item.designId   || null,

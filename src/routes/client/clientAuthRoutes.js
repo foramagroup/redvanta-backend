@@ -18,6 +18,7 @@ import {
   me,
   switchCompany,
   addCompany,
+  deleteUserCompany,
   logout,
 } from "../../controllers/client/clientAuthController.js";
 import { signupSchema, loginSchema, addCompanySchema } from "../../validators/client/clientauth.validator.js";
@@ -56,6 +57,7 @@ router.post("/switch-company", authenticateAdmin, requireAdmin, switchCompany);
 
 
 router.post("/add-company", authenticateAdmin, validate(addCompanySchema), addCompany);
+router.delete("/company/:id", authenticateAdmin, requireAdmin, deleteUserCompany);
 
 // POST /api/auth/logout
 router.post("/logout", authenticateAdmin, logout);

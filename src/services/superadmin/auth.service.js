@@ -171,6 +171,14 @@ export function formatAdmin(user, activeCompanyId = null) {
 
 // ─── Charger un user pour l'auth ─────────────────────────────
 export async function loadUserForAuth(userId, type = "admin") {
+  if (type === "admin") {
+    // Supprimer les UserCompany orphelins (company supprimée sans cascade)
+    await prisma.$executeRaw`
+      DELETE FROM user_companies
+      WHERE userId = ${userId}
+      AND companyId NOT IN (SELECT id FROM companies)
+    `;
+  }
   const include = type === "superadmin" ? SUPERADMIN_INCLUDE : ADMIN_INCLUDE;
   return prisma.user.findUnique({ where: { id: userId }, include });
 }

@@ -109,7 +109,7 @@ export const signup = async (req, res, next) => {
     // Vérifier unicité
     const [userExists, companyExists] = await Promise.all([
       prisma.user.findUnique({ where: { email } }),
-      prisma.company.findUnique({ where: { email } }),
+      prisma.company.findFirst({ where: { email } }),
     ]);
 
     if (userExists || companyExists) {
@@ -815,6 +815,35 @@ export const logout = async (req, res, next) => {
  * Ajouter une nouvelle company à un compte utilisateur existant
  * Nécessite d'être authentifié
  */
+// ─── DELETE /api/client/auth/company/:id ──────────────────────
+export const deleteUserCompany = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ success: false, error: "Non authentifié", code: "UNAUTHORIZED" });
+
+    const companyId = parseInt(req.params.id);
+    if (!companyId) return res.status(400).json({ success: false, error: "ID invalide" });
+
+    // Vérifier que l'user est owner de cette company
+    const link = await prisma.userCompany.findFirst({
+      where: { userId, companyId, isOwner: true },
+    });
+    if (!link) return res.status(403).json({ success: false, error: "Non autorisé ou company introuvable", code: "FORBIDDEN" });
+
+    // Vérifier qu'il lui reste au moins une autre company
+    const total = await prisma.userCompany.count({ where: { userId } });
+    if (total <= 1) return res.status(400).json({ success: false, error: "Vous ne pouvez pas supprimer votre seule entreprise", code: "LAST_COMPANY" });
+
+    // Supprimer les liens UserCompany d'abord, puis la company
+    await prisma.userCompany.deleteMany({ where: { companyId } });
+    await prisma.company.delete({ where: { id: companyId } });
+
+    return res.json({ success: true, message: "Entreprise supprimée avec succès" });
+  } catch (e) {
+    next(e);
+  }
+};
+
 export const addCompany = async (req, res, next) => {
   const ip = getIp(req);
   const userAgent = req.headers["user-agent"] ?? null;
@@ -853,31 +882,32 @@ export const addCompany = async (req, res, next) => {
     }
 
     // Vérifier si une company existe déjà avec cet email
-    const existingCompany = await prisma.company.findUnique({
-      where: { email: user.email }
-    });
+    // const existingCompany = await prisma.company.findUnique({
+    //   where: { email: user.email }
+    // });
 
-    if (existingCompany) {
-      // Vérifier si l'utilisateur est déjà lié à cette company
-      const existingLink = await prisma.userCompany.findUnique({
-        where: {
-          userId_companyId: {
-            userId: user.id,
-            companyId: existingCompany.id
-          }
-        }
-      });
+    // if (existingCompany) {
+    //   // Vérifier si l'utilisateur est déjà lié à cette company
+    //   const existingLink = await prisma.userCompany.findUnique({
+    //     where: {
+    //       userId_companyId: {
+    //         userId: user.id,
+    //         companyId: existingCompany.id
+    //       }
+    //     }
+    //   });
 
-      if (existingLink) {
-        return res.status(409).json({
-          success: false,
-          error: "ALREADY LINKED",
-          code: "ALREADY_LINKED"
-        });
-      }
-    }
+    //   if (existingLink) {
+    //     return res.status(409).json({
+    //       success: false,
+    //       error: "ALREADY LINKED",
+    //       code: "ALREADY_LINKED"
+    //     });
+    //   }
+    // }
 
     // Récupérer les valeurs par défaut
+    
     const [defaultPlan, adminRole, defaultLang] = await Promise.all([
       getDefaultPlan(),
       getAdminRole(),
@@ -982,12 +1012,4 @@ export const addCompany = async (req, res, next) => {
     next(e);
   }
 };
-
-
-
-
-
-
-
-
 

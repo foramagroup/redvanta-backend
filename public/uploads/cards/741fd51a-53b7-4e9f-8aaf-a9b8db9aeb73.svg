@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+  width="1067" height="1380" viewBox="0 0 1067 1380">
+<defs>
+  
+  <linearGradient id="rectoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%"  stop-color="#FFFFFF"/>
+    <stop offset="70%" stop-color="#FAFAFA"/>
+  </linearGradient>
+  <linearGradient id="versoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%"   stop-color="#FAFAFA"/>
+    <stop offset="100%" stop-color="#FFFFFF"/>
+  </linearGradient>
+  <linearGradient id="bandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%"   stop-color="#D4AF37"/>
+    <stop offset="100%" stop-color="#D4AF37"/>
+  </linearGradient>
+  <clipPath id="cr"><rect x="28" y="42" width="1011" height="638" rx="18"/></clipPath>
+  <clipPath id="cv"><rect x="28" y="714" width="1011" height="638" rx="18"/></clipPath>
+</defs>
+
+<!-- ✅ Fond blanc total — pas de fond noir -->
+<rect width="1067" height="1380" fill="#FFFFFF"/>
+
+<!-- Label RECTO -->
+<text x="28" y="38"
+  font-family="Arial,sans-serif" font-size="10" fill="#AAAAAA" letter-spacing="0.12em">RECTO</text>
+<g clip-path="url(#cr)">
+  <rect x="28" y="42" width="1011" height="638" fill="url(#rectoGrad)"/>
+  <rect x="28" y="540" width="1011" height="140" fill="url(#bandGrad)" opacity="0.9"/>
+  <g transform="translate(991,56) scale(1.417)"
+    fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" opacity="0.35">
+    <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/>
+    <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/>
+    <path d="M12.91 4.1a16.09 16.09 0 0 1 0 15.8"/>
+  </g>
+  <g transform="translate(1000,596) scale(1.167)" opacity="1">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>
+  <text x="56" y="252"
+    font-family="'Space Grotesk', sans-serif" font-size="23"
+    font-weight="700" letter-spacing="0em"
+    
+    fill="#1a1a1a" text-anchor="start">VirtualTest</text>
+  <text x="56" y="273"
+    font-family="'Space Grotesk', sans-serif" font-size="17"
+    font-weight="400" letter-spacing="0em"
+    
+    fill="#1a1a1a" opacity="0.70">slogan</text>
+  <polygon points="65.00,280.00 67.02,286.22 73.56,286.22 68.27,290.06 70.29,296.28 65.00,292.44 59.71,296.28 61.73,290.06 56.44,286.22 62.98,286.22" fill="#F59E0B"/><polygon points="86.00,280.00 88.02,286.22 94.56,286.22 89.27,290.06 91.29,296.28 86.00,292.44 80.71,296.28 82.73,290.06 77.44,286.22 83.98,286.22" fill="#F59E0B"/><polygon points="107.00,280.00 109.02,286.22 115.56,286.22 110.27,290.06 112.29,296.28 107.00,292.44 101.71,296.28 103.73,290.06 98.44,286.22 104.98,286.22" fill="#F59E0B"/><polygon points="128.00,280.00 130.02,286.22 136.56,286.22 131.27,290.06 133.29,296.28 128.00,292.44 122.71,296.28 124.73,290.06 119.44,286.22 125.98,286.22" fill="#F59E0B"/><polygon points="149.00,280.00 151.02,286.22 157.56,286.22 152.27,290.06 154.29,296.28 149.00,292.44 143.71,296.28 145.73,290.06 140.44,286.22 146.98,286.22" fill="#F59E0B"/>
+  
+  <circle cx="64" cy="323" r="8.32" fill="#22C55E" opacity="0.15"/>
+  <polyline points="59.2,323 63.2,329.4 69.6,319"
+    fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="81" y="331" font-family="'Space Grotesk', sans-serif" font-size="14"
+    font-weight="400" letter-spacing="0em"
+    fill="#1a1a1a" opacity="0.90">Approach your phone to the card</text>
+  
+  <circle cx="64" cy="346" r="8.32" fill="#22C55E" opacity="0.15"/>
+  <polyline points="59.2,346 63.2,352.4 69.6,342"
+    fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="81" y="354" font-family="'Space Grotesk', sans-serif" font-size="14"
+    font-weight="400" letter-spacing="0em"
+    fill="#1a1a1a" opacity="0.90">Tap to leave a review</text>
+  <text x="56" y="529"
+    font-family="'Space Grotesk', sans-serif" font-size="13" font-weight="500"
+    fill="#1a1a1a" opacity="0.75">Powered by RedVanta</text></g>
+
+<!-- Séparateur discret -->
+<line x1="28" y1="690" x2="1039" y2="690"
+  stroke="#DDDDDD" stroke-width="1" stroke-dasharray="5 4"/>
+
+<!-- Label VERSO -->
+<text x="28" y="710"
+  font-family="Arial,sans-serif" font-size="10" fill="#AAAAAA" letter-spacing="0.12em">VERSO</text>
+<g clip-path="url(#cv)">
+  <rect x="28" y="714" width="1011" height="638" fill="url(#versoGrad)"/>
+  <rect x="28" y="1275" width="1011" height="77" fill="url(#bandGrad)" opacity="0.9"/>
+  <g transform="translate(1000,1299) scale(1.167)" opacity="1">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>
+  <rect x="676" y="912" width="114" height="114" rx="6" fill="#FFFFFF"/>
+  <rect x="676" y="912" width="30" height="7" fill="#FFFFFF"/>
+  <rect x="676" y="912" width="7" height="30" fill="#FFFFFF"/>
+  <rect x="760" y="912" width="30" height="7" fill="#FFFFFF"/>
+  <rect x="783"  y="912" width="7"  height="30" fill="#FFFFFF"/>
+  <rect x="676" y="1019" width="30" height="7" fill="#FFFFFF"/>
+  <rect x="676" y="996" width="7" height="30" fill="#FFFFFF"/>
+  <rect x="760" y="1019" width="30" height="7" fill="#FFFFFF"/>
+  <rect x="783"  y="996" width="7" height="30" fill="#FFFFFF"/>
+  <svg x="685" y="921"
+       width="96" height="96"
+       viewBox="0 0 96 96"
+       preserveAspectRatio="xMidYMid meet"><svg viewBox="0 0 45 45" preserveAspectRatio="xMidYMid meet" width="100%" height="100%"><path fill="#FFFFFF" d="M0 0h45v45H0z"/><path stroke="#E10600" d="M0 0.5h7m1 0h2m1 0h1m2 0h2m6 0h2m3 0h5m4 0h1m1 0h7M0 1.5h1m5 0h1m1 0h1m2 0h3m1 0h2m3 0h1m1 0h4m7 0h1m1 0h1m2 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m2 0h2m1 0h1m3 0h4m1 0h1m1 0h1m1 0h1m2 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m8 0h2m1 0h1m1 0h1m2 0h2m1 0h2m1 0h1m3 0h1m1 0h2m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m4 0h2m2 0h4m1 0h5m1 0h2m2 0h2m2 0h3m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m1 0h2m1 0h1m1 0h1m2 0h1m3 0h1m3 0h1m1 0h1m2 0h1m8 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h1m1 0h1m2 0h1m5 0h2m3 0h1m3 0h5m1 0h1m1 0h1M2 8.5h3m1 0h1m1 0h1m4 0h1m1 0h2m3 0h6m3 0h1m4 0h1m2 0h3m2 0h3M0 9.5h1m2 0h1m1 0h1m3 0h1m2 0h1m1 0h5m1 0h1m2 0h1m2 0h3m1 0h2m3 0h3m6 0h1M0 10.5h1m1 0h1m1 0h3m1 0h2m2 0h5m2 0h1m1 0h1m1 0h1m2 0h1m1 0h1m4 0h4m1 0h3m1 0h2M4 11.5h1m2 0h1m1 0h2m1 0h1m1 0h2m1 0h1m2 0h4m1 0h1m2 0h1m2 0h3m2 0h1m2 0h4M0 12.5h2m1 0h1m2 0h1m4 0h1m1 0h1m2 0h1m1 0h1m1 0h1m2 0h3m3 0h2m2 0h1m5 0h1m3 0h1M0 13.5h1m7 0h1m1 0h1m2 0h3m2 0h2m1 0h2m1 0h2m2 0h3m1 0h2m2 0h1m2 0h2m2 0h2M2 14.5h1m3 0h1m3 0h2m1 0h1m2 0h2m1 0h1m2 0h1m3 0h1m7 0h5m3 0h1M0 15.5h2m1 0h2m2 0h2m2 0h2m1 0h2m3 0h3m2 0h3m2 0h1m2 0h1m1 0h1m1 0h1m1 0h1m1 0h3M0 16.5h3m3 0h2m3 0h2m4 0h2m1 0h1m2 0h4m8 0h1m2 0h2m1 0h1m1 0h1M0 17.5h2m2 0h2m3 0h1m2 0h2m1 0h1m1 0h1m2 0h1m1 0h3m2 0h3m2 0h2m2 0h1m2 0h1m1 0h1m2 0h1M1 18.5h1m3 0h2m2 0h2m1 0h5m1 0h5m3 0h1m1 0h1m1 0h1m3 0h1m1 0h3m2 0h1m1 0h1M0 19.5h1m3 0h2m1 0h1m2 0h1m1 0h2m1 0h1m2 0h2m3 0h3m1 0h1m2 0h1m1 0h2m2 0h2m2 0h3M0 20.5h9m2 0h1m1 0h1m1 0h12m2 0h3m4 0h6m2 0h1M0 21.5h1m3 0h1m3 0h4m1 0h1m5 0h2m3 0h1m1 0h1m1 0h1m1 0h3m2 0h2m3 0h1m1 0h1m1 0h1M1 22.5h4m1 0h1m1 0h2m3 0h3m1 0h1m2 0h1m1 0h1m1 0h2m2 0h3m2 0h2m1 0h1m1 0h1m1 0h4M0 23.5h2m1 0h2m3 0h3m3 0h1m1 0h1m1 0h1m1 0h1m3 0h1m1 0h2m2 0h1m5 0h1m3 0h3M0 24.5h2m1 0h6m1 0h1m1 0h14m3 0h4m1 0h7m2 0h2M2 25.5h4m2 0h1m2 0h1m2 0h1m1 0h1m2 0h2m1 0h1m1 0h6m2 0h2m1 0h1m1 0h1m1 0h1m1 0h4M0 26.5h2m1 0h2m1 0h3m1 0h3m2 0h1m2 0h3m2 0h3m1 0h3m1 0h2m1 0h3m2 0h1m1 0h2M1 27.5h2m5 0h3m3 0h1m2 0h2m5 0h1m1 0h3m3 0h1m1 0h2m1 0h2m3 0h1m1 0h1M0 28.5h1m1 0h2m2 0h2m2 0h3m1 0h2m3 0h2m2 0h1m1 0h1m2 0h2m1 0h1m1 0h1m3 0h2m1 0h2M0 29.5h1m1 0h3m2 0h2m1 0h5m1 0h2m1 0h2m2 0h1m1 0h2m2 0h3m5 0h1m3 0h4M0 30.5h3m1 0h1m1 0h1m4 0h3m1 0h5m1 0h1m8 0h5m1 0h1m2 0h1m2 0h1M1 31.5h2m4 0h2m6 0h1m1 0h5m2 0h2m1 0h2m3 0h2m1 0h1m1 0h2m2 0h3M1 32.5h2m1 0h1m1 0h1m3 0h3m1 0h2m2 0h1m1 0h1m1 0h2m4 0h4m1 0h1m2 0h1m3 0h1m2 0h2M0 33.5h1m1 0h3m3 0h2m1 0h2m1 0h3m2 0h1m3 0h3m3 0h1m1 0h3m2 0h2m1 0h1m1 0h4M4 34.5h1m1 0h1m1 0h2m2 0h1m1 0h1m6 0h2m1 0h2m7 0h5m1 0h2m1 0h1M1 35.5h4m2 0h1m1 0h1m1 0h2m1 0h5m1 0h1m3 0h1m2 0h1m1 0h1m1 0h2m2 0h1m2 0h2m1 0h4M0 36.5h1m2 0h2m1 0h4m1 0h1m1 0h3m3 0h6m1 0h1m2 0h1m1 0h1m4 0h6m1 0h1M8 37.5h1m1 0h1m1 0h1m3 0h5m3 0h2m4 0h4m1 0h2m3 0h1m1 0h1m1 0h1M0 38.5h7m3 0h2m3 0h1m1 0h2m1 0h1m1 0h1m1 0h1m3 0h2m1 0h2m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1M0 39.5h1m5 0h1m7 0h3m1 0h1m1 0h1m3 0h2m2 0h2m2 0h1m3 0h1m3 0h3M0 40.5h1m1 0h3m1 0h1m1 0h1m1 0h4m2 0h1m3 0h6m1 0h1m1 0h3m1 0h2m1 0h6m1 0h2M0 41.5h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h1m1 0h2m2 0h14m1 0h1m2 0h7M0 42.5h1m1 0h3m1 0h1m1 0h2m1 0h3m2 0h1m1 0h7m1 0h1m1 0h7m1 0h1m1 0h1M0 43.5h1m5 0h1m2 0h2m1 0h1m4 0h1m1 0h1m1 0h1m3 0h3m5 0h1m2 0h1m4 0h2M0 44.5h7m3 0h1m1 0h1m1 0h2m1 0h2m1 0h1m1 0h6m2 0h1m3 0h3m1 0h3m2 0h1"/></svg></svg>
+  <text x="470" y="957"
+    font-family="'Space Grotesk', sans-serif" font-size="17"
+    font-weight="700"
+    fill="#1a1a1a" text-anchor="middle">VirtualTest</text>
+  <text x="470" y="975"
+    font-family="'Space Grotesk', sans-serif" font-size="14"
+    font-weight="400"
+    fill="#1a1a1a" opacity="0.70" text-anchor="middle">slogan</text>
+  <polygon points="434.00,981.00 435.57,985.84 440.66,985.84 436.54,988.83 438.11,993.66 434.00,990.67 429.89,993.66 431.46,988.83 427.34,985.84 432.43,985.84" fill="#F59E0B"/><polygon points="451.00,981.00 452.57,985.84 457.66,985.84 453.54,988.83 455.11,993.66 451.00,990.67 446.89,993.66 448.46,988.83 444.34,985.84 449.43,985.84" fill="#F59E0B"/><polygon points="468.00,981.00 469.57,985.84 474.66,985.84 470.54,988.83 472.11,993.66 468.00,990.67 463.89,993.66 465.46,988.83 461.34,985.84 466.43,985.84" fill="#F59E0B"/><polygon points="485.00,981.00 486.57,985.84 491.66,985.84 487.54,988.83 489.11,993.66 485.00,990.67 480.89,993.66 482.46,988.83 478.34,985.84 483.43,985.84" fill="#F59E0B"/><polygon points="502.00,981.00 503.57,985.84 508.66,985.84 504.54,988.83 506.11,993.66 502.00,990.67 497.89,993.66 499.46,988.83 495.34,985.84 500.43,985.84" fill="#F59E0B"/>
+  
+  <circle cx="417.46" cy="1050" r="7.28" fill="#22C55E" opacity="0.15"/>
+  <polyline points="413.26,1050 416.76,1055.6 422.35999999999996,1046.5"
+    fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="433.46" y="1057" font-family="'Space Grotesk', sans-serif" font-size="13"
+    font-weight="400" letter-spacing="0em"
+    fill="#1a1a1a" opacity="0.90">Scan the QR code with your camera</text>
+  
+  <circle cx="414.08" cy="1071" r="7.28" fill="#22C55E" opacity="0.15"/>
+  <polyline points="409.88,1071 413.38,1076.6 418.97999999999996,1067.5"
+    fill="none" stroke="#22C55E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="430.08" y="1078" font-family="'Space Grotesk', sans-serif" font-size="13"
+    font-weight="400" letter-spacing="0em"
+    fill="#1a1a1a" opacity="0.90">Write a review on our profile page</text>
+  <text x="533.5" y="1264"
+    font-family="'Space Grotesk', sans-serif" font-size="13" font-weight="500"
+    fill="#1a1a1a" opacity="0.70" text-anchor="middle">Powered by RedVanta</text></g>
+</svg>

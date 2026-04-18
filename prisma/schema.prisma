@@ -154,7 +154,6 @@ model PlatformSetting {
 }
 
 
-
 model Location {
   id          Int      @id @default(autoincrement())
   companyId   Int              
@@ -1697,7 +1696,7 @@ model Company {
   logoScale      Int      @default(100)
   vatNumber      String?
   tradeNumber    String?
-  email          String   @unique
+  email          String   
   phone          String?
   countryCode    String?  @default("+1")
   country        String?
@@ -2100,6 +2099,15 @@ enum CardModel {
   premium
   metal
   transparent
+  luxury
+  neon
+  memphis
+  glass
+  layered
+  polygon
+  geometric
+  blob
+  material
 }
 
 enum OrderStatus {
