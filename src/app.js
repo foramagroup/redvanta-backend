@@ -227,7 +227,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/places", placesRoutes);
   app.use("/api/client/orders", orderClientRoutes);
   app.use("/api/r",        scanRouter);
-  app.use("/review",   reviewRouter);
+  app.use("api/review",   reviewRouter);
   suspendUnverifiedAccounts();
 
 

@@ -177,8 +177,9 @@ export const handleScan = async (req, res, next) => {
   .toLowerCase()
   .trim()
   .replace(/\s+/g, '-')
+  .replace(/[^\w-]/g, '');
 
-    return res.redirect(302, `${process.env.URL_PROD_FRONTEND}/review/${companySlug}`);
+   return res.redirect(302, `${process.env.URL_PROD_FRONTEND}/review/${companySlug}?uid=${uid}`);
   } catch (e) { next(e); }
 };
 
