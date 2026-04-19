@@ -4,6 +4,7 @@ import prisma  from "../../config/database.js";
 import bcrypt  from "bcryptjs";
 import { generateToken, getCookieOptions, blacklistToken } from "../../services/token.service.js";
 import { loadUserByEmail, loadUserForAuth, formatSuperAdmin } from "../../services/superadmin/auth.service.js";
+import { errorResponse, successResponse } from "../../helpers/response.helper.js";
 
 
 async function logActivity(userId, name, ip, userAgent, status) {
@@ -27,7 +28,7 @@ export const login = async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(422).json({ success: false, error: "Email et mot de passe requis" });
+      return res.status(422).json({ success: false, error: "Email and password are required" });
     }
 
     // Charger l'utilisateur
@@ -36,14 +37,14 @@ export const login = async (req, res, next) => {
     // Vérifier que c'est un superadmin
     if (!user || !user.isSuperadmin) {
       await logActivity(null, email, ip, userAgent, "failed");
-      return res.status(401).json({ success: false, error: "Identifiants invalides" });
+      return  errorResponse(res, "auth.login_failed", {}, 401, null);
     }
 
     // Vérifier le mot de passe
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       await logActivity(user.id, user.name, ip, userAgent, "failed");
-      return res.status(401).json({ success: false, error: "Identifiants invalides" });
+      return errorResponse(res, "auth.login_failed", {}, 401, null);
     }
 
     // Générer le JWT
@@ -63,12 +64,8 @@ export const login = async (req, res, next) => {
     // ── Stocker le JWT dans un cookie HttpOnly ──────────────
     res.cookie("sa_token", token, getCookieOptions("sa_token"));
 
-    // Retourner les infos user (PAS le token — il est dans le cookie)
-    return res.json({
-      success: true,
-      message: "Connexion réussie",
-      user:    formatSuperAdmin(user),
-    });
+    // Retourner les infos user
+    return  successResponse(res, "auth.login_success", {user:    formatSuperAdmin(user)}, {}, 200);
   } catch (e) {
     await logActivity(null, req.body?.email, ip, userAgent, "failed");
     next(e);
@@ -80,7 +77,7 @@ export const me = async (req, res, next) => {
   try {
     const user = await loadUserForAuth(req.user.userId, "superadmin");
     if (!user || !user.isSuperadmin) {
-      return res.status(403).json({ success: false, error: "Accès refusé" });
+      return res.status(403).json({ success: false, error: "Access denied" });
     }
     return res.json({ success: true, user: formatSuperAdmin(user) });
   } catch (e) { next(e); }
@@ -93,21 +90,19 @@ export const logout = async (req, res, next) => {
     if (req.token) {
       await blacklistToken(req.token);
     }
-
     // Logger la déconnexion
     if (req.user?.userId) {
       await logActivity(req.user.userId, null, getIp(req), req.headers["user-agent"], "logout");
     }
-
     // Effacer le cookie
     res.clearCookie("sa_token", { path: "/" });
-
-    return res.json({ success: true, message: "Déconnecté avec succès" });
+    return res.json({ success: true, message: "Logged out successfully" });
+    
   } catch (e) { next(e); }
 };
 
 // ─── GET /api/superadmin/auth/check ──────────────────────────
-// Vérifier si la session est toujours valide (ping silencieux du frontend)
+// Vérifier si la session est toujours valide
 export const check = async (req, res) => {
   return res.json({ success: true, authenticated: true });
 };

@@ -41,7 +41,11 @@ export const listMyOrders = async (req, res, next) => {
         include: {
           items: {
             include: {
-              product: true,
+              product: {
+                include:{
+                  translations:true,
+                }
+              },
               packageTier: true,
               cardType: true
             }

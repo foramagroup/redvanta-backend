@@ -84,6 +84,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
 import { requireSuperadmin } from "./middleware/requireSuperadmin.js";
+import { languageMiddleware } from "./i18n/middleware.js";
 
 
 //----jobs----
@@ -149,6 +150,7 @@ app.post(
 // --------------------
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+app.use(languageMiddleware);
 
 // Raw body parser for webhooks
 app.use(

@@ -1,0 +1,87 @@
+{
+  "auth": {
+"login_success": "Connexion réussie",
+"login_failed": "Identifiants invalides",
+"logout_success": "Déconnexion réussie",
+"token_invalid": "Jeton invalide ou expiré",
+"unauthorized": "Accès non autorisé",
+"email_required": "Adresse e-mail requise",
+"password_required": "Mot de passe requis",
+"user_not_found": "Utilisateur introuvable",
+"account_disabled": "Votre compte a été désactivé",
+"create_account_success": "Compte créé avec succès. Un code de vérification a été envoyé à votre adresse e-mail.",
+"email_exists": "Adresse e-mail déjà utilisée.",
+"login_account": "Connectez-vous, puis ajoutez votre nouvelle entreprise.",
+"account_exists": "Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.",
+"signup_success": "Compte créé avec succès. Veuillez vérifier votre adresse e-mail.",
+"invalid_credentials": "Adresse e-mail ou mot de passe invalide",
+"account_suspended": "Votre compte a été suspendu. Veuillez contacter l'assistance.",
+"verification_code_expired": "Votre code de vérification a expiré. Votre compte a été suspendu.",
+"email_not_verified": "Veuillez vérifier votre adresse e-mail avant de vous connecter.",
+"no_company": "Aucune entreprise n'est associée à ce compte.",
+"already_verified": "Votre adresse e-mail est déjà vérifiée. Vous pouvez vous connecter.",
+"too_many_attempts": "Trop de tentatives infructueuses. Votre compte a été suspendu pour des raisons de sécurité.",
+"invalid_verification_code": "Code incorrect. Veuillez réessayer.",
+"verification_success": "Adresse e-mail vérifiée avec succès. Vous êtes maintenant connecté.",
+"verification_code_sent": "Si un compte existe avec cette adresse e-mail, un nouveau code a été envoyé.",
+"token_missing": "Jeton manquant.",
+"token_expired": "Ce lien Le lien a expiré. Veuillez demander un nouveau lien de confirmation.",
+"email_verified_success" : "Courriel confirmé. Vous êtes maintenant connecté.",
+"invalid_code_format" : "Code invalide. Le code doit contenir 6 chiffres.",
+"verification_email_sent" : "Si un compte correspondant existe, un courriel de confirmation vous sera envoyé."
+  },
+   "company": {
+    "created": "Company \"{{name}}\" created successfully",
+    "deleted": "Company deleted successfully",
+    "not_found": "Company not found",
+    "access_denied": "Access denied to this company",
+    "suspended": "This company is suspended",
+    "switched_success": "Switched to \"{{name}}\"",
+    "cannot_delete_last": "You cannot delete your only company",
+    "name": "Company name"
+  },
+  "validation": {
+    "required": "{{field}} is required",
+    "invalid_email": "Invalid email format",
+    "min_length": "{{field}} must be at least {{min}} characters",
+    "max_length": "{{field}} must not exceed {{max}} characters",
+    "invalid_phone": "Invalid phone number format",
+    "invalid": "Invalid {{field}}"
+  },
+  "success": {
+    "operation_completed": "Operation completed successfully",
+    "saved": "Saved successfully",
+    "deleted": "Deleted successfully"
+  },
+  "nfc": {
+    "card_not_found": "NFC card not found",
+    "card_created": "NFC card created successfully",
+    "card_updated": "NFC card updated successfully",
+    "card_deleted": "NFC card deleted successfully",
+    "assign_success": "Card assigned to location successfully",
+    "unassign_success": "Card unassigned successfully",
+    "already_assigned": "Card is already assigned to a location",
+    "invalid_status": "Invalid card status"
+  },
+  "design": {
+    "created": "Design created successfully",
+    "updated": "Design updated successfully",
+    "deleted": "Design deleted successfully",
+    "not_found": "Design not found",
+    "duplicate_failed": "Failed to duplicate design"
+  },
+  "location": {
+    "created": "Location created successfully",
+    "updated": "Location updated successfully",
+    "deleted": "Location deleted successfully",
+    "not_found": "Location not found",
+    "invalid_google_place": "Invalid Google Place ID"
+  },
+  "errors": {
+    "server_error": "Internal server error",
+    "not_found": "Resource not found",
+    "forbidden": "Access forbidden",
+    "validation_failed": "Validation failed",
+    "database_error": "Database error occurred"
+  }
+}

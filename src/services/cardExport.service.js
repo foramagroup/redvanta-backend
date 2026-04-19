@@ -15,13 +15,14 @@ const PUBLIC_DIR = path.join(ROOT_DIR, "public");
 const UPLOAD_DIR = path.resolve(process.cwd(), process.env.UPLOAD_DIR || "uploads");
 const EXPORT_DIR = path.join(PUBLIC_DIR, "uploads", "cards");
 
-const CR80 = { W: 1011, H: 638 };
-const RX = 16;
+// ✅ Dimensions CR80 réduites de moitié pour export compact
+const CR80 = { W: 506, H: 319 };
+const RX = 8;
 
-// Dimensions normales pour carte CR80 print NFC/QR
-const SCALE = 1.5;
-const PAD = Math.round(20 * SCALE);
-const GAP4 = Math.round(16 * SCALE);
+// ✅ SCALE réduit pour fichiers plus légers
+const SCALE = 1.0;
+const PAD = Math.round(16 * SCALE);
+const GAP4 = Math.round(12 * SCALE);
 
 console.log(`[cardExport] EXPORT_DIR = ${EXPORT_DIR}`);
 
@@ -121,8 +122,13 @@ function normalizeDesign(design, card) {
   const bg1 = colorMode === "single" ? (d.bgColor ?? "#0B0D0F") : (d.gradient1 ?? "#0B0D0F");
   const bg2 = colorMode === "single" ? bg1 : (d.gradient2 ?? "#1A1A1A");
 
+  // ✅ Gestion des elementOffsets (JSON depuis DB)
+  const elementOffsets = d.elementOffsets || {};
+  const frontOffsets = elementOffsets?.[orientation]?.front || {};
+  const backOffsets = elementOffsets?.[orientation]?.back || {};
+
   return {
-    cardW, cardH, isLandscape,
+    cardW, cardH, isLandscape, orientation,
     colorMode, bg1, bg2,
     textColor: d.textColor ?? "#FFFFFF",
     accentBand1: d.accentBand1 ?? d.accentColor ?? "#E10600",
@@ -163,7 +169,7 @@ function normalizeDesign(design, card) {
     showNfcIcon: d.showNfcIcon !== false,
     showGoogleIcon: d.showGoogleIcon !== false,
     nfcIconSize: d.nfcIconSize ?? 24,
-    googleIconSize: d.googleLogoSize ?? 16, // ✅ taille réduite pour carte CR80
+    googleIconSize: d.googleLogoSize ?? 16,
 
     businessName: esc(d.businessName ?? card?.locationName ?? "Business Name"),
     sloganText: d.slogan ? esc(d.slogan) : null,
@@ -174,6 +180,10 @@ function normalizeDesign(design, card) {
     frontInstruction2: esc(d.frontInstruction2 ?? "Tap to leave a review"),
     backInstruction1: esc(d.backInstruction1 ?? "Scan the QR code with your camera"),
     backInstruction2: esc(d.backInstruction2 ?? "Write a review on our profile page"),
+
+    // ✅ Offsets drag-and-drop (px) depuis elementOffsets
+    frontOffsets,
+    backOffsets,
   };
 }
 
@@ -220,15 +230,15 @@ function buildGlobalSvg(d, qrInner, totalW, totalH, rectoY, versoY) {
   </clipPath>
 </defs>
 
-<text x="30" y="${rectoY - 10}" font-family="Arial,sans-serif" font-size="20" fill="#555">RECTO</text>
+<text x="30" y="${rectoY - 10}" font-family="Arial,sans-serif" font-size="16" fill="#555">RECTO</text>
 <g clip-path="url(#cr)">
   ${buildRecto(d, qrInner, 30, rectoY)}
 </g>
 
 <line x1="30" y1="${rectoY + d.cardH + 40}" x2="${30 + d.cardW}" y2="${rectoY + d.cardH + 40}"
-      stroke="#333" stroke-width="1" stroke-dasharray="8 5" opacity="0.5"/>
+      stroke="#333" stroke-width="1" stroke-dasharray="6 4" opacity="0.4"/>
 
-<text x="30" y="${versoY - 10}" font-family="Arial,sans-serif" font-size="20" fill="#555">VERSO</text>
+<text x="30" y="${versoY - 10}" font-family="Arial,sans-serif" font-size="16" fill="#555">VERSO</text>
 <g clip-path="url(#cv)">
   ${buildVerso(d, qrInner, 30, versoY)}
 </g>
@@ -252,82 +262,96 @@ function buildGradientDefs(d) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// RECTO - ✅ Layout corrigé
+// RECTO
 // ─────────────────────────────────────────────────────────────
 
 function buildRecto(d, _qrInner, ox, oy) {
   const W = d.cardW, H = d.cardH;
 
-  // ── Tailles en px (propriétés Prisma × SCALE) ─────────────
-  const logoSzPx  = Math.round(d.logoSize * SCALE);           // logoSize
-  const nameSzPx  = Math.round(d.businessFontSize * SCALE);   // businessFontSize
-  const sloganSzPx= Math.round(d.sloganFontSize * SCALE);     // sloganFontSize
-  const instrSzPx = Math.round(d.instrFontSize * SCALE);      // instrFontSize
-  const ctaSzPx   = Math.round(9 * SCALE);                    // taille fixe CTA
-  const nfcSzPx   = Math.round(d.nfcIconSize * SCALE);        // nfcIconSize
-  const gSzPx     = Math.round(d.googleIconSize * SCALE);     // googleLogoSize
-  const starSzPx  = Math.round(14 * SCALE);
-  const checkSzPx = Math.round(12 * SCALE);
-  const instrGap  = Math.round(6 * SCALE);
+  const logoSzPx = Math.round(d.logoSize * SCALE);
+  const nameSzPx = Math.round(d.businessFontSize * SCALE);
+  const sloganSzPx = Math.round(d.sloganFontSize * SCALE);
+  const instrSzPx = Math.round(d.instrFontSize * SCALE);
+  const ctaSzPx = Math.round(9 * SCALE);
+  const nfcSzPx = Math.round(d.nfcIconSize * SCALE);
+  const gSzPx = Math.round(d.googleIconSize * SCALE);
+  const starSzPx = Math.round(12 * SCALE);
+  const checkSzPx = Math.round(10 * SCALE);
+  const instrGap = Math.round(5 * SCALE);
 
-  // ── Band (frontBandHeight %) — calculé EN PREMIER ─────────
-  const hasBand   = d.colorMode === "template" && d.bandPosition !== "hidden";
-  const bandH_px  = hasBand
-    ? Math.round((H * d.frontBandH) / 100)  // frontBandHeight
-    : 0;
-  const bandSvg   = hasBand ? buildBandSvg(d, ox, oy, W, H, d.frontBandH) : "";
+  const hasBand = d.colorMode === "template" && d.bandPosition !== "hidden";
+  const bandH_px = hasBand ? Math.round((H * d.frontBandH) / 100) : 0;
+  const bandSvg = hasBand ? buildBandSvg(d, ox, oy, W, H, d.frontBandH) : "";
 
-  // ── Zone utile (hors band bas) ────────────────────────────
-  const usableH   = H - bandH_px;
+  const usableH = H - bandH_px;
 
-  // ── CTA : bas-gauche dans la zone utile, ctaPaddingTop au-dessus du band ──
-  // ctaPaddingTop = espacement entre la dernière instr et le CTA (propriété Prisma)
-  const ctaPadPx  = Math.round(d.ctaPaddingTop * SCALE);       // ctaPaddingTop
-  const ctaBaseY  = usableH - ctaPadPx;                        // ancrage bas de la zone utile
+  // ✅ CTA : ctaPaddingTop depuis le BAS de la zone utile + offset drag (CORRIGÉ)
+  const ctaPadPx = Math.round(d.ctaPaddingTop * SCALE);
+  const ctaOffsetX = (d.frontOffsets?.cta?.x || 0);  // ✅ PAS de multiplication par SCALE
+  const ctaOffsetY = (d.frontOffsets?.cta?.y || 0);  // ✅ PAS de multiplication par SCALE
+  const ctaBaseY = usableH - ctaPadPx + ctaOffsetY;
 
-  // ── Bloc central (name + slogan + stars + instructions) ───
-  const sloganExtra  = d.sloganText ? sloganSzPx + Math.round(4 * SCALE) : 0;
-  const headerH      = nameSzPx + sloganExtra + Math.round(6 * SCALE) + starSzPx;
-  const instrCount   = (d.frontInstruction1 ? 1 : 0) + (d.frontInstruction2 ? 1 : 0);
-  const instrBlockH  = instrCount * checkSzPx + (instrCount > 1 ? instrGap : 0);
-  // Centrage vertical dans la zone utile (pas toute la carte)
-  const contentH     = headerH + GAP4 + instrBlockH;
-  const contentY     = Math.round((usableH - contentH) / 2);
+  const sloganExtra = d.sloganText ? sloganSzPx + Math.round(3 * SCALE) : 0;
+  const headerH = nameSzPx + sloganExtra + Math.round(5 * SCALE) + starSzPx;
+  const instrCount = (d.frontInstruction1 ? 1 : 0) + (d.frontInstruction2 ? 1 : 0);
+  const instrBlockH = instrCount * checkSzPx + (instrCount > 1 ? instrGap : 0);
+  const contentH = headerH + GAP4 + instrBlockH;
+  const contentY = Math.round((usableH - contentH) / 2);
 
-  const nameBaseY    = contentY + nameSzPx;
-  const sloganBaseY  = nameBaseY + Math.round(4 * SCALE) + sloganSzPx;
-  const starsBaseY   = (d.sloganText ? sloganBaseY : nameBaseY) + Math.round(6 * SCALE) + starSzPx;
-  const instr1BaseY  = starsBaseY + GAP4 + checkSzPx;
-  const instr2BaseY  = instr1BaseY + instrGap + checkSzPx;
+  const nameBaseY = contentY + nameSzPx;
+  const sloganBaseY = nameBaseY + Math.round(3 * SCALE) + sloganSzPx;
+  const starsBaseY = (d.sloganText ? sloganBaseY : nameBaseY) + Math.round(5 * SCALE) + starSzPx;
+  const instr1BaseY = starsBaseY + GAP4 + checkSzPx;
+  const instr2BaseY = instr1BaseY + instrGap + checkSzPx;
 
-  // ── Alignement horizontal (businessAlign) ─────────────────
-  const bizTextX  = d.logoUrl ? PAD + logoSzPx + Math.round(6 * SCALE) : PAD;
+  // ✅ Offsets drag-and-drop (PAS de multiplication par SCALE, valeurs brutes en px)
+  const instrOffsetX = d.frontOffsets?.instructions?.x || 0;
+  const instrOffsetY = d.frontOffsets?.instructions?.y || 0;
+  const logoOffsetX = d.frontOffsets?.logo?.x || 0;
+  const logoOffsetY = d.frontOffsets?.logo?.y || 0;
 
-  // ── NFC icon : haut-droite (showNfcIcon, nfcIconSize) ─────
-  const nfcX = ox + W - Math.round(10 * SCALE) - nfcSzPx;
-  const nfcY = oy + Math.round(10 * SCALE);
+  const nfcOffsetX = d.frontOffsets?.nfcIcon?.x || 0;
+  const nfcOffsetY = d.frontOffsets?.nfcIcon?.y || 0;
+  const nfcX = ox + W - Math.round(8 * SCALE) - nfcSzPx + nfcOffsetX;
+  const nfcY = oy + Math.round(8 * SCALE) + nfcOffsetY;
 
-  // ── Google icon : bas-droite, centré dans le band (showGoogleIcon, googleLogoSize) ──
+  const gOffsetX = d.frontOffsets?.googleIcon?.x || 0;
+  const gOffsetY = d.frontOffsets?.googleIcon?.y || 0;
   const gBandCenterY = bandH_px > 0
-    ? oy + H - Math.round((bandH_px + gSzPx) / 2)   // centré dans le band
-    : oy + H - Math.round(6 * SCALE) - gSzPx;        // pas de band → collé en bas
-  const gX = ox + W - Math.round(8 * SCALE) - gSzPx;
+    ? oy + H - Math.round((bandH_px + gSzPx) / 2) + gOffsetY
+    : oy + H - Math.round(5 * SCALE) - gSzPx + gOffsetY;
+  const gX = ox + W - Math.round(6 * SCALE) - gSzPx + gOffsetX;
+
+  // ✅ Layout selon logoPosition
+  const logoPos = d.logoPosition || "left";
+  const isLogoHorizontal = logoPos === "left" || logoPos === "right";
+  const isLogoLeft = logoPos === "left";
+
+  let logoSvg = "";
+  let businessInfoX = PAD;
+
+  if (d.logoUrl && isLogoHorizontal) {
+    const logoX = isLogoLeft 
+      ? ox + PAD + logoOffsetX 
+      : ox + W - PAD - logoSzPx + logoOffsetX;
+    const logoY = oy + contentY + logoOffsetY;
+    
+    logoSvg = `<image href="${d.logoUrl}" x="${logoX}" y="${logoY}" width="${logoSzPx}" height="${logoSzPx}" preserveAspectRatio="xMidYMid meet"/>`;
+    
+    if (isLogoLeft) {
+      businessInfoX = PAD + logoSzPx + Math.round(5 * SCALE);
+    }
+  }
 
   return `
-  <!-- Fond recto -->
   <rect x="${ox}" y="${oy}" width="${W}" height="${H}" fill="url(#rectoGrad)"/>
-
-  <!-- Band (frontBandHeight=${d.frontBandH}%, bandPosition=${d.bandPosition}) -->
   ${bandSvg}
-
-  <!-- NFC icon (showNfcIcon=${d.showNfcIcon}, nfcIconSize=${d.nfcIconSize}) -->
   ${d.showNfcIcon ? buildNfcIcon(nfcX, nfcY, nfcSzPx, d.textColor, 0.3) : ""}
-
-  <!-- Google icon dans le band, dessiné APRÈS pour z-order (showGoogleIcon=${d.showGoogleIcon}) -->
   ${d.showGoogleIcon ? buildGoogleIcon(gX, gBandCenterY, gSzPx, 1.0) : ""}
 
-  <!-- Business Name (businessFont, businessFontSize, businessFontWeight, businessFontSpacing, businessTextTransform) -->
-  <text x="${ox + bizTextX}" y="${oy + nameBaseY}"
+  ${logoSvg}
+
+  <text x="${ox + businessInfoX}" y="${oy + nameBaseY}"
     font-family="${d.businessFont}" font-size="${nameSzPx}"
     font-weight="${d.businessFontWeight}"
     letter-spacing="${d.businessFontSpacing}"
@@ -335,23 +359,19 @@ function buildRecto(d, _qrInner, ox, oy) {
     fill="${d.textColor}"
     text-anchor="start">${d.businessName}</text>
 
-  <!-- Slogan (sloganFont, sloganFontSize, sloganFontWeight, sloganFontSpacing, sloganTextTransform) -->
-  ${d.sloganText ? `<text x="${ox + bizTextX}" y="${oy + sloganBaseY}"
+  ${d.sloganText ? `<text x="${ox + businessInfoX}" y="${oy + sloganBaseY}"
     font-family="${d.sloganFont}" font-size="${sloganSzPx}"
     font-weight="${d.sloganFontWeight}"
     letter-spacing="${d.sloganFontSpacing}"
     ${d.sloganTextTransform ? `text-transform="${d.sloganTextTransform}"` : ""}
     fill="${d.textColor}" opacity="0.70">${d.sloganText}</text>` : ""}
 
-  <!-- Stars (starColor) -->
-  ${buildStarsRow(ox + bizTextX, oy + starsBaseY, 5, starSzPx, d.starsColor)}
+  ${buildStarsRow(ox + businessInfoX, oy + starsBaseY, 5, starSzPx, d.starsColor)}
 
-  <!-- Instructions (instrFont, instrFontSize, instrFontWeight, instrFontSpacing, iconsColor, checkStrokeWidth) -->
-  ${d.frontInstruction1 ? buildCheckLine(ox + PAD, oy + instr1BaseY, d.frontInstruction1, d, instrSzPx, checkSzPx) : ""}
-  ${d.frontInstruction2 ? buildCheckLine(ox + PAD, oy + instr2BaseY, d.frontInstruction2, d, instrSzPx, checkSzPx) : ""}
+  ${d.frontInstruction1 ? buildCheckLine(ox + PAD + instrOffsetX, oy + instr1BaseY + instrOffsetY, d.frontInstruction1, d, instrSzPx, checkSzPx) : ""}
+  ${d.frontInstruction2 ? buildCheckLine(ox + PAD + instrOffsetX, oy + instr2BaseY + instrOffsetY, d.frontInstruction2, d, instrSzPx, checkSzPx) : ""}
 
-  <!-- CTA (callToAction, ctaPaddingTop) : bas-gauche, au-dessus du band -->
-  <text x="${ox + PAD}" y="${oy + ctaBaseY}"
+  <text x="${ox + PAD + ctaOffsetX}" y="${oy + ctaBaseY}"
     font-family="${d.instrFont}" font-size="${ctaSzPx}"
     font-weight="500"
     fill="${d.textColor}" opacity="0.75">${d.ctaText}</text>
@@ -359,101 +379,90 @@ function buildRecto(d, _qrInner, ox, oy) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// VERSO - ✅ Layout corrigé
+// VERSO
 // ─────────────────────────────────────────────────────────────
 
 function buildVerso(d, qrInner, ox, oy) {
   const W = d.cardW, H = d.cardH;
 
-  // ── Tailles en px (propriétés Prisma × SCALE) ─────────────
-  const nameSzPx  = Math.round(Math.max(d.businessFontSize - 4, 8) * SCALE);  // businessFontSize
-  const sloganSzPx= Math.round(Math.max(d.sloganFontSize - 2, 7) * SCALE);    // sloganFontSize
-  const instrSzPx = Math.round(Math.max(d.instrFontSize - 1, 7) * SCALE);     // instrFontSize
-  const ctaSzPx   = Math.round(9 * SCALE);
-  const starSzPx  = Math.round(11 * SCALE);
-  const checkSzPx = Math.round(12 * SCALE);
-  const gSzPx     = Math.round(d.googleIconSize * SCALE);                      // googleLogoSize
-  const qrSzPx    = Math.min(Math.round(d.qrSize * SCALE), Math.round(H * 0.5)); // qrCodeSize
-  const rowGap    = Math.round(12 * SCALE);
-  const instrGap  = Math.round(6 * SCALE);
+  const nameSzPx = Math.round(Math.max(d.businessFontSize - 3, 9) * SCALE);
+  const sloganSzPx = Math.round(Math.max(d.sloganFontSize - 2, 8) * SCALE);
+  const instrSzPx = Math.round(Math.max(d.instrFontSize - 1, 8) * SCALE);
+  const ctaSzPx = Math.round(8 * SCALE);
+  const starSzPx = Math.round(10 * SCALE);
+  const checkSzPx = Math.round(10 * SCALE);
+  const gSzPx = Math.round(d.googleIconSize * SCALE);
+  const qrSzPx = Math.min(Math.round(d.qrSize * SCALE), Math.round(H * 0.45));
+  const rowGap = Math.round(10 * SCALE);
+  const instrGap = Math.round(5 * SCALE);
 
-  // ── Band (backBandHeight %) — calculé EN PREMIER ──────────
-  const hasBand  = d.colorMode === "template" && d.bandPosition !== "hidden";
-  const bandH_px = hasBand
-    ? Math.round((H * d.backBandH) / 100)   // backBandHeight
-    : 0;
-  const bandSvg  = hasBand ? buildBandSvg(d, ox, oy, W, H, d.backBandH) : "";
+  const hasBand = d.colorMode === "template" && d.bandPosition !== "hidden";
+  const bandH_px = hasBand ? Math.round((H * d.backBandH) / 100) : 0;
+  const bandSvg = hasBand ? buildBandSvg(d, ox, oy, W, H, d.backBandH) : "";
 
-  // ── Zone utile (hors band bas) ────────────────────────────
-  const usableH  = H - bandH_px;
+  const usableH = H - bandH_px;
 
-  // ── CTA : centré, ancré en bas de la zone utile (ctaPaddingTop) ──
-  const ctaPadPx = Math.round(d.ctaPaddingTop * SCALE);   // ctaPaddingTop
-  const ctaBaseY = usableH - ctaPadPx;
+  // ✅ CTA : ctaPaddingTop depuis le BAS de la zone utile + offset drag (CORRIGÉ)
+  const ctaPadPx = Math.round(d.ctaPaddingTop * SCALE);
+  const ctaOffsetY = d.backOffsets?.cta?.y || 0;  // ✅ PAS de multiplication par SCALE
+  const ctaBaseY = usableH - ctaPadPx + ctaOffsetY;
 
-  // ── Google icon : bas-droite, centré dans le band ─────────
+  const gOffsetX = d.backOffsets?.googleIcon?.x || 0;
+  const gOffsetY = d.backOffsets?.googleIcon?.y || 0;
   const gBandCenterY = bandH_px > 0
-    ? oy + H - Math.round((bandH_px + gSzPx) / 2)
-    : oy + H - Math.round(6 * SCALE) - gSzPx;
-  const gX = ox + W - Math.round(8 * SCALE) - gSzPx;
+    ? oy + H - Math.round((bandH_px + gSzPx) / 2) + gOffsetY
+    : oy + H - Math.round(5 * SCALE) - gSzPx + gOffsetY;
+  const gX = ox + W - Math.round(6 * SCALE) - gSzPx + gOffsetX;
 
-  // ── QR brackets ───────────────────────────────────────────
+  // ✅ QR : fond blanc + brackets blancs
   const bracketSize = Math.round(qrSzPx * 0.28);
-  const bracketW    = Math.round(bracketSize * 0.25);
+  const bracketW = Math.round(bracketSize * 0.25);
 
-  // ── Disposition QR / Info selon qrCodeStyle ───────────────
   const isQrHoriz = d.qrPosition === "left" || d.qrPosition === "right";
   const isQrFirst = d.qrPosition === "left" || d.qrPosition === "top";
 
-  const sloganLineH = d.sloganText ? sloganSzPx + Math.round(4 * SCALE) : 0;
-  const infoH  = nameSzPx + Math.round(4 * SCALE) + sloganLineH + Math.round(4 * SCALE) + starSzPx;
+  const sloganLineH = d.sloganText ? sloganSzPx + Math.round(3 * SCALE) : 0;
+  const infoH = nameSzPx + Math.round(3 * SCALE) + sloganLineH + Math.round(3 * SCALE) + starSzPx;
   const topRowH = Math.max(qrSzPx, infoH);
 
-  // ── Centrage vertical du bloc central dans la zone utile ──
-  const instrCount   = (d.backInstruction1 ? 1 : 0) + (d.backInstruction2 ? 1 : 0);
-  const instrTotalH  = instrCount * checkSzPx + (instrCount > 1 ? instrGap : 0);
-  const contentH     = topRowH + GAP4 + instrTotalH;
-  const startY       = Math.round((usableH - contentH) / 2);
+  const instrCount = (d.backInstruction1 ? 1 : 0) + (d.backInstruction2 ? 1 : 0);
+  const instrTotalH = instrCount * checkSzPx + (instrCount > 1 ? instrGap : 0);
+  const contentH = topRowH + GAP4 + instrTotalH;
+  const startY = Math.round((usableH - contentH) / 2);
 
-  const topRowTop  = startY;
-  const instrTop   = topRowTop + topRowH + GAP4;
+  const topRowTop = startY;
+  const instrTop = topRowTop + topRowH + GAP4;
   const instr1Base = instrTop + checkSzPx;
   const instr2Base = instr1Base + instrGap + checkSzPx;
 
-  // ── Positions horizontales QR + bloc info ─────────────────
   const infoBlockW = Math.round(W * 0.4);
-  const topRowW    = isQrHoriz ? infoBlockW + rowGap + qrSzPx : Math.max(qrSzPx, infoBlockW);
-  const topRowX    = Math.round((W - topRowW) / 2);
+  const topRowW = isQrHoriz ? infoBlockW + rowGap + qrSzPx : Math.max(qrSzPx, infoBlockW);
+  const topRowX = Math.round((W - topRowW) / 2);
 
   let qrX, infoBlockX;
   if (isQrHoriz) {
     if (isQrFirst) { qrX = ox + topRowX; infoBlockX = qrX + qrSzPx + rowGap; }
-    else           { infoBlockX = ox + topRowX; qrX = infoBlockX + infoBlockW + rowGap; }
+    else { infoBlockX = ox + topRowX; qrX = infoBlockX + infoBlockW + rowGap; }
   } else {
     qrX = ox + Math.round((W - qrSzPx) / 2);
     infoBlockX = ox + Math.round((W - infoBlockW) / 2);
   }
 
-  const infoCX    = infoBlockX + Math.round(infoBlockW / 2);
-  const qrY       = oy + topRowTop + Math.round((topRowH - qrSzPx) / 2);
-  const infoTopY  = oy + topRowTop + Math.round((topRowH - infoH) / 2);
+  const infoCX = infoBlockX + Math.round(infoBlockW / 2);
+  const qrY = oy + topRowTop + Math.round((topRowH - qrSzPx) / 2);
+  const infoTopY = oy + topRowTop + Math.round((topRowH - infoH) / 2);
   const nameBaseY = infoTopY + nameSzPx;
-  const sloganBaseY = nameBaseY + Math.round(4 * SCALE) + sloganSzPx;
-  const starsY    = (d.sloganText ? sloganBaseY : nameBaseY) + Math.round(4 * SCALE) + starSzPx;
-  const starsStartX = infoCX - Math.round((5 * (starSzPx + Math.round(2 * SCALE))) / 2);
+  const sloganBaseY = nameBaseY + Math.round(3 * SCALE) + sloganSzPx;
+  const starsY = (d.sloganText ? sloganBaseY : nameBaseY) + Math.round(3 * SCALE) + starSzPx;
+  const starsStartX = infoCX - Math.round((5 * (starSzPx + Math.round(1.5 * SCALE))) / 2);
 
   return `
-  <!-- Fond verso -->
   <rect x="${ox}" y="${oy}" width="${W}" height="${H}" fill="url(#versoGrad)"/>
-
-  <!-- Band (backBandHeight=${d.backBandH}%, bandPosition=${d.bandPosition}) -->
   ${bandSvg}
-
-  <!-- Google icon dans le band, dessiné APRÈS (showGoogleIcon=${d.showGoogleIcon}, googleLogoSize=${d.googleIconSize}) -->
   ${d.showGoogleIcon ? buildGoogleIcon(gX, gBandCenterY, gSzPx, 1.0) : ""}
 
-  <!-- QR Code (qrCodeSize=${d.qrSize}, qrCodeStyle=${d.qrPosition}, accentColor=${d.qrColor}) -->
-  <rect x="${qrX}" y="${qrY}" width="${qrSzPx}" height="${qrSzPx}" rx="8" fill="#FFFFFF"/>
+  <rect x="${qrX}" y="${qrY}" width="${qrSzPx}" height="${qrSzPx}" rx="6" fill="#FFFFFF"/>
+  
   <rect x="${qrX}" y="${qrY}" width="${bracketSize}" height="${bracketW}" fill="#FFFFFF"/>
   <rect x="${qrX}" y="${qrY}" width="${bracketW}" height="${bracketSize}" fill="#FFFFFF"/>
   <rect x="${qrX + qrSzPx - bracketSize}" y="${qrY}" width="${bracketSize}" height="${bracketW}" fill="#FFFFFF"/>
@@ -462,31 +471,27 @@ function buildVerso(d, qrInner, ox, oy) {
   <rect x="${qrX}" y="${qrY + qrSzPx - bracketSize}" width="${bracketW}" height="${bracketSize}" fill="#FFFFFF"/>
   <rect x="${qrX + qrSzPx - bracketSize}" y="${qrY + qrSzPx - bracketW}" width="${bracketSize}" height="${bracketW}" fill="#FFFFFF"/>
   <rect x="${qrX + qrSzPx - bracketW}" y="${qrY + qrSzPx - bracketSize}" width="${bracketW}" height="${bracketSize}" fill="#FFFFFF"/>
+
   <svg x="${qrX + Math.round(qrSzPx * 0.1)}" y="${qrY + Math.round(qrSzPx * 0.1)}"
        width="${Math.round(qrSzPx * 0.8)}" height="${Math.round(qrSzPx * 0.8)}"
        viewBox="0 0 ${Math.round(qrSzPx * 0.8)} ${Math.round(qrSzPx * 0.8)}"
        preserveAspectRatio="xMidYMid meet">${qrInner}</svg>
 
-  <!-- Business Name (businessFont, businessFontSize, businessFontWeight) -->
   <text x="${infoCX}" y="${nameBaseY}"
     font-family="${d.businessFont}" font-size="${nameSzPx}"
     font-weight="${d.businessFontWeight}"
     fill="${d.textColor}" text-anchor="middle">${d.businessName}</text>
 
-  <!-- Slogan (sloganFont, sloganFontSize, sloganFontWeight) -->
   ${d.sloganText ? `<text x="${infoCX}" y="${sloganBaseY}"
     font-family="${d.sloganFont}" font-size="${sloganSzPx}"
     font-weight="${d.sloganFontWeight}"
     fill="${d.textColor}" opacity="0.70" text-anchor="middle">${d.sloganText}</text>` : ""}
 
-  <!-- Stars (starColor) -->
   ${buildStarsRow(starsStartX, starsY, 5, starSzPx, d.starsColor)}
 
-  <!-- Instructions (backInstruction1/2, instrFont, instrFontSize, iconsColor, checkStrokeWidth) -->
   ${d.backInstruction1 ? buildCheckLineCentered(ox + W / 2, oy + instr1Base, d.backInstruction1, d, instrSzPx, checkSzPx) : ""}
   ${d.backInstruction2 ? buildCheckLineCentered(ox + W / 2, oy + instr2Base, d.backInstruction2, d, instrSzPx, checkSzPx) : ""}
 
-  <!-- CTA (callToAction, ctaPaddingTop) : centré, au-dessus du band -->
   <text x="${ox + W / 2}" y="${oy + ctaBaseY}"
     font-family="${d.instrFont}" font-size="${ctaSzPx}"
     font-weight="500"
@@ -509,8 +514,8 @@ function buildCheckLine(x, y, text, d, fontSize, checkSz) {
   if (!text) return "";
   const cx = x + checkSz / 2;
   const cy = y - checkSz * 0.5;
-  const tx = x + checkSz + Math.round(8 * SCALE);
-  const sw = Math.max(2, d.checkStrokeWidth * SCALE * 0.45);
+  const tx = x + checkSz + Math.round(6 * SCALE);
+  const sw = Math.max(1.5, d.checkStrokeWidth * SCALE * 0.35);
   return `
   <circle cx="${cx}" cy="${cy}" r="${checkSz * 0.55}" fill="${d.iconsColor}" opacity="0.15"/>
   <polyline
@@ -527,8 +532,8 @@ function buildCheckLine(x, y, text, d, fontSize, checkSz) {
 
 function buildCheckLineCentered(cx, y, text, d, fontSize, checkSz) {
   if (!text) return "";
-  const textW = text.length * fontSize * 0.52;
-  const itemW = checkSz + Math.round(8 * SCALE) + textW;
+  const textW = text.length * fontSize * 0.5;
+  const itemW = checkSz + Math.round(6 * SCALE) + textW;
   const startX = cx - itemW / 2;
   return buildCheckLine(startX, y, text, d, fontSize, checkSz);
 }
@@ -537,7 +542,7 @@ function buildStarsRow(x, y, count, size, color) {
   let svg = "";
   const R = size / 2;
   const r = R * 0.382;
-  const gap = Math.round(2 * SCALE);
+  const gap = Math.round(1.5 * SCALE);
   for (let i = 0; i < count; i++) {
     const cx = x + R + i * (size + gap);
     const cy = y - R;
@@ -587,7 +592,7 @@ function esc(s) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PNG
+// PNG + PDF (inchangé)
 // ─────────────────────────────────────────────────────────────
 
 async function writePngWithLogoOverlay(svgContent, outPath, w, h, d, logoPngBuffer, rectoY) {
@@ -597,7 +602,7 @@ async function writePngWithLogoOverlay(svgContent, outPath, w, h, d, logoPngBuff
     if (logoPngBuffer) {
       const logoSzPx = Math.round(d.logoSize * SCALE);
       const logoX = 30 + PAD;
-      const bizRowY = Math.round((d.cardH - 200) / 2);
+      const bizRowY = Math.round((d.cardH - 180) / 2);
       const logoY = rectoY + bizRowY;
       const logoBuf = await sharp(logoPngBuffer)
         .resize({ width: logoSzPx, height: logoSzPx, fit: "inside", background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -612,22 +617,16 @@ async function writePngWithLogoOverlay(svgContent, outPath, w, h, d, logoPngBuff
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// ✅ PDF - via Playwright (remplace le stub vide)
-// ─────────────────────────────────────────────────────────────
-
 async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY) {
   try {
     const { chromium } = await import("playwright");
-
-    // ✅ On construit un PNG intermédiaire haute qualité
     const sharp = (await import("sharp")).default;
     let img = sharp(Buffer.from(svgContent)).resize(totalW, totalH);
 
     if (logoPngBuffer) {
       const logoSzPx = Math.round(d.logoSize * SCALE);
       const logoX = 30 + PAD;
-      const bizRowY = Math.round((d.cardH - 200) / 2);
+      const bizRowY = Math.round((d.cardH - 180) / 2);
       const logoY = rectoY + bizRowY;
       const logoBuf = await sharp(logoPngBuffer)
         .resize({ width: logoSzPx, height: logoSzPx, fit: "inside", background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -639,7 +638,6 @@ async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, lo
     const pngBuffer = await img.png({ compressionLevel: 6 }).toBuffer();
     const base64Png = pngBuffer.toString("base64");
 
-    // ✅ HTML wrapper pour Playwright
     const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -661,7 +659,6 @@ async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, lo
     await page.setViewportSize({ width: totalW, height: totalH });
     await page.setContent(html, { waitUntil: "networkidle" });
 
-    // ✅ PDF au format exact de la carte (px → pt : 1px = 0.75pt)
     await page.pdf({
       path: pdfPath,
       width: `${totalW}px`,
@@ -674,14 +671,9 @@ async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, lo
     console.log(`[cardExport] ✅ PDF → ${pdfPath}`);
   } catch (e) {
     console.warn(`[cardExport] ⚠️ Erreur PDF Playwright : ${e.message}`);
-    // ✅ Fallback : PDF = PNG renommé encapsulé (dernier recours)
     await writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY);
   }
 }
-
-// ─────────────────────────────────────────────────────────────
-// ✅ PDF Fallback (si Playwright échoue) - PNG encapsulé en PDF minimal
-// ─────────────────────────────────────────────────────────────
 
 async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY) {
   try {
@@ -691,7 +683,7 @@ async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngB
     if (logoPngBuffer) {
       const logoSzPx = Math.round(d.logoSize * SCALE);
       const logoX = 30 + PAD;
-      const bizRowY = Math.round((d.cardH - 200) / 2);
+      const bizRowY = Math.round((d.cardH - 180) / 2);
       const logoY = rectoY + bizRowY;
       const logoBuf = await sharp(logoPngBuffer)
         .resize({ width: logoSzPx, height: logoSzPx, fit: "inside", background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -700,10 +692,7 @@ async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngB
       img = img.composite([{ input: logoBuf, left: Math.round(logoX), top: Math.round(logoY), blend: "over" }]);
     }
 
-    // Convertir en JPEG pour PDF (plus léger)
     const jpegBuffer = await img.jpeg({ quality: 95 }).toBuffer();
-
-    // ✅ PDF minimal valide encapsulant le JPEG (structure PDF basique)
     const pdfContent = buildMinimalPdf(jpegBuffer, totalW, totalH);
     await fsP.writeFile(pdfPath, pdfContent);
     console.log(`[cardExport] ✅ PDF fallback → ${pdfPath}`);
@@ -713,7 +702,6 @@ async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngB
 }
 
 function buildMinimalPdf(jpegBuffer, widthPx, heightPx) {
-  // Conversion px → pt (72pt / 96dpi)
   const wPt = Math.round(widthPx * 72 / 96);
   const hPt = Math.round(heightPx * 72 / 96);
   const imgLen = jpegBuffer.length;
@@ -739,10 +727,6 @@ function buildMinimalPdf(jpegBuffer, widthPx, heightPx) {
 
   return Buffer.concat(parts);
 }
-
-// ─────────────────────────────────────────────────────────────
-// EXPORTS UTILITAIRES
-// ─────────────────────────────────────────────────────────────
 
 export async function deleteCardExportFiles(uid) {
   for (const ext of ["svg", "png", "pdf"]) {

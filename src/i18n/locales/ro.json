@@ -1,0 +1,87 @@
+{
+  "auth": {
+    "login_success": "Conectare reușită",
+    "login_failed": "Date de autentificare nevalide",
+    "logout_success": "Deconectare reușită",
+    "token_invalid": "Token nevalid sau expirat",
+    "unauthorized": "Acces neautorizat",
+    "email_required": "Adresa de e-mail este obligatorie",
+    "password_required": "Parola este obligatorie",
+    "user_not_found": "Utilizatorul nu a fost găsit",
+    "account_disabled": "Contul dumneavoastră a fost dezactivat",
+    "create_account_success": "Cont creat cu succes. Un cod de verificare a fost trimis la adresa de e-mail.",
+    "email_exists": "Această adresă de e-mail este deja utilizată.",
+    "login_account": "Autentificați-vă, apoi adăugați noua companie.",
+    "account_exists": "Există deja un cont cu această adresă de e-mail. Vă rugăm să vă autentificați.",
+    "signup_success": "Cont creat cu succes. Vă rugăm să vă verificați e-mailul.",
+    "invalid_credentials": "Adresă de e-mail sau parolă nevalidă",
+    "account_suspended": "Contul dumneavoastră a fost suspendat. Vă rugăm să contactați asistența.",
+    "verification_code_expired": "Codul de verificare a expirat. Contul dumneavoastră a fost suspendat.",
+    "email_not_verified": "Vă rugăm să vă verificați e-mailul înainte de a vă conecta.",
+    "no_company": "Nicio companie nu este asociată cu acest cont.",
+    "already_verified": "Adresa de e-mail este deja verificată. Vă puteți conecta.",
+    "too_many_attempts": "Prea multe încercări eșuate. Contul dumneavoastră a fost suspendat din motive de securitate.",
+    "invalid_verification_code": "Cod incorect. Vă rugăm să încercați din nou.",
+    "verification_success": "Adresă de e-mail verificată cu succes. Sunteți acum conectat.",
+    "verification_code_sent": "Dacă există un cont cu această adresă de e-mail, un nou cod a fost trimis.",
+    "token_missing": "Token lipsește.",
+    "token_expired": "Acest link a expirat. Vă rugăm să solicitați un nou link de confirmare.",
+    "email_verified_success": "E-mail confirmat. Sunteți acum conectat.",
+    "invalid_code_format": "Cod nevalid. Codul trebuie să conțină 6 cifre.",
+    "verification_email_sent": "Dacă există un cont corespunzător, un e-mail de confirmare vă va fi trimis."
+  },
+  "company": {
+    "created": "Compania \"{{name}}\" a fost creată cu succes",
+    "deleted": "Companie ștearsă cu succes",
+    "not_found": "Compania nu a fost găsită",
+    "access_denied": "Acces refuzat pentru această companie",
+    "suspended": "Această companie este suspendată",
+    "switched_success": "S-a trecut la \"{{name}}\"",
+    "cannot_delete_last": "Nu puteți șterge singura companie deținută",
+    "name": "Numele companiei"
+  },
+  "validation": {
+    "required": "{{field}} este obligatoriu",
+    "invalid_email": "Format de e-mail nevalid",
+    "min_length": "{{field}} trebuie să aibă cel puțin {{min}} caractere",
+    "max_length": "{{field}} nu trebuie să depășească {{max}} caractere",
+    "invalid_phone": "Format de număr de telefon nevalid",
+    "invalid": "{{field}} nevalid"
+  },
+  "success": {
+    "operation_completed": "Operațiune finalizată cu succes",
+    "saved": "Salvat cu succes",
+    "deleted": "Șters cu succes"
+  },
+  "nfc": {
+    "card_not_found": "Cardul NFC nu a fost găsit",
+    "card_created": "Card NFC creat cu succes",
+    "card_updated": "Card NFC actualizat cu succes",
+    "card_deleted": "Card NFC șters cu succes",
+    "assign_success": "Card atribuit locației cu succes",
+    "unassign_success": "Card neatribuit cu succes",
+    "already_assigned": "Cardul este deja atribuit unei locații",
+    "invalid_status": "Stare card nevalidă"
+  },
+  "design": {
+    "created": "Design creat cu succes",
+    "updated": "Design actualizat cu succes",
+    "deleted": "Design șters cu succes",
+    "not_found": "Designul nu a fost găsit",
+    "duplicate_failed": "Duplicarea designului a eșuat"
+  },
+  "location": {
+    "created": "Locație creată cu succes",
+    "updated": "Locație actualizată cu succes",
+    "deleted": "Locație ștearsă cu succes",
+    "not_found": "Locația nu a fost găsită",
+    "invalid_google_place": "ID Google Place nevalid"
+  },
+  "errors": {
+    "server_error": "Eroare internă de server",
+    "not_found": "Resursa nu a fost găsită",
+    "forbidden": "Acces interzis",
+    "validation_failed": "Validarea a eșuat",
+    "database_error": "A apărut o eroare de bază de date"
+  }
+}

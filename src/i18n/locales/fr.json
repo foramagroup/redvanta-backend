@@ -1,0 +1,69 @@
+{
+  "auth": {
+    "login_success": "Connexion réussie",
+    "login_failed": "Identifiants invalides",
+    "logout_success": "Déconnexion réussie",
+    "token_invalid": "Token invalide ou expiré",
+    "unauthorized": "Accès non autorisé",
+    "email_required": "L'email est requis",
+    "password_required": "Le mot de passe est requis",
+    "user_not_found": "Utilisateur non trouvé",
+    "account_disabled": "Votre compte a été désactivé",
+    "create_account_success": "Compte créé avec succès. Un code de vérification a été envoyé à votre adresse e-mail.",
+
+"email_exists": "Adresse e-mail déjà utilisée."
+  },
+  "validation": {
+    "created": "Entreprise \"{{name}}\" créée avec succès",
+    "deleted": "Entreprise supprimée avec succès",
+    "not_found": "Entreprise introuvable",
+    "access_denied": "Accès refusé à cette entreprise",
+    "suspended": "Cette entreprise est suspendue",
+    "switched_success": "Passage à \"{{name}}\"",
+    "cannot_delete_last": "Vous ne pouvez pas supprimer votre seule entreprise",
+    "name": "Nom de l'entreprise",
+    "invalid": "Invalide {{field}}"
+  },
+  "nfc": {
+    "card_not_found": "Carte NFC introuvable",
+    "card_created": "Carte NFC créée avec succès",
+    "card_updated": "Carte NFC mise à jour avec succès",
+    "card_deleted": "Carte NFC supprimée avec succès",
+    "assign_success": "Carte assignée à l'emplacement avec succès",
+    "unassign_success": "Carte désassignée avec succès",
+    "already_assigned": "La carte est déjà assignée à un emplacement",
+    "invalid_status": "Statut de carte invalide"
+  },
+  "design": {
+    "created": "Design créé avec succès",
+    "updated": "Design mis à jour avec succès",
+    "deleted": "Design supprimé avec succès",
+    "not_found": "Design introuvable",
+    "duplicate_failed": "Échec de la duplication du design"
+  },
+  "location": {
+    "created": "Emplacement créé avec succès",
+    "updated": "Emplacement mis à jour avec succès",
+    "deleted": "Emplacement supprimé avec succès",
+    "not_found": "Emplacement introuvable",
+    "invalid_google_place": "ID Google Place invalide"
+  },
+  "company": {
+    "not_found": "Entreprise introuvable",
+    "updated": "Paramètres de l'entreprise mis à jour avec succès",
+    "plan_upgraded": "Plan amélioré avec succès",
+    "limit_reached": "Limite d'entreprise atteinte pour le plan actuel"
+  },
+  "errors": {
+    "server_error": "Erreur interne du serveur",
+    "not_found": "Ressource introuvable",
+    "forbidden": "Accès interdit",
+    "validation_failed": "Échec de la validation",
+    "database_error": "Erreur de base de données"
+  },
+  "success": {
+    "operation_completed": "Opération terminée avec succès",
+    "saved": "Enregistré avec succès",
+    "deleted": "Supprimé avec succès"
+  }
+}

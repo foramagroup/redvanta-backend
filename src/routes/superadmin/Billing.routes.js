@@ -5,7 +5,7 @@ import {
   getStats, listInvoices, getInvoice,
   createInvoice, updateInvoice, refundInvoice,
   addManualPayment, listPayments, retryPayment
-} from "../../controllers/superadmin/billing.controller.js";
+} from "../../controllers/superadmin/Billing.controller.js";
 
 const router = Router();
 const auth   = [authenticateSuperAdmin, requireSuperAdmin];

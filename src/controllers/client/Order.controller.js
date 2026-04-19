@@ -166,9 +166,7 @@ export const createOrder = async (req, res, next) => {
       stripeClientSecret = paymentIntent.client_secret;
     }
 
-  
 
-    
     const order = await prisma.$transaction(async (tx) => {
       const o = await tx.order.create({
         data: {

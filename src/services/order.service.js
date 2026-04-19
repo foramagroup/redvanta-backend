@@ -14,7 +14,7 @@ export const formatOrder = (order) => {
     paymentMethod: order.stripePaymentIntentId ? "Stripe / Card" : "Manual",
     // Formatage des items pour correspondre à la vue
     items: order.items.map(item => ({
-      name: item.product?.name || "Product",
+      name: item.product?.translations?.[0]?.title || item.product?.title || "Product",
       model: item.cardType?.name || item.packageTier?.name || "Standard",
       quantity: item.quantity,
       unitPrice: item.unitPrice,
