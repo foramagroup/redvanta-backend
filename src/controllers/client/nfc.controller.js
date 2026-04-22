@@ -214,7 +214,6 @@ export const getReviewPage = async (req, res, next) => {
         name:             true,
         logo:             true,
         primaryColor:     true,
-        thankYouMessage:  true,  // message personnalisé affiché sur la page
       },
     });
 
@@ -265,7 +264,12 @@ export const submitRating = async (req, res, next) => {
       });
     }
 
-    const card = await prisma.nFCCard.findUnique({ where: { uid } });
+    const card = await prisma.nFCCard.findUnique({ 
+      where: { uid },
+      include: {
+        company: true
+      }
+    });
     if (!card || !card.active) {
       return res.status(404).json({ success: false, error: "Carte introuvable ou inactive" });
     }
@@ -300,7 +304,8 @@ export const submitRating = async (req, res, next) => {
       return res.json({
         success:         true,
         action:          "GOOGLE_REDIRECT",
-        googleReviewUrl: card.googleReviewUrl,  // URL Google Reviews
+        googleReviewUrl: card.googleReviewUrl||card.company.googleReviewUrl,  // URL Google Reviews
+        googlePlaceId: card.company.googlePlaceId,  // URL Google Reviews
         message:         "Merci ! Vous allez être redirigé vers Google.",
         stars:           starsNum,
       });
@@ -313,7 +318,6 @@ export const submitRating = async (req, res, next) => {
         action:  "INTERNAL_FEEDBACK",
         message: "Votre avis compte beaucoup pour nous.",
         stars:   starsNum,
-        // uid retourné pour le POST /review/:uid/feedback suivant
         uid,
       });
     }
@@ -402,13 +406,11 @@ export const submitFeedback = async (req, res, next) => {
 async function sendFeedbackNotification(feedback, card) {
   try {
     const { sendTemplatedMail } = await import("../../services/client/mail.service.js");
-
     const ownerLink = await prisma.userCompany.findFirst({
       where:   { companyId: card.companyId, isOwner: true },
       include: { user: true },
     });
     if (!ownerLink) return;
-
     await sendTemplatedMail({
       slug: "feedback_received",
       to:   ownerLink.user.email,
@@ -429,7 +431,6 @@ async function sendFeedbackNotification(feedback, card) {
         text: `Feedback ${feedback.stars}/5 : ${feedback.message ?? ""}`,
       }),
     });
-
     await prisma.feedback.update({
       where: { id: feedback.id },
       data:  { notifiedAt: new Date() },

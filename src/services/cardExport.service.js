@@ -59,7 +59,7 @@ export async function generateCardExport(card, design) {
   const pdfPath = path.join(EXPORT_DIR, `${card.uid}.pdf`);
   await writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY);
 
-  const base = (process.env.APP_URL ?? process.env.FRONTEND_URL ?? "http://localhost:4000").replace(/\/$/, "");
+  const base = (process.env.APP_URL ?? process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/$/, "");
   return {
     svgUrl: `${base}/uploads/cards/${card.uid}.svg`,
     pngUrl: `${base}/uploads/cards/${card.uid}.png`,
@@ -621,6 +621,7 @@ async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, lo
   try {
     const { chromium } = await import("playwright");
     const sharp = (await import("sharp")).default;
+    
     let img = sharp(Buffer.from(svgContent)).resize(totalW, totalH);
 
     if (logoPngBuffer) {
@@ -671,6 +672,7 @@ async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, lo
     console.log(`[cardExport] ✅ PDF → ${pdfPath}`);
   } catch (e) {
     console.warn(`[cardExport] ⚠️ Erreur PDF Playwright : ${e.message}`);
+    // ✅ CORRECTION : Passer svgContent au fallback au lieu de le relire
     await writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY);
   }
 }
@@ -678,6 +680,8 @@ async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, lo
 async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY) {
   try {
     const sharp = (await import("sharp")).default;
+    
+    // ✅ IMPORTANT : Utiliser svgContent (SVG frais) au lieu de lire depuis le disque
     let img = sharp(Buffer.from(svgContent)).resize(totalW, totalH);
 
     if (logoPngBuffer) {
@@ -692,6 +696,7 @@ async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngB
       img = img.composite([{ input: logoBuf, left: Math.round(logoX), top: Math.round(logoY), blend: "over" }]);
     }
 
+    // ✅ Convertir le SVG frais en JPEG
     const jpegBuffer = await img.jpeg({ quality: 95 }).toBuffer();
     const pdfContent = buildMinimalPdf(jpegBuffer, totalW, totalH);
     await fsP.writeFile(pdfPath, pdfContent);

@@ -8,7 +8,7 @@ import {
 } from "../../controllers/client/CartController.js";
 
 import {
-  getDesignByCartItem, createDesign,
+  getDesignById, getDesignByCartItem, createDesign,
   saveStep1, saveStep2, validateDesign,
   getVersions, restoreVersion,
 } from "../../controllers/client/DesignController.js";
@@ -46,6 +46,7 @@ router.delete("/cart",     ...auth, clearCart);
 // GET  /api/designs/:id/versions          → historique des versions
 // POST /api/designs/:id/restore/:vId      → restaurer une version
 
+router.get  ("/designs/:id",                        ...auth, getDesignById);
 router.get  ("/designs/cart-item/:cartItemId",     ...auth, getDesignByCartItem);
 router.post ("/designs",                           ...auth, createDesign);
 router.put  ("/designs/:id/step1",                 ...auth, saveStep1);

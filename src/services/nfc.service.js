@@ -7,6 +7,7 @@
 import prisma from "../config/database.js";
 import { v4 as uuidv4 } from "uuid";
 import { generateAllQrCodes, deriveQrUrls, deleteQrFiles } from "./qrcode.service.js";
+import { generateCardExport, deleteCardExportFiles, deriveCardUrls } from "./cardExport.service.js";
 
 const APP_URL = process.env.URL_PROD_BACKEND || "http://localhost:4000/api";
 
@@ -109,16 +110,116 @@ async function createNfcCard(orderItem, order) {
 // Utile si l'upload a échoué lors de la création (qrCodeUrl === null)
 // Endpoint superadmin : PATCH /api/superadmin/nfc/cards/:uid/regenerate-qr
 export async function regenerateQrCode(cardUid) {
-  const card = await prisma.nFCCard.findUnique({ where: { uid: cardUid } });
-  if (!card)         throw new Error(`NFCCard uid=${cardUid} introuvable`);
-  if (!card.payload) throw new Error(`NFCCard uid=${cardUid} n'a pas de payload`);
- 
-  const { svgUrl: qrCodeUrl } = await generateAllQrCodes(cardUid, card.payload);
-  if (!qrCodeUrl) throw new Error(`Échec de génération du QR Code pour uid=${cardUid}`);
- 
-  await prisma.nFCCard.update({ where: { uid: cardUid }, data: { qrCodeUrl } });
-  console.log(`[qr] QR Code regénéré pour uid=${cardUid} → ${qrCodeUrl}`);
-  return qrCodeUrl;
+  console.log(`[nfc] 🔄 Régénération exports pour carte uid=${cardUid}`);
+
+  // ✅ Récupérer la carte avec son design
+  const card = await prisma.nFCCard.findUnique({ 
+    where: { uid: cardUid },
+    include: { design: true }  // ✅ Important : inclure le design
+  });
+
+  if (!card) {
+    throw new Error(`NFCCard uid=${cardUid} introuvable`);
+  }
+
+  if (!card.payload) {
+    throw new Error(`NFCCard uid=${cardUid} n'a pas de payload`);
+  }
+
+  if (!card.design) {
+    throw new Error(`NFCCard uid=${cardUid} n'a pas de design lié`);
+  }
+
+  try {
+    // ✅ ÉTAPE 1 : Supprimer les anciens fichiers (SVG + PNG + PDF)
+    await deleteCardExportFiles(cardUid);
+    console.log(`[nfc]   ✅ Anciens fichiers supprimés`);
+
+    // ✅ ÉTAPE 2 : Générer les nouveaux exports avec le design
+    const exports = await generateCardExport(card, card.design);
+    console.log(`[nfc]   ✅ Nouveaux exports générés → ${exports.svgUrl}`);
+
+    // ✅ ÉTAPE 3 : Mettre à jour qrCodeUrl en DB
+    await prisma.nFCCard.update({ 
+      where: { uid: cardUid }, 
+      data: { qrCodeUrl: exports.svgUrl } 
+    });
+    console.log(`[nfc]   ✅ DB mise à jour`);
+
+    console.log(`[nfc] ✅ Régénération réussie pour uid=${cardUid}`);
+    return exports;  // ✅ Retourne { svgUrl, pngUrl, pdfUrl }
+
+  } catch (err) {
+    console.error(`[nfc] ❌ Échec régénération uid=${cardUid} :`, err.message);
+    throw new Error(`Échec de génération des exports pour uid=${cardUid}: ${err.message}`);
+  }
+}
+
+export async function regenerateCardExportsForDesign(designId) {
+  console.log(`[nfc] 🔄 Début régénération exports pour design #${designId}`);
+
+  // ✅ Récupérer le design avec toutes ses cartes NFC
+  const design = await prisma.design.findUnique({ 
+    where: { id: designId },
+    include: { 
+      nfcCards: true  // ✅ Relation Design → NFCCard
+    }
+  });
+
+  if (!design) {
+    console.error(`[nfc] ❌ Design #${designId} introuvable`);
+    throw new Error(`Design #${designId} introuvable`);
+  }
+
+  if (!design.nfcCards || design.nfcCards.length === 0) {
+    console.log(`[nfc] ⚠️ Design #${designId} — aucune carte NFC liée, skip`);
+    return { regenerated: 0, failed: 0 };
+  }
+
+  console.log(`[nfc] 📋 ${design.nfcCards.length} carte(s) NFC liées au design #${designId}`);
+
+  let regenerated = 0;
+  let failed = 0;
+
+  // ✅ Régénérer pour chaque carte
+  for (const card of design.nfcCards) {
+    if (!card.payload) {
+      console.warn(`[nfc] ⚠️ Carte uid=${card.uid} sans payload, skip`);
+      failed++;
+      continue;
+    }
+
+    try {
+      console.log(`[nfc] 🔄 Régénération uid=${card.uid}...`);
+
+      // ✅ ÉTAPE 1 : Supprimer les anciens fichiers (SVG + PNG + PDF)
+      await deleteCardExportFiles(card.uid);
+      console.log(`[nfc]   ✅ Anciens fichiers supprimés`);
+
+      // ✅ ÉTAPE 2 : Générer les nouveaux exports avec le design mis à jour
+      const exports = await generateCardExport(card, design);
+      console.log(`[nfc]   ✅ Nouveaux exports générés → ${exports.svgUrl}`);
+
+      // ✅ ÉTAPE 3 : Mettre à jour qrCodeUrl en DB (si l'URL a changé)
+      if (exports.svgUrl !== card.qrCodeUrl) {
+        await prisma.nFCCard.update({
+          where: { uid: card.uid },
+          data: { qrCodeUrl: exports.svgUrl }
+        });
+        console.log(`[nfc]   ✅ DB mise à jour`);
+      }
+
+      regenerated++;
+      console.log(`[nfc] ✅ uid=${card.uid} régénéré avec succès`);
+
+    } catch (err) {
+      console.error(`[nfc] ❌ Échec régénération uid=${card.uid} :`, err.message);
+      failed++;
+    }
+  }
+
+  console.log(`[nfc] 🎯 Design #${designId} — ${regenerated} régénérés, ${failed} échecs`);
+  return { regenerated, failed };
 }
  
 // ─── Lier une NFCCard à sa location ──────────────────────────

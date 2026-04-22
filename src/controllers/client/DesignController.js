@@ -8,13 +8,13 @@ import fs     from "fs";
 import crypto from "crypto";
 import sharp  from "sharp";
 import { getPlaceDetails, findPlaceIdFromUrl } from "../../services/Googleplaces.service.js";
+import { regenerateCardExportsForDesign } from "../../services/nfc.service.js";
 
 const LOGOS_DIR    = path.resolve(process.env.UPLOAD_DIR || "uploads", "designs", "logos");
 const MAX_VERSIONS = 10;
 fs.mkdirSync(LOGOS_DIR, { recursive: true });
 
 // ─── Helpers ──────────────────────────────────────────────────
-
 
 const LINK_INPUT_PLATFORMS = new Set([
   "facebook", "instagram", "tiktok",
@@ -147,6 +147,19 @@ function buildSnapshot(d) {
     elementOffsets: d.elementOffsets,
   };
 }
+
+// ─── GET /api/designs/:id ─────────────────────────────────────
+export const getDesignById = async (req, res, next) => {
+  try {
+    const userId    = req.user.userId;
+    const companyId = getCompanyId(req);
+    const design    = await prisma.design.findFirst({
+      where: { id: parseInt(req.params.id), userId, companyId },
+    });
+    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    res.json({ success: true, data: formatDesign(design) });
+  } catch (e) { next(e); }
+};
 
 // ─── GET /api/designs/cart-item/:cartItemId ───────────────────
 export const getDesignByCartItem = async (req, res, next) => {
@@ -284,6 +297,8 @@ export const saveStep1 = async (req, res, next) => {
 
     const updated = await saveWithVersion(id, updateData, design);
 
+    const result = await regenerateCardExportsForDesign(design.id);
+
     res.json({ success: true, message: "Brouillon étape 1 sauvegardé", data: formatDesign(updated) });
   } catch (e) { next(e); }
 };
@@ -389,6 +404,8 @@ export const saveStep2 = async (req, res, next) => {
       lastAutoSave: new Date(),
     }, design);
 
+    const result = await regenerateCardExportsForDesign(design.id);
+
     res.json({ success: true, message: "Brouillon étape 2 sauvegardé", data: formatDesign(updated) });
   } catch (e) { next(e); }
 };
@@ -413,6 +430,8 @@ export const validateDesign = async (req, res, next) => {
       where: { id },
       data:  { status: "validated", validatedAt: new Date() },
     });
+
+     const result = await regenerateCardExportsForDesign(id);
 
     res.json({ success: true, message: "Design validé !", data: formatDesign(updated) });
   } catch (e) { next(e); }

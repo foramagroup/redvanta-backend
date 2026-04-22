@@ -24,7 +24,7 @@ import path   from "path";
 import fs     from "fs";
 import prisma from "../../config/database.js";
 import { generateCardExport, deriveCardUrls, deleteCardExportFiles } from "../../services/cardExport.service.js";
-import { formatNfcCard, assignTagToCard } from "../../services/nfc.service.js";
+import { formatNfcCard, assignTagToCard, regenerateQrCode } from "../../services/nfc.service.js";
 
 // ─── Include Prisma complet (superadmin voit tout) ────────────
 
@@ -327,19 +327,26 @@ export const activateCard = async (req, res, next) => {
 export const regenerateSuperCardExport = async (req, res, next) => {
   try {
     const { uid } = req.params;
-    const card    = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true } });
-    if (!card)         return res.status(404).json({ success: false, error: "Carte introuvable" });
-    if (!card.payload) return res.status(422).json({ success: false, error: "Carte sans payload" });
 
-    await deleteCardExportFiles(uid);
-    const exports = await generateCardExport(card, card.design);
+    // ✅ Appel de la fonction corrigée
+    const exports = await regenerateQrCode(uid);
 
-    if (exports.svgUrl !== card.qrCodeUrl) {
-      await prisma.nFCCard.update({ where: { uid }, data: { qrCodeUrl: exports.svgUrl } });
+    res.json({ 
+      success: true, 
+      message: `Exports régénérés pour carte uid=${uid}`,
+      data: exports  // { svgUrl, pngUrl, pdfUrl }
+    });
+
+  } catch (e) {
+    // ✅ Gestion des erreurs spécifiques
+    if (e.message.includes("introuvable")) {
+      return res.status(404).json({ success: false, error: e.message });
     }
-
-    res.json({ success: true, message: "Exports regénérés", data: exports });
-  } catch (e) { next(e); }
+    if (e.message.includes("payload") || e.message.includes("design")) {
+      return res.status(422).json({ success: false, error: e.message });
+    }
+    next(e);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────

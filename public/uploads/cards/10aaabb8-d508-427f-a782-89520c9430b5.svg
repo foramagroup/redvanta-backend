@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+  width="566" height="798" viewBox="0 0 566 798">
+<defs>
+  
+  <linearGradient id="rectoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%" stop-color="#0A0A0A"/>
+    <stop offset="70%" stop-color="#000000"/>
+  </linearGradient>
+  <linearGradient id="versoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+    <stop offset="0%" stop-color="#000000"/>
+    <stop offset="100%" stop-color="#0A0A0A"/>
+  </linearGradient>
+  <linearGradient id="bandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#22C55E"/>
+    <stop offset="100%" stop-color="#15803D"/>
+  </linearGradient>
+  <clipPath id="cr">
+    <rect x="30" y="30" width="506" height="319" rx="8"/>
+  </clipPath>
+  <clipPath id="cv">
+    <rect x="30" y="429" width="506" height="319" rx="8"/>
+  </clipPath>
+</defs>
+
+<text x="30" y="20" font-family="Arial,sans-serif" font-size="16" fill="#555">RECTO</text>
+<g clip-path="url(#cr)">
+  
+  <rect x="30" y="30" width="506" height="319" fill="url(#rectoGrad)"/>
+  <rect x="30" y="279" width="506" height="70"
+    fill="url(#bandGrad)" opacity="0.9"/>
+  <g transform="translate(504, 38) scale(1.000)"
+    fill="none" stroke="#22C55E" stroke-width="2" stroke-linecap="round"
+    opacity="0.3">
+    <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36"/>
+    <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58"/>
+    <path d="M12.91 4.1a16.09 16.09 0 0 1 0 15.8"/>
+  </g>
+  <g transform="translate(510, 304) scale(0.833)" opacity="1">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>
+
+  <image href="/uploads/designs/logos/71-1776871884995-9aea6d7b.webp" x="46" y="112" width="32" height="32" preserveAspectRatio="xMidYMid meet"/>
+
+  <text x="83" y="128"
+    font-family="'Space Grotesk', sans-serif" font-size="16"
+    font-weight="700"
+    letter-spacing="0em"
+    
+    fill="#22C55E"
+    text-anchor="start">Villa Borghese</text>
+
+  <text x="83" y="143"
+    font-family="'Space Grotesk', sans-serif" font-size="12"
+    font-weight="400"
+    letter-spacing="0em"
+    
+    fill="#22C55E" opacity="0.70">slogan</text>
+
+  <polygon points="89.00,148.00 90.35,152.15 94.71,152.15 91.18,154.71 92.53,158.85 89.00,156.29 85.47,158.85 86.82,154.71 83.29,152.15 87.65,152.15" fill="#F59E0B"/><polygon points="103.00,148.00 104.35,152.15 108.71,152.15 105.18,154.71 106.53,158.85 103.00,156.29 99.47,158.85 100.82,154.71 97.29,152.15 101.65,152.15" fill="#F59E0B"/><polygon points="117.00,148.00 118.35,152.15 122.71,152.15 119.18,154.71 120.53,158.85 117.00,156.29 113.47,158.85 114.82,154.71 111.29,152.15 115.65,152.15" fill="#F59E0B"/><polygon points="131.00,148.00 132.35,152.15 136.71,152.15 133.18,154.71 134.53,158.85 131.00,156.29 127.47,158.85 128.82,154.71 125.29,152.15 129.65,152.15" fill="#F59E0B"/><polygon points="145.00,148.00 146.35,152.15 150.71,152.15 147.18,154.71 148.53,158.85 145.00,156.29 141.47,158.85 142.82,154.71 139.29,152.15 143.65,152.15" fill="#F59E0B"/>
+
+  
+  <circle cx="51" cy="177" r="5.5" fill="#22C55E" opacity="0.15"/>
+  <polyline
+    points="48,177 50.5,181 54.5,174.5"
+    fill="none" stroke="#22C55E"
+    stroke-width="1.5"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="62" y="182"
+    font-family="'Space Grotesk', sans-serif" font-size="10"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#22C55E" opacity="0.90">Approach your phone to the card</text>
+  
+  <circle cx="51" cy="192" r="5.5" fill="#22C55E" opacity="0.15"/>
+  <polyline
+    points="48,192 50.5,196 54.5,189.5"
+    fill="none" stroke="#22C55E"
+    stroke-width="1.5"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="62" y="197"
+    font-family="'Space Grotesk', sans-serif" font-size="10"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#22C55E" opacity="0.90">Tap to leave a review</text>
+
+  <text x="42" y="275"
+    font-family="'Space Grotesk', sans-serif" font-size="9"
+    font-weight="500"
+    fill="#22C55E" opacity="0.75">Powered by RedVanta</text>
+
+</g>
+
+<line x1="30" y1="389" x2="536" y2="389"
+      stroke="#333" stroke-width="1" stroke-dasharray="6 4" opacity="0.4"/>
+
+<text x="30" y="419" font-family="Arial,sans-serif" font-size="16" fill="#555">VERSO</text>
+<g clip-path="url(#cv)">
+  
+  <rect x="30" y="429" width="506" height="319" fill="url(#versoGrad)"/>
+  <rect x="30" y="710" width="506" height="38"
+    fill="url(#bandGrad)" opacity="0.9"/>
+  <g transform="translate(510, 719) scale(0.833)" opacity="1">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </g>
+
+  <rect x="349" y="511" width="80" height="80" rx="6" fill="#FFFFFF"/>
+  
+  <rect x="349" y="511" width="22" height="6" fill="#FFFFFF"/>
+  <rect x="349" y="511" width="6" height="22" fill="#FFFFFF"/>
+  <rect x="407" y="511" width="22" height="6" fill="#FFFFFF"/>
+  <rect x="423" y="511" width="6" height="22" fill="#FFFFFF"/>
+  <rect x="349" y="585" width="22" height="6" fill="#FFFFFF"/>
+  <rect x="349" y="569" width="6" height="22" fill="#FFFFFF"/>
+  <rect x="407" y="585" width="22" height="6" fill="#FFFFFF"/>
+  <rect x="423" y="569" width="6" height="22" fill="#FFFFFF"/>
+
+  <svg x="357" y="519"
+       width="64" height="64"
+       viewBox="0 0 64 64"
+       preserveAspectRatio="xMidYMid meet"><svg viewBox="0 0 45 45" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">
+    <path fill="#FFFFFF" d="M0 0h45v45H0z"/><path stroke="#4ADE80" d="M0 0.5h7m1 0h3m2 0h3m1 0h1m1 0h2m2 0h5m2 0h1m1 0h2m2 0h1m1 0h7M0 1.5h1m5 0h1m2 0h1m1 0h3m2 0h1m3 0h4m1 0h1m1 0h1m7 0h1m2 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m1 0h1m3 0h2m2 0h1m1 0h3m1 0h4m1 0h3m1 0h1m1 0h1m1 0h1m2 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m2 0h4m1 0h1m1 0h2m3 0h4m1 0h1m1 0h2m2 0h2m1 0h2m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m1 0h1m2 0h2m2 0h1m1 0h2m1 0h5m2 0h1m2 0h2m2 0h3m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m6 0h1m2 0h2m2 0h1m3 0h4m1 0h1m8 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h1m1 0h2m1 0h1m5 0h2m3 0h1m2 0h2m2 0h4m1 0h1M5 8.5h2m2 0h1m2 0h2m1 0h3m2 0h9m1 0h1m3 0h2m2 0h1m1 0h1m1 0h1m1 0h1M1 9.5h2m5 0h1m1 0h1m6 0h2m2 0h2m3 0h1m3 0h1m1 0h3m1 0h1m1 0h3m1 0h2M2 10.5h6m2 0h1m2 0h4m4 0h1m3 0h4m3 0h4m1 0h4M0 11.5h4m3 0h1m2 0h1m3 0h1m2 0h1m4 0h2m1 0h1m1 0h2m2 0h2m2 0h2m3 0h1m1 0h1M2 12.5h2m1 0h8m1 0h1m4 0h1m2 0h1m1 0h3m1 0h1m1 0h6m1 0h4m3 0h1M0 13.5h3m1 0h2m2 0h2m1 0h1m1 0h2m2 0h1m3 0h3m1 0h2m1 0h1m1 0h1m5 0h1m3 0h1m3 0h1M4 14.5h1m1 0h1m3 0h1m2 0h1m2 0h2m1 0h1m2 0h1m3 0h1m2 0h1m4 0h1m1 0h3m3 0h2M0 15.5h2m2 0h2m1 0h1m4 0h1m1 0h1m1 0h1m2 0h4m1 0h2m2 0h2m3 0h1m7 0h2m1 0h1M0 16.5h3m3 0h2m2 0h3m1 0h1m2 0h4m4 0h2m8 0h1m2 0h1m2 0h1M0 17.5h2m1 0h2m4 0h1m2 0h2m1 0h3m1 0h1m3 0h2m4 0h1m2 0h2m2 0h1m2 0h1m1 0h1m2 0h1M2 18.5h1m1 0h6m1 0h5m1 0h2m1 0h1m1 0h2m1 0h1m2 0h6m1 0h2m2 0h2m3 0h1M0 19.5h1m2 0h3m1 0h4m1 0h2m2 0h1m1 0h1m1 0h1m1 0h4m4 0h1m1 0h1m1 0h1m1 0h1m2 0h4M0 20.5h9m2 0h1m1 0h1m1 0h4m1 0h7m2 0h3m1 0h1m2 0h6m2 0h1M0 21.5h1m1 0h3m3 0h1m2 0h1m2 0h3m2 0h2m3 0h1m2 0h1m2 0h2m2 0h3m3 0h1m1 0h1M0 22.5h1m1 0h3m1 0h1m1 0h2m3 0h3m2 0h1m1 0h1m1 0h1m1 0h2m2 0h3m3 0h1m1 0h1m1 0h1m1 0h4M1 23.5h1m2 0h1m3 0h1m1 0h1m2 0h5m2 0h1m3 0h2m4 0h1m5 0h1m3 0h3M0 24.5h1m1 0h1m1 0h5m3 0h1m1 0h1m1 0h1m1 0h1m1 0h5m1 0h1m1 0h1m1 0h1m2 0h1m2 0h6M1 25.5h2m1 0h2m1 0h3m4 0h4m1 0h4m1 0h1m1 0h1m1 0h2m2 0h1m2 0h1m2 0h1m3 0h3M2 26.5h3m1 0h2m1 0h1m2 0h1m4 0h1m1 0h11m1 0h2m1 0h2m1 0h1m1 0h1M2 27.5h3m4 0h4m2 0h2m3 0h1m1 0h1m1 0h2m5 0h1m1 0h1m1 0h2m2 0h2m1 0h3M0 28.5h1m1 0h1m3 0h1m2 0h1m2 0h1m1 0h2m1 0h1m1 0h2m2 0h1m3 0h3m3 0h1m3 0h2m1 0h2m1 0h1M0 29.5h2m2 0h1m2 0h2m1 0h8m1 0h3m1 0h1m4 0h4m1 0h1m1 0h3m1 0h1m2 0h3M2 30.5h2m1 0h2m2 0h1m1 0h2m1 0h2m4 0h3m2 0h1m1 0h4m2 0h1m1 0h1m2 0h7M1 31.5h2m4 0h1m2 0h1m1 0h1m6 0h2m2 0h2m1 0h1m4 0h2m2 0h2m1 0h2m1 0h3M0 32.5h1m2 0h2m1 0h1m1 0h5m1 0h2m4 0h1m1 0h4m1 0h4m2 0h1m3 0h1m2 0h1m2 0h2M1 33.5h1m3 0h1m4 0h3m7 0h3m1 0h1m4 0h4m1 0h1m1 0h1m1 0h1m1 0h4M4 34.5h1m1 0h1m1 0h1m1 0h1m2 0h2m5 0h3m1 0h1m1 0h2m1 0h3m1 0h2m5 0h1m1 0h1M1 35.5h4m3 0h2m2 0h2m2 0h4m1 0h1m2 0h1m2 0h1m3 0h3m1 0h4m2 0h3M0 36.5h1m2 0h2m1 0h1m2 0h1m5 0h1m1 0h1m2 0h6m1 0h4m1 0h9m2 0h2M8 37.5h1m3 0h1m1 0h1m1 0h3m1 0h1m3 0h2m2 0h5m3 0h1m3 0h1m1 0h1m1 0h1M0 38.5h7m3 0h2m2 0h1m2 0h4m1 0h1m1 0h1m3 0h2m1 0h2m1 0h3m1 0h1m1 0h2m1 0h1M0 39.5h1m5 0h1m1 0h3m4 0h2m1 0h3m3 0h4m6 0h1m1 0h1m3 0h3m1 0h1M0 40.5h1m1 0h3m1 0h1m3 0h6m3 0h7m1 0h1m2 0h2m1 0h2m1 0h6m1 0h2M0 41.5h1m1 0h3m1 0h1m4 0h2m1 0h1m2 0h1m1 0h2m1 0h2m1 0h2m1 0h1m1 0h3m2 0h1m2 0h1m1 0h1m1 0h3M0 42.5h1m1 0h3m1 0h1m2 0h2m1 0h1m2 0h5m1 0h1m1 0h1m1 0h1m4 0h1m2 0h1m1 0h3m2 0h1m1 0h3M0 43.5h1m5 0h1m3 0h1m1 0h2m2 0h1m1 0h1m5 0h1m8 0h1m2 0h1m2 0h4M0 44.5h7m3 0h4m3 0h2m1 0h4m1 0h3m2 0h1m4 0h2m1 0h1m4 0h1"/>
+  </svg></svg>
+
+  <text x="238" y="543"
+    font-family="'Space Grotesk', sans-serif" font-size="13"
+    font-weight="700"
+    fill="#22C55E" text-anchor="middle">Villa Borghese</text>
+
+  <text x="238" y="556"
+    font-family="'Space Grotesk', sans-serif" font-size="10"
+    font-weight="400"
+    fill="#22C55E" opacity="0.70" text-anchor="middle">slogan</text>
+
+  <polygon points="213.00,559.00 214.12,562.45 217.76,562.45 214.82,564.59 215.94,568.05 213.00,565.91 210.06,568.05 211.18,564.59 208.24,562.45 211.88,562.45" fill="#F59E0B"/><polygon points="225.00,559.00 226.12,562.45 229.76,562.45 226.82,564.59 227.94,568.05 225.00,565.91 222.06,568.05 223.18,564.59 220.24,562.45 223.88,562.45" fill="#F59E0B"/><polygon points="237.00,559.00 238.12,562.45 241.76,562.45 238.82,564.59 239.94,568.05 237.00,565.91 234.06,568.05 235.18,564.59 232.24,562.45 235.88,562.45" fill="#F59E0B"/><polygon points="249.00,559.00 250.12,562.45 253.76,562.45 250.82,564.59 251.94,568.05 249.00,565.91 246.06,568.05 247.18,564.59 244.24,562.45 247.88,562.45" fill="#F59E0B"/><polygon points="261.00,559.00 262.12,562.45 265.76,562.45 262.82,564.59 263.94,568.05 261.00,565.91 258.06,568.05 259.18,564.59 256.24,562.45 259.88,562.45" fill="#F59E0B"/>
+
+  
+  <circle cx="205.75" cy="608" r="5.5" fill="#22C55E" opacity="0.15"/>
+  <polyline
+    points="202.75,608 205.25,612 209.25,605.5"
+    fill="none" stroke="#22C55E"
+    stroke-width="1.5"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="216.75" y="613"
+    font-family="'Space Grotesk', sans-serif" font-size="9"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#22C55E" opacity="0.90">Scan the QR code with your camera</text>
+  
+  <circle cx="203.5" cy="623" r="5.5" fill="#22C55E" opacity="0.15"/>
+  <polyline
+    points="200.5,623 203,627 207,620.5"
+    fill="none" stroke="#22C55E"
+    stroke-width="1.5"
+    stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="214.5" y="628"
+    font-family="'Space Grotesk', sans-serif" font-size="9"
+    font-weight="400"
+    letter-spacing="0em"
+    fill="#22C55E" opacity="0.90">Write a review on our profile page</text>
+
+  <text x="283" y="702"
+    font-family="'Space Grotesk', sans-serif" font-size="8"
+    font-weight="500"
+    fill="#22C55E" opacity="0.70" text-anchor="middle">Powered by RedVanta</text>
+
+</g>
+</svg>
