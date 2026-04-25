@@ -60,6 +60,9 @@ model User {
   invoices     Invoice[]
   payments    Payment[]
   nfcCards NFCCard[]
+  locationAssignments UserLocation[]
+  activityLogs        TeamActivityLog[]
+  reviewRequests ReviewRequest[]
   locations    Location[] @relation("OwnerLocations")
   auditLogs AuditLog[] @relation("AdminLogs")
   changedStatuses OrderStatusHistory[] @relation("StatusChangedBy")
@@ -182,11 +185,47 @@ model Location {
   nfcCards NFCCard[]
   reviews   Review[]
   feedbacks Feedback[]
+  reviewRequests ReviewRequest[]
+  userAssignments     UserLocation[]
 
   @@index([companyId])
   @@index([googlePlaceId])
   @@index([active])
   @@map("locations")
+}
+
+model UserLocation {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @db.UnsignedInt
+  companyId  Int
+  locationId Int
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId],     references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId],  references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, locationId])   // un user ne peut être assigné qu'une fois à une location
+  @@index([companyId])
+  @@index([userId])
+  @@map("user_locations")
+}
+
+model TeamActivityLog {
+  id         Int      @id @default(autoincrement())
+  companyId  Int
+  userId     Int      @db.UnsignedInt  // membre qui a effectué l'action
+  action     String   @db.VarChar(500) // description lisible ex: "Replied to review"
+  category   String?  @db.VarChar(50)  // "review" | "request" | "auth" | "location" | "settings"
+  metadata   Json?                     // données supplémentaires (reviewId, locationId...)
+  createdAt  DateTime @default(now())
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId],    references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId])
+  @@index([createdAt])
+  @@map("team_activity_logs")
 }
 
 
@@ -572,6 +611,7 @@ model dashboardstat {
     product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
     cartItem    CartItem[]
     orderItem   OrderItem[]
+    cartItemLocations CartItemLocation[]
     versions    DesignVersion[]
     nfcCards  NFCCard[]
 
@@ -866,6 +906,53 @@ model Feedback {
   @@map("feedbacks")
 }
 
+
+model ReviewRequest {
+  id           Int                  @id @default(autoincrement())
+  companyId    Int
+  userId       Int                  @db.UnsignedInt  // admin qui a créé la demande
+  locationId   Int?                                  // location concernée
+
+  // Destinataire
+  customerName String               @db.VarChar(255)
+  method       ReviewRequestMethod  @default(email)
+  email        String?              @db.VarChar(255) // si method = email
+  phone        String?              @db.VarChar(50)  // si method = sms
+  countryCode  String?              @db.VarChar(10)  // ex: "+33"
+
+  // Message
+  customMessage String?             @db.Text
+
+  // Statut & conversion
+  status       ReviewRequestStatus  @default(sent)
+  conversion   Boolean              @default(false)  // true = avis laissé
+
+  // Timestamps métier
+  sentAt       DateTime?            // quand l'envoi a été effectué
+  deliveredAt  DateTime?
+  openedAt     DateTime?
+  completedAt  DateTime?
+  failedAt     DateTime?
+  failureReason String?             @db.VarChar(500)
+
+  // Metadata
+  externalId   String?              @db.VarChar(255) // ID du prestataire SMS/email
+  metadata     Json?                // données supplémentaires
+
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  company      Company              @relation(fields: [companyId],  references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId],     references: [id], onDelete: Cascade)
+  location     Location?            @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([method])
+  @@index([locationId])
+  @@index([createdAt])
+  @@map("review_requests")
+}
 
 
 model payoutrequest {
@@ -1743,6 +1830,9 @@ model Company {
   payments    Payment[]
   locations   Location[]
   usageRecords UsageRecord[]
+  reviewRequests ReviewRequest[]
+  userLocations       UserLocation[]
+  teamActivityLogs    TeamActivityLog[]
 
  cards    NFCCard[]
  scans    NfcScan[]
@@ -1963,10 +2053,34 @@ model CartItem {
   packageTier ProductPackageTier?  @relation(fields: [packageTierId], references: [id], onDelete: Restrict)
   design      Design?             @relation(fields: [designId],     references: [id], onDelete: SetNull)
   cardType    CardType?           @relation(fields: [cardTypeId],   references: [id], onDelete: SetNull)
+  locations   CartItemLocation[]  // ← NOUVEAU
 
   @@index([userId, companyId])
   @@index([productId])
   @@map("cart_items")
+}
+
+model CartItemLocation {
+  id           Int      @id @default(autoincrement())
+  cartItemId   Int
+  quantity     Int                                      // nb cartes pour cette location
+  platform     String   @db.VarChar(50)                // google | facebook | instagram | custom
+  businessName String?  @db.VarChar(255)               // pour google
+  handle       String?  @db.VarChar(255)               // pour instagram
+  url          String?  @db.VarChar(500)               // pour facebook / custom
+  googleReviewUrl          String?  @db.VarChar(500)               // pour facebook / custom
+  googlePlaceId          String?  @db.VarChar(255)               // pour facebook / custom
+  cardColor    String?  @default("#0A0A0A") @db.VarChar(7)
+  designId     Int?     @unique                        // design propre à cette location
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cartItem     CartItem @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  design       Design?  @relation(fields: [designId],   references: [id], onDelete: SetNull)
+
+  @@index([cartItemId])
+  @@map("cart_item_locations")
 }
 
 
@@ -2228,5 +2342,19 @@ enum BillingStatus {
   failed
   refunded
   canceled
+}
+
+enum ReviewRequestStatus {
+  sent        // Envoyé — en attente de livraison
+  delivered   // Livré au destinataire
+  opened      // Ouvert/lu par le client
+  completed   // Avis laissé (conversion réussie)
+  failed      // Échec d'envoi
+  cancelled   // Annulé manuellement
+}
+
+enum ReviewRequestMethod {
+  email
+  sms
 }
 

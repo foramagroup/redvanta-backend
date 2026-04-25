@@ -33,6 +33,9 @@ import  adminSettingsRoutes  from "./routes/settingsRoutes.js";
 import analyticsEventsRoutes from './routes/analyticsEvents.routes.js';
 import billingAdminRoutes from './routes/billing.routes.js';
 import nfcCardsRoutes from "./routes/nfcCards.routes.js";
+import reviewRequestRoutes from "./routes/reviewRequest.routes.js";
+import analyticsRoutes from "./routes/analytics.routes.js";
+import teamRoutes from "./routes/team.routes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -253,6 +256,13 @@ app.use("/api/customization", customizationRoutes);
 
   //ges NFCcard
   app.use("/api/admin/nfc-cards", nfcCardsRoutes);
+
+  //ges Review Request
+  app.use("/api/admin/requests", reviewRequestRoutes);
+  //ges Analytics
+  app.use("/api/admin/analytics", analyticsRoutes);
+  //ges team
+  app.use("/api/admin/team", teamRoutes);
 
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);

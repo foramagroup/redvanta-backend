@@ -92,14 +92,14 @@ export const createOrder = async (req, res, next) => {
       paymentMethod,
       paymentMethodId = null,
     } = req.body;
-
+ 
     const isStripe = paymentMethod === "stripe";
     const isManual = paymentMethod === "manual";
-
+ 
     if (!isStripe && !isManual) {
       return res.status(422).json({ success: false, error: "paymentMethod invalide : 'stripe' | 'manual'" });
     }
-
+ 
     let manualMethod = null;
     if (isManual) {
       if (!paymentMethodId) return res.status(422).json({ success: false, error: "paymentMethodId requis" });
@@ -108,38 +108,36 @@ export const createOrder = async (req, res, next) => {
       });
       if (!manualMethod) return res.status(422).json({ success: false, error: "Méthode manuelle introuvable ou inactive" });
     }
-
-     const cartItems = await prisma.cartItem.findMany({
+ 
+    // ── Charger le panier — include locations v2 ──────────────
+    const cartItems = await prisma.cartItem.findMany({
       where: { userId, companyId },
       include: {
         product:     { include: { translations: { take: 1, orderBy: { langId: "asc" } } } },
         design:      true,
         cardType:    true,
         packageTier: true,
+        // ← v2 : locations avec leur design propre
+        locations: {
+          include: { design: true },
+          orderBy: { sortOrder: "asc" },
+        },
       },
     });
-
+ 
     if (!cartItems.length) return res.status(422).json({ success: false, error: "Votre panier est vide" });
-        // const unvalidated = cartItems.filter(
-        //   (i) => i.design && !["validated", "locked"].includes(i.design.status)
-        // );
-        // if (unvalidated.length) {
-        //   return res.status(422).json({
-        //     success: false,
-        //     error:   `${unvalidated.length} design(s) non validé(s).`,
-        //     code:    "DESIGNS_NOT_VALIDATED",
-        //   });
-        // }
-
-        const alreadyLocked = cartItems.filter((i) => i.design?.status === "locked");
-        if (alreadyLocked.length) {
-          return res.status(422).json({
-            success: false,
-            error:   `${alreadyLocked.length} design(s) déjà verrouillé(s) par une commande existante.`,
-            code:    "DESIGNS_ALREADY_LOCKED",
-          });
-        }
-
+ 
+    // Vérifier qu'aucun design n'est déjà verrouillé
+    // (legacy items uniquement — les locations ont chacune leur design)
+    const legacyDesigns = cartItems.filter((i) => !i.locations?.length && i.design?.status === "locked");
+    if (legacyDesigns.length) {
+      return res.status(422).json({
+        success: false,
+        error:   `${legacyDesigns.length} design(s) déjà verrouillé(s) par une commande existante.`,
+        code:    "DESIGNS_ALREADY_LOCKED",
+      });
+    }
+ 
     const shippingRate = await prisma.shippingRate.findUnique({
       where: { method: shippingMethod || "standard" },
     });
@@ -149,12 +147,10 @@ export const createOrder = async (req, res, next) => {
     const rate            = parseFloat(exchangeRate) || 1;
     const displayTotal    = Math.round(totalEUR * rate * 100) / 100;
     const orderNumber     = await generateOrderNumber();
-
+ 
     let paymentIntent      = null;
     let stripeClientSecret = null;
-
-
-    // ── Stripe depuis la DB ──────────────────────────────────
+ 
     if (isStripe) {
       const stripe = await getStripe();
       paymentIntent = await stripe.paymentIntents.create({
@@ -165,13 +161,46 @@ export const createOrder = async (req, res, next) => {
       });
       stripeClientSecret = paymentIntent.client_secret;
     }
-
-
+ 
     const order = await prisma.$transaction(async (tx) => {
+      // ── Construire les OrderItems ─────────────────────────────
+      // v2 : un CartItem avec locations → N OrderItems (1 par location)
+      // v1 : un CartItem sans location  → 1 OrderItem (comportement inchangé)
+      const orderItemsData = cartItems.flatMap((item) => {
+        const hasLocations = item.locations?.length > 0;
+ 
+        if (hasLocations) {
+          // ── v2 : 1 OrderItem par location ──────────────────
+          return item.locations.map((loc) => ({
+            productId:     item.productId,
+            packageTierId: item.packageTierId ?? null,
+            // la quantité de l'OrderItem = quantité de cette location
+            totalCards:    loc.quantity,
+            quantity:      loc.quantity,
+            unitPrice:     Number(item.unitPrice),
+            totalPrice:    loc.quantity * Number(item.unitPrice),
+            // chaque location a son propre design
+            designId:      loc.designId ?? null,
+            cardTypeId:    item.cardTypeId ?? null,
+          }));
+        }
+ 
+        // ── v1 legacy : 1 OrderItem par CartItem ───────────
+        return [{
+          productId:     item.productId,
+          packageTierId: item.packageTierId ?? null,
+          totalCards:    item.packageTierId == null ? item.quantity : item.totalCards,
+          quantity:      item.packageTierId == null ? item.quantity : item.totalCards,
+          unitPrice:     Number(item.unitPrice),
+          totalPrice:    Number(item.lineTotal),
+          designId:      item.designId   ?? null,
+          cardTypeId:    item.cardTypeId ?? null,
+        }];
+      });
+ 
       const o = await tx.order.create({
         data: {
           userId, companyId, orderNumber,
-          // ── stripe → "pending" | manual → "unpaid"
           status:        isStripe ? "pending" : "unpaid",
           methodPayment: paymentMethod,
           manualPaymentMethodId: isManual ? manualMethod.id : null,
@@ -186,19 +215,7 @@ export const createOrder = async (req, res, next) => {
           shippingMethod:   shippingMethod   || "standard",
           stripePaymentIntentId: paymentIntent?.id ?? null,
           stripeClientSecret:    stripeClientSecret ?? null,
-          items: {
-            create: cartItems.map((item) => ({
-              
-              productId:     item.productId,
-              packageTierId: item.packageTierId,
-              totalCards:    item.packageTierId == null?item.quantity:item.totalCards,
-              quantity:      item.packageTierId == null?item.quantity:item.totalCards,
-              unitPrice:     Number(item.unitPrice),
-              totalPrice:    Number(item.lineTotal),
-              designId:      item.designId   || null,
-              cardTypeId:    item.cardTypeId || null,
-            })),
-          },
+          items: { create: orderItemsData },
         },
         include: {
           user:    true,
@@ -216,24 +233,12 @@ export const createOrder = async (req, res, next) => {
         data: { orderId: o.id, currency, rate, displayTotal, baseCurrency: "EUR", baseTotal: totalEUR },
       });
  
-      // Verrouiller tous les designs (draft ou validated) au moment du paiement
-      // Le design reste lisible pour la production même sans personnalisation
-      // const designIds = cartItems.filter((i) => i.designId).map((i) => i.designId);
-      // if (designIds.length) {
-      //   await tx.design.updateMany({
-      //     where: { id: { in: designIds } },
-      //     data:  { status: "locked" },
-      //   });
-      // }
- 
-      // Vider le panier pour les deux méthodes
-      // (pour Stripe, re-vidé dans le webhook en sécurité)
+      // Vider le panier (cascade supprime automatiquement les CartItemLocations)
       await tx.cartItem.deleteMany({ where: { userId, companyId } });
       return o;
     });
  
     // ── CASH : créer la facture immédiatement en "unpaid" ─────
-    // PAS de NFC — ils seront générés quand le superadmin confirme le paiement
     let invoiceNumber = null;
     if (isManual) {
       const invoice = await createUnpaidInvoice(order);
@@ -245,9 +250,8 @@ export const createOrder = async (req, res, next) => {
       success:      true,
       data:         formatOrder(order),
       stripeClientSecret,
-      paymentMethod, 
+      paymentMethod,
       invoiceNumber,
-      // Instructions de paiement à afficher au client
       ...(isManual && {
         manualInstructions: manualMethod.instructions ?? null,
         message: `Commande ${order.orderNumber} créée. Votre facture ${invoiceNumber} est en attente de paiement.`,
@@ -322,6 +326,9 @@ export const stripeWebhook = async (req, res, next) => {
  
         await prisma.invoice.update({ where: { id: invoice.id }, data: { paymentMethod: methodLabel } });
  
+        // generateNfcCardsForOrder itère sur order.items
+        // → fonctionne sans modification : chaque OrderItem (y compris les items de location v2)
+        //   a son propre designId → une série de cartes NFC générées
         generateNfcCardsForOrder(fullOrder).catch((e) =>
           console.error("[webhook] Erreur génération NFC:", e.message)
         );
@@ -499,22 +506,21 @@ async function sendOrderEmails(order, invoice) {
   await prisma.order.update({ where: { id: order.id }, data: { confirmationEmailSentAt: new Date() } });
   console.log(`[order] Emails envoyés pour #${order.orderNumber}`);
 }
-
-
+ 
 async function sendOrderPendingEmail(order, invoice, manualMethod) {
   try {
     await sendTemplatedMail({
       slug: "order_pending_payment",
       to:   order.user.email,
       variables: {
-        customer_name:       order.user?.name || order.user?.email,
-        order_number:        order.orderNumber,
-        invoice_number:      invoice.invoiceNumber,
-        total:               String(Number(order.total).toFixed(2)),
-        currency:            order.currency ?? "EUR",
-        payment_method:      manualMethod.name,
+        customer_name:        order.user?.name || order.user?.email,
+        order_number:         order.orderNumber,
+        invoice_number:       invoice.invoiceNumber,
+        total:                String(Number(order.total).toFixed(2)),
+        currency:             order.currency ?? "EUR",
+        payment_method:       manualMethod.name,
         payment_instructions: manualMethod.instructions ?? "",
-        due_date:            new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("fr-FR"),
+        due_date:             new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("fr-FR"),
       },
       fallbackFn: () => ({
         subject: `Commande ${order.orderNumber} — En attente de paiement`,

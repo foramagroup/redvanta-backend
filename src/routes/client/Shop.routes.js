@@ -4,7 +4,7 @@ import { Router } from "express";
 import { authenticateAdmin, requireAdmin } from "../../middleware/auth.middleware.js";
 
 import {
-  getCart, addToCart, updateCartItem, removeFromCart, clearCart, syncCart
+  getCart, addToCart, updateCartItem, removeFromCart, clearCart, syncCart, updateCartItemLocations,
 } from "../../controllers/client/CartController.js";
 
 import {
@@ -34,6 +34,7 @@ router.get   ("/cart",     ...auth, getCart);
 router.post  ("/cart",     ...auth, addToCart);
 router.post  ("/sync",     ...auth, syncCart);
 router.put   ("/cart/:id", ...auth, updateCartItem);
+router.put("/cart/:id/locations", ...auth, updateCartItemLocations);
 router.delete("/cart/:id", ...auth, removeFromCart);
 router.delete("/cart",     ...auth, clearCart);
 
