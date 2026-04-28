@@ -101,7 +101,6 @@ function formatItem(item) {
 
     // ── Type B — sans tiers ──────────────────────────────────
     quantity: item.quantity ?? 1,
-
     // ── Commun ───────────────────────────────────────────────
     totalCards: item.totalCards ?? 0,
     unitPrice: Number(item.unitPrice),
@@ -152,7 +151,6 @@ function getCompanyId(req) {
 async function resolveDesignDefaultsFromTemplate(product, company) {
   try {
     let template = null;
-
     if (product.defaultTemplateId) {
       template =
         product.defaultTemplate ||
@@ -160,7 +158,6 @@ async function resolveDesignDefaultsFromTemplate(product, company) {
           where: { id: product.defaultTemplateId },
         }));
     }
-
     if (!template && product.reviewPlatform) {
       template = await prisma.cardTemplate.findFirst({
         where: {
@@ -280,7 +277,6 @@ async function resolveDesignDefaultsFromTemplate(product, company) {
 /**
  * Crée un Design pour une location spécifique du ConfiguratorModal.
  * Fusionne les valeurs du template DB avec les données saisies par l'utilisateur.
- *
  * @param {Object} loc - { quantity, platform, data: {businessName?,handle?,url?}, cardColor }
  */
 async function createLocationDesign(tx, { userId, companyId, productId, company, product, location }) {
@@ -291,16 +287,69 @@ async function createLocationDesign(tx, { userId, companyId, productId, company,
   const businessName = data.businessName || company?.name || null;
   const handle = data.handle || null;
   const rawUrl = data.url || null;
+  let manualUrl = data?.manualUrl;
+  let place = null;
+  let googlePlaceId = platform === "google" ? data?.googlePlaceId : null;
+  
 
   // URL canonique selon la plateforme
-  const googlePlaceId = platform === "google" ? (data.placeId || company?.googlePlaceId || null) : null;
-  const googleReviewUrl = platform === "google" ? (rawUrl || company?.googleReviewUrl || null) : null;
+  if(platform === "google" && !googlePlaceId){
+    if (manualUrl) {
+          googlePlaceId = await findPlaceIdFromUrl(manualUrl).catch(() => null);
+    }else{
+          googlePlaceId = company?.googlePlaceId;
+    }
+  }
+  
+  if (googlePlaceId) {
+     place = await getPlaceDetails(googlePlaceId).catch(() => null);
+  }
+  const googleReviewUrl = platform === "google" ? (place?.googleReviewUrl || company?.googleReviewUrl || null) : null;
   const platformUrl =
     platform === "instagram" && handle
       ? `https://instagram.com/${handle.replace(/^@/, "")}`
       : platform !== "google"
       ? rawUrl
       : null;
+
+
+
+       // ── platformUrl — pour toutes les plateformes non-Google ──
+  // Chaque plateforme a sa logique de construction d'URL :
+  //   instagram  → URL canonique construite depuis le handle
+  //   facebook   → rawUrl (page FB de l'entreprise)
+  //   tiktok     → rawUrl ou https://tiktok.com/@{handle}
+  //   tripadvisor → rawUrl (page de l'établissement)
+  //   booking    → rawUrl (fiche Booking)
+  //   airbnb     → rawUrl (fiche Airbnb)
+  //   custom     → rawUrl (URL libre)
+  //   google     → null  (on utilise googleReviewUrl)
+  let Url = null;
+ 
+  if (platform !== "google") {
+    switch (platform) {
+      case "instagram":
+        // Priorité : rawUrl > construction depuis handle
+        Url = rawUrl
+          || (handle ? `https://www.instagram.com/${handle.replace(/^@/, "")}/` : null);
+        break;
+ 
+      case "tiktok":
+        Url = rawUrl
+          || (handle ? `https://www.tiktok.com/@${handle.replace(/^@/, "")}` : null);
+        break;
+ 
+      case "facebook":
+      case "tripadvisor":
+      case "booking":
+      case "airbnb":
+      case "custom":
+      default:
+        // Pour toutes ces plateformes : l'user fournit directement l'URL
+        Url = rawUrl;
+        break;
+    }
+  }
 
   // ── Card color : si l'user a choisi une couleur dans le modal ──
   // cardColor remplace le gradient du template et force colorMode = "single"
@@ -319,7 +368,7 @@ async function createLocationDesign(tx, { userId, companyId, productId, company,
     platform,
     googlePlaceId,
     googleReviewUrl,
-    platformUrl,
+    platformUrl:Url,
 
     // Couleur de carte choisie dans le modal (override)
     ...(hasCustomColor
@@ -355,7 +404,6 @@ async function createLocationDesign(tx, { userId, companyId, productId, company,
  */
 async function createDefaultDesign(tx, { userId, companyId, productId, company, product }) {
   const defaults = await resolveDesignDefaultsFromTemplate(product, company);
-
   return tx.design.create({
     data: {
       userId,
@@ -432,6 +480,8 @@ async function createLocations(tx, { cartItemId, locations, userId, companyId, p
         businessName: loc.data?.businessName || null,
         handle: loc.data?.handle || null,
         url: loc.data?.url || null,
+        googlePlaceId:   loc.data?.googlePlaceId || loc.data?.placeId   || design.googlePlaceId   || null,
+        googleReviewUrl: loc.data?.googleReviewUrl || loc.data?.url    || design.googleReviewUrl || null,
         cardColor: loc.cardColor || "#0A0A0A",
         designId: design.id,
         sortOrder: i,

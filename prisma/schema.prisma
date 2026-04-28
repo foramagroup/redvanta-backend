@@ -519,6 +519,7 @@ model dashboardstat {
     googleReviewUrl String?
     platform    String?  @default("google")  // google|facebook|instagram|tiktok|tripadvisor|booking|airbnb|custom
     platformUrl String?                      // URL review/profil pour toutes plateformes non-Google
+    redirectMode  String?  @db.VarChar(20)
  
     // ── Step 2 : Orientation & Logo ───────────────────────────
     orientation   DesignOrientation @default(landscape)
