@@ -166,12 +166,23 @@ export const getDesignByCartItem = async (req, res, next) => {
   try {
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
+    const locationId = req.query?.locationId ? parseInt(req.query.locationId) : null;
     const cartItem  = await prisma.cartItem.findFirst({
       where:   { id: parseInt(req.params.cartItemId), userId, companyId },
-      include: { design: true },
+      include: {
+        design: true,
+        locations: {
+          include: { design: true },
+          orderBy: { sortOrder: "asc" },
+        },
+      },
     });
     if (!cartItem) return res.status(404).json({ success: false, error: "Item introuvable" });
-    res.json({ success: true, data: cartItem.design ? formatDesign(cartItem.design) : null });
+    const locationDesign = locationId
+      ? cartItem.locations?.find((location) => location.id === locationId && location.design)?.design || null
+      : cartItem.locations?.find((location) => location.design)?.design || null;
+    const design = cartItem.design || locationDesign || null;
+    res.json({ success: true, data: design ? formatDesign(design) : null });
   } catch (e) { next(e); }
 };
 
@@ -180,7 +191,7 @@ export const createDesign = async (req, res, next) => {
   try {
     const userId    = req.user.userId;
     const companyId = getCompanyId(req);
-    const { cartItemId, productId } = req.body;
+    const { cartItemId, productId, locationId } = req.body;
 
     if (!cartItemId || !productId) {
       return res.status(422).json({ success: false, error: "cartItemId et productId requis" });
@@ -188,12 +199,26 @@ export const createDesign = async (req, res, next) => {
 
     const cartItem = await prisma.cartItem.findFirst({
       where: { id: parseInt(cartItemId), userId, companyId },
+      include: {
+        design: true,
+        locations: {
+          include: { design: true },
+          orderBy: { sortOrder: "asc" },
+        },
+      },
     });
     if (!cartItem) return res.status(404).json({ success: false, error: "Item panier introuvable" });
 
     if (cartItem.designId) {
       const existing = await prisma.design.findUnique({ where: { id: cartItem.designId } });
       if (existing) return res.json({ success: true, data: formatDesign(existing) });
+    }
+
+    const existingLocationDesign = locationId
+      ? cartItem.locations?.find((location) => location.id === parseInt(locationId) && location.design)?.design || null
+      : cartItem.locations?.find((location) => location.design)?.design || null;
+    if (existingLocationDesign) {
+      return res.json({ success: true, data: formatDesign(existingLocationDesign) });
     }
 
     const design = await prisma.$transaction(async (tx) => {

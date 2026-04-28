@@ -19,41 +19,87 @@ function formatProductForClient(product, langId) {
     metaImageMap[code] = t.metaImage       ?? null;
   }
  
+  const tpl = product.defaultTemplate;
+
   return {
     id:              product.id,
     price:           Number(product.price),
     active:          product.active,
     image:           product.image ?? null,
     cardSettings:    product.cardSettings ?? {},
- 
+
+    // Template par défaut (visuel)
+    defaultTemplate: tpl ? {
+      id:              tpl.id,
+      name:            tpl.name,
+      colorMode:       tpl.colorMode,
+      gradient:        Array.isArray(tpl.gradient) ? tpl.gradient : JSON.parse(tpl.gradient || "[]"),
+      accentColor:     tpl.accentColor,
+      textColor:       tpl.textColor,
+      bandColor1:      tpl.bandColor1,
+      bandColor2:      tpl.bandColor2,
+      qrColor:         tpl.qrColor,
+      starsColor:      tpl.starsColor,
+      iconsColor:      tpl.iconsColor,
+      pattern:         tpl.pattern,
+      bandPosition:    tpl.bandPosition,
+      frontBandHeight: tpl.frontBandHeight,
+      backBandHeight:  tpl.backBandHeight,
+      showNfcIcon:     tpl.showNfcIcon,
+      showGoogleIcon:  tpl.showGoogleIcon,
+      nfcIconSize:     tpl.nfcIconSize,
+      googleIconSize:  tpl.googleIconSize,
+      checkStrokeWidth: tpl.checkStrokeWidth / 10,
+      ctaPaddingTop:   tpl.ctaPaddingTop,
+      textShadow:      tpl.textShadow,
+      nameFontSize:    tpl.nameFontSize,
+      nameFontWeight:  tpl.nameFontWeight,
+      nameLetterSpacing: tpl.nameLetterSpacing,
+      nameTextTransform: tpl.nameTextTransform,
+      nameLineHeight:  tpl.nameLineHeight,
+      nameTextAlign:   tpl.nameTextAlign,
+      sloganFontSize:  tpl.sloganFontSize,
+      sloganFontWeight: tpl.sloganFontWeight,
+      instructionFontSize:   tpl.instructionFontSize,
+      instructionFontWeight: tpl.instructionFontWeight,
+      frontLine1: tpl.frontLine1,
+      frontLine2: tpl.frontLine2,
+      backLine1:  tpl.backLine1,
+      backLine2:  tpl.backLine2,
+      qrSize:      tpl.qrSize,
+      qrPosition:  tpl.qrPosition,
+      logoPosition: tpl.logoPosition,
+      logoSize:     tpl.logoSize,
+    } : null,
+
     // Maps par code langue (ex: { en: "Smart Card", fr: "Carte NFC" })
     title:           titleMap,
     slug:            slugMap,
     seoTitle:        seoTitleMap,
     metaDescription: metaDescMap,
     metaImage:       metaImageMap,
- 
+
     // Paliers de prix (qty → price/carte)
     packageTiers: product.packageTiers.map((t) => ({
       id:    t.id,
       qty:   t.qty,
       price: Number(t.price),
     })),
- 
+
     // Galerie (images/vidéos)
     gallery: product.galleryItems.map((g) => ({
       url:    g.url,
       type:   g.type,
       poster: g.poster ?? null,
     })),
- 
+
     // Prix supplémentaires par type de carte
     cardTypePrices: product.cardTypePrices.map((c) => ({
       cardTypeId: c.cardTypeId,
       cardType:   c.cardType ? { id: c.cardType.id, name: c.cardType.name, color: c.cardType.color } : null,
       price:      Number(c.price),
     })),
- 
+
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
   };
@@ -67,6 +113,50 @@ const PRODUCT_INCLUDE = {
   packageTiers: { orderBy: { qty: "asc" } },
   cardTypePrices: {
     include: { cardType: true },
+  },
+  defaultTemplate: {
+    select: {
+      id: true,
+      name: true,
+      colorMode: true,
+      gradient: true,
+      accentColor: true,
+      textColor: true,
+      bandColor1: true,
+      bandColor2: true,
+      qrColor: true,
+      starsColor: true,
+      iconsColor: true,
+      pattern: true,
+      bandPosition: true,
+      frontBandHeight: true,
+      backBandHeight: true,
+      showNfcIcon: true,
+      showGoogleIcon: true,
+      nfcIconSize: true,
+      googleIconSize: true,
+      checkStrokeWidth: true,
+      ctaPaddingTop: true,
+      textShadow: true,
+      nameFontSize: true,
+      nameFontWeight: true,
+      nameLetterSpacing: true,
+      nameTextTransform: true,
+      nameLineHeight: true,
+      nameTextAlign: true,
+      sloganFontSize: true,
+      sloganFontWeight: true,
+      instructionFontSize: true,
+      instructionFontWeight: true,
+      frontLine1: true,
+      frontLine2: true,
+      backLine1: true,
+      backLine2: true,
+      qrSize: true,
+      qrPosition: true,
+      logoPosition: true,
+      logoSize: true,
+    },
   },
 };
 

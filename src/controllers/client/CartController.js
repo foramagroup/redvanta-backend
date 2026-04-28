@@ -201,18 +201,24 @@ async function resolveDesignDefaultsFromTemplate(product, company) {
     const cardModel =
       template?.model && template.model.trim() !== "" ? template.model : "classic";
 
+    const resolvedBandPosition = template.bandPosition || "bottom";
+    const resolvedColorMode =
+      resolvedBandPosition !== "hidden"
+        ? "template"
+        : (template.colorMode || "template");
+
     return {
       platform: product.reviewPlatform || template.platform || "google",
       orientation: template.orientation || "landscape",
       templateName: template.name,
-      colorMode: template.colorMode || "template",
+      colorMode: resolvedColorMode,
       gradient1: gradientArray[0] || "#0D0D0D",
       gradient2: gradientArray[1] || "#1A1A1A",
       textColor: template.textColor || "#FFFFFF",
       accentColor: template.qrColor || company?.primaryColor || "#E10600",
       accentBand1: template.bandColor1 || "#E10600",
       accentBand2: template.bandColor2 || "#FF4444",
-      bandPosition: template.bandPosition || "bottom",
+      bandPosition: resolvedBandPosition,
       frontBandHeight: template.frontBandHeight || 22,
       backBandHeight: template.backBandHeight || 12,
       frontInstruction1: template.frontLine1 || "Approach your phone to the card",
