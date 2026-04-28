@@ -66,6 +66,7 @@ model User {
   locations    Location[] @relation("OwnerLocations")
   auditLogs AuditLog[] @relation("AdminLogs")
   changedStatuses OrderStatusHistory[] @relation("StatusChangedBy")
+  filteringAssignments FeedbackFilteringConfig[] @relation("FilterAssignedUser")
   @@index([email])
   @@map("users")
 }
@@ -1833,6 +1834,7 @@ model Company {
   reviewRequests ReviewRequest[]
   userLocations       UserLocation[]
   teamActivityLogs    TeamActivityLog[]
+  filteringConfig FeedbackFilteringConfig?
 
  cards    NFCCard[]
  scans    NfcScan[]
@@ -1882,6 +1884,36 @@ updatedAt         DateTime @updatedAt
 
   company           Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   @@map("company_settings")
+}
+
+
+
+model FeedbackFilteringConfig {
+  id          Int      @id @default(autoincrement())
+  companyId   Int      @unique    // 1:1 avec Company
+
+  // ── Seuil de notation ─────────────────────────────────────
+  // rating >= threshold → plateforme publique (Google, FB...)
+  // rating <  threshold → formulaire interne
+  threshold   Int      @default(4) // 1–5
+
+  // ── Redirection plateforme publique ───────────────────────
+  redirectPlatform  FilterRedirectPlatform @default(google)
+  customUrl         String?  @db.VarChar(500) // si redirectPlatform = custom
+
+  // ── Gestion des feedbacks privés ──────────────────────────
+  assignedUserId    Int?     @db.UnsignedInt  // membre de l'équipe assigné
+  autoEmailEnabled  Boolean  @default(true)   // envoyer un email à chaque feedback privé
+  autoEmailAddress  String?  @db.VarChar(255) // destinataire de la notif email
+  autoResponseMessage String? @db.Text        // message automatique envoyé au client
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company      Company @relation(fields: [companyId],    references: [id], onDelete: Cascade)
+  assignedUser User?   @relation("FilterAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@map("feedback_filtering_configs")
 }
 
 
@@ -2356,5 +2388,10 @@ enum ReviewRequestStatus {
 enum ReviewRequestMethod {
   email
   sms
+}
+enum FilterRedirectPlatform {
+  google
+  facebook
+  custom
 }
 
