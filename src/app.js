@@ -61,7 +61,7 @@ import companyRoutes from "./routes/superadmin/companyRoutes.js";
 import authSuperAdminRoutes from "./routes/superadmin/authRoutes.js";
 import emailServerConfigRoutes from "./routes/superadmin/emailServerConfigRoutes.js";
 import statusRoutes from "./routes/superadmin/statusRoutes.js";
-import billingRoutes from "./routes/superadmin/billing.routes.js";
+import billingRoutes from "./routes/superadmin/Billing.routes.js";
 import nfcSuperAdminRoutes from "./routes/superadmin/nfc.routes.js";
 import orderSuperAdminRoutes from "./routes/superadmin/order.routes.js";
 import { superNfcRouter } from "./routes/superadmin/nfcCards.routes.js";
