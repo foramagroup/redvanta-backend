@@ -1,7 +1,7 @@
 // src/routes/googlePlaces.routes.js
 
 import { Router } from "express";
-import { authenticateAdmin, requireAdmin, requireSuperAdmin } from "../../middleware/auth.middleware.js";
+// import { authenticateAdmin, requireAdmin, requireSuperAdmin } from "../../middleware/auth.middleware.js";
 import { autocompleteRateLimit } from "../../middleware/Placesratelimit.middleware.js";
 import {
   search,
@@ -14,19 +14,19 @@ import {
 
 const router = Router();
 
-const auth = [authenticateAdmin, requireAdmin];
+// const auth = [authenticateAdmin, requireAdmin];
 
 // ─── Recherche (autocomplete) ─────────────────────────────────
 // GET /api/places/search?q=urban+bites&session=uuid&lang=fr
 // Rate limité : 30 req/min/user
 
-router.get("/search", ...auth, autocompleteRateLimit, search);
+router.get("/search", autocompleteRateLimit, search);
 
 // ─── Détails d'un lieu ────────────────────────────────────────
 // GET /api/places/details/:placeId?session=uuid
 // Résultat mis en cache 30 jours — pas de rate limit nécessaire
 
-router.get("/details/:placeId", ...auth, details);
+router.get("/details/:placeId", details);
 
 // ─── Lier à la company ────────────────────────────────────────
 // POST /api/places/link-to-company
