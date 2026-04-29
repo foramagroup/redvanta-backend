@@ -63,7 +63,7 @@ function formatLocation(loc) {
     businessName: loc.businessName,
     handle: loc.handle,
     url: loc.url,
-    cardColor: loc.cardColor || "#0A0A0A",
+    cardColor: loc.cardColor ?? null,
     sortOrder: loc.sortOrder,
     design: loc.design
       ? {
@@ -75,6 +75,14 @@ function formatLocation(loc) {
           orientation: loc.design.orientation,
           version: loc.design.version,
           validatedAt: loc.design.validatedAt,
+          colorMode: loc.design.colorMode,
+          bgColor: loc.design.bgColor,
+          gradient1: loc.design.gradient1,
+          gradient2: loc.design.gradient2,
+          accentColor: loc.design.accentColor,
+          accentBand1: loc.design.accentBand1,
+          accentBand2: loc.design.accentBand2,
+          bandPosition: loc.design.bandPosition,
         }
       : null,
   };
@@ -138,6 +146,18 @@ function getCompanyId(req) {
   const id = req.user?.companyId;
   if (!id) throw Object.assign(new Error("Aucune company active"), { status: 403 });
   return parseInt(id);
+}
+
+function getContrastTextColor(hex) {
+  const normalized = String(hex || "#0A0A0A").replace("#", "");
+  if (normalized.length !== 6) return "#FFFFFF";
+
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  return luminance > 0.55 ? "#111111" : "#FFFFFF";
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -357,7 +377,7 @@ async function createLocationDesign(tx, { userId, companyId, productId, company,
 
   // ── Card color : si l'user a choisi une couleur dans le modal ──
   // cardColor remplace le gradient du template et force colorMode = "single"
-  const hasCustomColor = Boolean(cardColor && cardColor !== "#0A0A0A");
+   const hasCustomColor = cardColor != null && String(cardColor).trim() !== "";
 
   const designData = {
     userId,
@@ -381,6 +401,7 @@ async function createLocationDesign(tx, { userId, companyId, productId, company,
           gradient1: cardColor,
           gradient2: cardColor,
           bgColor: cardColor,
+          textColor: getContrastTextColor(cardColor),
         }
       : {}),
 
@@ -486,7 +507,7 @@ async function createLocations(tx, { cartItemId, locations, userId, companyId, p
         url: loc.data?.url || null,
         googlePlaceId:   loc.data?.googlePlaceId || loc.data?.placeId   || design.googlePlaceId   || null,
         googleReviewUrl: loc.data?.googleReviewUrl || loc.data?.url    || design.googleReviewUrl || null,
-        cardColor: loc.cardColor || "#0A0A0A",
+        cardColor: loc.cardColor ?? null,
         designId: design.id,
         sortOrder: i,
       },

@@ -509,7 +509,7 @@ model dashboardstat {
     companyId   Int
     productId   Int
     status      DesignStatus    @default(draft)
-    useLogo      String?  Boolean @default(false) 
+    useLogo       Boolean @default(false) 
 
     // ── Step 1 : Business ─────────────────────────────────────
     businessName    String?
@@ -533,7 +533,7 @@ model dashboardstat {
     // ── Step 2 : Couleurs ─────────────────────────────────────
     colorMode   String?  @default("single")        // "single" | "template"
     bgColor     String?  @default("#0B0D0F")
-    selectedIconId       String?     @default(255) 
+    selectedIconId       String? 
     textColor   String?  @default("#FFFFFF")
     accentColor String?  @default("#E10600")       // = qrColor côté front
     starColor   String?  @default("#F59E0B")
@@ -1067,7 +1067,7 @@ model CardTemplate {
   slogan       String?  @db.VarChar(255)
   cta          String   @default("Powered by RedVanta") @db.VarChar(255)
   logoUrl      String?  @db.Text 
-  useLogo      String?  Boolean @default(false) 
+  useLogo      Boolean   @default(false) 
   
   // Layout
   orientation      String  @default("landscape") @db.VarChar(20)
@@ -1082,7 +1082,7 @@ model CardTemplate {
   logoSize     Int     @default(32) 
   qrPosition   String  @default("right") @db.VarChar(20) 
   qrSize       Int     @default(80) 
-  selectedIconId       String?     @default(255) 
+  selectedIconId       String?
   
   // Typography - Name/Business
   nameFont           String @default("'Space Grotesk', sans-serif") @db.VarChar(100) 
