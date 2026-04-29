@@ -1,6 +1,5 @@
 import prisma from "../../config/database.js";
 
-
 function formatTemplate(template) {
   return {
     id: template.id.toString(),
@@ -13,8 +12,9 @@ function formatTemplate(template) {
     cta: template.cta,
     logoUrl: template.logoUrl,
     
-    // Layout
+    // ✅ Layout - NOUVEAU : Support orientations multiples
     orientation: template.orientation,
+    orientations: template.orientations || [template.orientation], // ✅ Fallback si ancien template
     bandPosition: template.bandPosition,
     frontBandHeight: template.frontBandHeight,
     backBandHeight: template.backBandHeight,
@@ -75,6 +75,11 @@ function formatTemplate(template) {
     // Element offsets
     elementOffsets: template.elementOffsets,
     
+    // ✅ Platform logo/icon settings - NOUVEAU
+    useLogo: template.useLogo ?? true,
+    selectedIconId: template.selectedIconId,
+    iconColor: template.iconColor,
+    
     // Colors
     gradient: Array.isArray(template.gradient) 
       ? template.gradient 
@@ -101,7 +106,6 @@ function formatTemplate(template) {
 
 /**
  * GET /api/superadmin/card-templates
- * Récupère tous les templates
  */
 export const getAllTemplates = async (req, res) => {
   try {
@@ -148,7 +152,6 @@ export const getAllTemplates = async (req, res) => {
 
 /**
  * GET /api/superadmin/card-templates/:id
- * Récupère un template spécifique
  */
 export const getTemplateById = async (req, res) => {
   try {
@@ -181,7 +184,6 @@ export const getTemplateById = async (req, res) => {
 
 /**
  * POST /api/superadmin/card-templates
- * Crée un nouveau template
  */
 export const createTemplate = async (req, res) => {
   try {
@@ -221,7 +223,6 @@ export const createTemplate = async (req, res) => {
         }
       });
     }
-
     const template = await prisma.cardTemplate.create({
       data: {
         // Basic
@@ -234,8 +235,11 @@ export const createTemplate = async (req, res) => {
         cta: data.cta || 'Powered by RedVanta',
         logoUrl: data.logoUrl || null,
         
-        // Layout
+        // ✅ Layout - NOUVEAU : Support orientations multiples
         orientation: data.orientation || 'landscape',
+        orientations: data.orientations && Array.isArray(data.orientations) && data.orientations.length > 0
+          ? data.orientations
+          : [data.orientation || 'landscape'],
         bandPosition: data.bandPosition || 'bottom',
         frontBandHeight: data.frontBandHeight || 22,
         backBandHeight: data.backBandHeight || 12,
@@ -296,6 +300,11 @@ export const createTemplate = async (req, res) => {
         // Element offsets
         elementOffsets: data.elementOffsets || null,
         
+        // ✅ Platform logo/icon settings - NOUVEAU
+        useLogo: data.useLogo ?? true,
+        selectedIconId: data.selectedIconId || null,
+        iconColor: data.iconColor || data.accentColor || '#4285F4',
+        
         // Colors
         gradient: JSON.stringify(data.gradient),
         accentColor: data.accentColor || '#4285F4',
@@ -329,10 +338,8 @@ export const createTemplate = async (req, res) => {
   }
 };
 
-
 /**
  * PUT /api/superadmin/card-templates/:id
- * Met à jour un template
  */
 export const updateTemplate = async (req, res) => {
   try {
@@ -376,8 +383,13 @@ export const updateTemplate = async (req, res) => {
     if (data.cta !== undefined) updateData.cta = data.cta;
     if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl;
     
-    // Layout
+    // ✅ Layout - NOUVEAU : Support orientations multiples
     if (data.orientation) updateData.orientation = data.orientation;
+    if (data.orientations !== undefined) {
+      updateData.orientations = Array.isArray(data.orientations) && data.orientations.length > 0
+        ? data.orientations
+        : [data.orientation || existing.orientation || 'landscape'];
+    }
     if (data.bandPosition) updateData.bandPosition = data.bandPosition;
     if (data.frontBandHeight !== undefined) updateData.frontBandHeight = data.frontBandHeight;
     if (data.backBandHeight !== undefined) updateData.backBandHeight = data.backBandHeight;
@@ -437,6 +449,11 @@ export const updateTemplate = async (req, res) => {
     
     // Element offsets
     if (data.elementOffsets !== undefined) updateData.elementOffsets = data.elementOffsets;
+    
+    // ✅ Platform logo/icon settings - NOUVEAU
+    if (data.useLogo !== undefined) updateData.useLogo = data.useLogo;
+    if (data.selectedIconId !== undefined) updateData.selectedIconId = data.selectedIconId;
+    if (data.iconColor !== undefined) updateData.iconColor = data.iconColor;
     
     // Colors
     if (data.gradient) updateData.gradient = JSON.stringify(data.gradient);
@@ -555,6 +572,9 @@ export const duplicateTemplate = async (req, res) => {
         bandPosition: original.bandPosition || 'bottom',
         frontBandHeight: original.frontBandHeight || 22,
         backBandHeight: original.backBandHeight || 12,
+        orientations: original.orientations && Array.isArray(original.orientations) && original.orientations.length > 0
+          ? original.orientations
+          : [original.orientation || 'landscape'],
         
         // Logo and QR
         logoPosition: original.logoPosition || 'left',
@@ -611,6 +631,10 @@ export const duplicateTemplate = async (req, res) => {
         
         // Element offsets
         elementOffsets: original.elementOffsets || null,
+
+        useLogo: original.useLogo ?? true,
+        selectedIconId: original.selectedIconId || null,
+        iconColor: original.iconColor || original.accentColor || '#4285F4',
         
         // Colors
         gradient: JSON.stringify(original.gradient),

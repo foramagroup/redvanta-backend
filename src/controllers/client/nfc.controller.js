@@ -1,23 +1,21 @@
-// src/controllers/nfc.controller.js — VERSION FINALE v3
+// src/controllers/nfc.controller.js — VERSION FINALE v4
 // ─────────────────────────────────────────────────────────────
-// Support multi-plateformes avec comportements différenciés :
+// Support multi-plateformes avec 2 flux :
 //
 //  ┌─────────────────┬──────────────────┬────────────────────────────────────┐
 //  │ Plateforme      │ Comportement     │ Flux                               │
 //  ├─────────────────┼──────────────────┼────────────────────────────────────┤
-//  │ google          │ redirect_filtered│ stars → ≥4 redirect, <4 feedback   │
-//  │ tripadvisor     │ redirect_filtered│ stars → ≥4 redirect, <4 feedback   │
-//  │ booking         │ redirect_filtered│ stars → ≥4 redirect, <4 feedback   │
-//  │ airbnb          │ redirect_filtered│ stars → ≥4 redirect, <4 feedback   │
+//  │ google          │ redirect_filtered│ Scan → Page → Rating → Redirect/FB │
+//  │ tripadvisor     │ redirect_filtered│ Scan → Page → Rating → Redirect/FB │
+//  │ booking         │ redirect_filtered│ Scan → Page → Rating → Redirect/FB │
+//  │ airbnb          │ redirect_filtered│ Scan → Page → Rating → Redirect/FB │
 //  ├─────────────────┼──────────────────┼────────────────────────────────────┤
-//  │ facebook        │ direct           │ toujours redirect (pas de filtre)   │
-//  │ instagram       │ direct           │ toujours redirect (pas de filtre)   │
-//  │ tiktok          │ direct           │ toujours redirect (pas de filtre)   │
+//  │ facebook        │ direct           │ Scan → Redirect direct (skip page) │
+//  │ instagram       │ direct           │ Scan → Redirect direct (skip page) │
+//  │ tiktok          │ direct           │ Scan → Redirect direct (skip page) │
 //  ├─────────────────┼──────────────────┼────────────────────────────────────┤
 //  │ custom          │ selon redirectMode│ "filtered" ou "direct" (Design)    │
 //  └─────────────────┴──────────────────┴────────────────────────────────────┘
-//
-//  Tous les événements sont trackés dans AnalyticsEvent.
 
 import prisma from "../../config/database.js";
 import crypto  from "crypto";
@@ -34,7 +32,7 @@ function getPlatformBehavior(platform, redirectMode = null) {
   if (platform === "custom") {
     return redirectMode === "filtered" ? "redirect_filtered" : "direct";
   }
-  return "redirect_filtered"; // défaut sûr
+  return "redirect_filtered"; 
 }
 
 function resolveRedirectUrl(platform, card, design, company) {
@@ -97,9 +95,6 @@ function formatCardForReview(card, company, design) {
     },
     platform,
     platformLabel:    platformLabel(platform),
-    // Le front adapte son UI selon ce champ :
-    // "redirect_filtered" → afficher les étoiles d'abord
-    // "direct"            → bouton direct "Laisser un avis"
     platformBehavior: behavior,
     positiveThreshold: POSITIVE_THRESHOLD,
     googlePlaceId: platform === "google" ? (card.googlePlaceId ?? null) : null,
@@ -109,8 +104,9 @@ function formatCardForReview(card, company, design) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// GET /r/:uid
+// GET /r/:uid — Point d'entrée scan NFC/QR
 // ─────────────────────────────────────────────────────────────
+// ✅ NOUVEAU : Flux différencié selon la plateforme
 
 export const handleScan = async (req, res, next) => {
   try {
@@ -121,27 +117,116 @@ export const handleScan = async (req, res, next) => {
     const deviceType = detectDevice(ua);
     const fingerprint = buildFingerprint(ip, ua);
 
-    const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { company: true } });
+    // ✅ Récupérer la carte avec le design pour connaître la plateforme
+    const card = await prisma.nFCCard.findUnique({ 
+      where: { uid }, 
+      include: { 
+        company: true,
+        design: {
+          select: {
+            platform: true,
+            platformUrl: true,
+            googleReviewUrl: true,
+            redirectMode: true,
+          }
+        }
+      } 
+    });
 
-    if (!card) return res.status(404).json({ success: false, error: "Carte introuvable", uid });
-    if (!card.active) return res.status(403).json({ success: false, error: "Cette carte n'est pas encore active.", status: card.status });
+    if (!card) {
+      return res.status(404).json({ success: false, error: "Carte introuvable", uid });
+    }
 
+    if (!card.active) {
+      return res.status(403).json({ 
+        success: false, 
+        error: "Cette carte n'est pas encore active.", 
+        status: card.status 
+      });
+    }
+
+    // ✅ Tracker le scan (async)
     Promise.all([
-      prisma.nfcScan.create({ data: { cardUid: uid, companyId: card.companyId, scanType, ipAddress: ip, userAgent: ua, deviceType } }),
-      logEvent(uid, card.companyId, "SCAN", { ipAddress: ip, userAgent: ua, deviceType, referrer: req.headers["referer"] ?? null, fingerprintHash: fingerprint }),
-      prisma.nFCCard.update({ where: { uid }, data: { used: true, scanCount: { increment: 1 }, lastScannedAt: new Date() } }),
+      prisma.nfcScan.create({ 
+        data: { 
+          cardUid: uid, 
+          companyId: card.companyId, 
+          scanType, 
+          ipAddress: ip, 
+          userAgent: ua, 
+          deviceType 
+        } 
+      }),
+      logEvent(uid, card.companyId, "SCAN", { 
+        ipAddress: ip, 
+        userAgent: ua, 
+        deviceType, 
+        referrer: req.headers["referer"] ?? null, 
+        fingerprintHash: fingerprint 
+      }),
+      prisma.nFCCard.update({ 
+        where: { uid }, 
+        data: { 
+          used: true, 
+          scanCount: { increment: 1 }, 
+          lastScannedAt: new Date() 
+        } 
+      }),
     ]).catch((e) => console.error("[nfc] scan tracking error:", e.message));
 
+    // ✅ Déterminer le comportement selon la plateforme
+    const platform = card.design?.platform ?? "google";
+    const redirectMode = card.design?.redirectMode ?? null;
+    const behavior = getPlatformBehavior(platform, redirectMode);
+
+    // ─────────────────────────────────────────────────────────
+    // ✅ FLUX B : REDIRECT DIRECT (Facebook, Instagram, TikTok)
+    // ─────────────────────────────────────────────────────────
+    if(behavior === "direct") {
+      const redirectUrl = resolveRedirectUrl(platform, card, card.design, card.company);
+
+        if (!redirectUrl) {
+          // Fallback : Si pas d'URL configurée, on redirige vers la page review quand même
+          console.warn(`[nfc] Platform ${platform} en mode direct mais pas d'URL configurée → fallback page review`);
+          const companySlug = (card.company?.name ?? "review")
+            .toLowerCase().trim().replace(/\s+/g, "-").replace(/[^\w-]/g, "");
+            return res.redirect(302, `${process.env.URL_PROD_FRONTEND}/review/${companySlug}?uid=${uid}`);
+        }
+        // ✅ Tracker la redirection directe
+        Promise.all([
+          logEvent(uid, card.companyId, "PLATFORM_REDIRECT_DIRECT", {
+            ipAddress: ip,
+            userAgent: ua,
+            deviceType,
+            referrer: req.headers["referer"] ?? null,
+          }),
+          prisma.nFCCard.update({ 
+            where: { uid }, 
+            data: { googleRedirectCount: { increment: 1 } }  // Réutilise le compteur existant
+          }),
+        ]).catch(console.error);
+
+        console.log(`[nfc] Redirect direct ${platform} → ${redirectUrl}`);
+        
+        // ✅ Redirection directe vers le réseau social
+       return res.redirect(302, redirectUrl);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // ✅ FLUX A : PAGE REVIEW (Google, TripAdvisor, Booking, Airbnb)
+    // ─────────────────────────────────────────────────────────
     const companySlug = (card.company?.name ?? "review")
       .toLowerCase().trim().replace(/\s+/g, "-").replace(/[^\w-]/g, "");
 
     return res.redirect(302, `${process.env.URL_PROD_FRONTEND}/review/${companySlug}?uid=${uid}`);
+
   } catch (e) { next(e); }
 };
 
 // ─────────────────────────────────────────────────────────────
 // GET /review/:uid
 // ─────────────────────────────────────────────────────────────
+// ✅ INCHANGÉ (sert uniquement pour redirect_filtered)
 
 export const getReviewPage = async (req, res, next) => {
   try {
@@ -157,7 +242,7 @@ export const getReviewPage = async (req, res, next) => {
           select: {
             platform: true, platformUrl: true,
             googleReviewUrl: true, googlePlaceId: true,
-            redirectMode: true, // "filtered" | "direct" | null (pour custom)
+            redirectMode: true,
           },
         },
       },
@@ -182,15 +267,8 @@ export const getReviewPage = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 // POST /review/:uid/rate
 // ─────────────────────────────────────────────────────────────
-//
-// redirect_filtered (google, tripadvisor, booking, airbnb) :
-//   ≥4 → PLATFORM_REDIRECT
-//   <4 → INTERNAL_FEEDBACK
-//
-// direct (facebook, instagram, tiktok) :
-//   toujours → PLATFORM_REDIRECT (stars trackées quand même)
-//
-// custom : selon design.redirectMode
+// ✅ Sert uniquement pour redirect_filtered (Google, TripAdvisor, etc.)
+// Les plateformes "direct" ne passent jamais par ici
 
 export const submitRating = async (req, res, next) => {
   try {
@@ -228,15 +306,11 @@ export const submitRating = async (req, res, next) => {
       referrer: req.headers["referer"] ?? null,
     }).catch(console.error);
 
-    // Décider du flux
-    const shouldRedirect =
-      behavior === "direct" ||
-      (behavior === "redirect_filtered" && starsNum >= POSITIVE_THRESHOLD);
+    // Décider du flux (redirect_filtered uniquement)
+    const shouldRedirect = (behavior === "redirect_filtered" && starsNum >= POSITIVE_THRESHOLD);
 
     if (shouldRedirect) {
-
       if (!redirectUrl) {
-        // URL non configurée → fallback feedback interne
         console.warn(`[nfc] No redirectUrl for uid=${uid} platform=${platform}`);
         return res.json({ success: true, action: "INTERNAL_FEEDBACK", message: "Merci pour votre avis !", stars: starsNum, uid });
       }
@@ -244,7 +318,6 @@ export const submitRating = async (req, res, next) => {
       // Tracker + incrémenter compteur
       Promise.all([
         logEvent(uid, card.companyId, "GOOGLE_REDIRECT", {
-          // Conserve "GOOGLE_REDIRECT" en DB pour compat analytics existants
           stars: starsNum, ipAddress: ip, userAgent: ua, deviceType,
           referrer: req.headers["referer"] ?? null,
         }),
@@ -258,7 +331,6 @@ export const submitRating = async (req, res, next) => {
         platformLabel:    platformLabel(platform),
         platformBehavior: behavior,
         redirectUrl,
-        // Compat legacy : si Google, exposer aussi googleReviewUrl
         ...(platform === "google" && {
           googleReviewUrl: redirectUrl,
           googlePlaceId:   card.design?.googlePlaceId || card.company?.googlePlaceId || null,
@@ -285,8 +357,7 @@ export const submitRating = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 // POST /review/:uid/feedback
 // ─────────────────────────────────────────────────────────────
-// Reçoit les feedbacks négatifs des plateformes redirect_filtered.
-// Les plateformes "direct" n'arrivent jamais ici.
+// ✅ INCHANGÉ (reçoit uniquement les feedbacks négatifs redirect_filtered)
 
 export const submitFeedback = async (req, res, next) => {
   try {
@@ -327,7 +398,6 @@ export const submitFeedback = async (req, res, next) => {
 };
 
 // ─── Email admin ───────────────────────────────────────────────
-
 async function sendFeedbackNotification(feedback, card) {
   try {
     const { sendTemplatedMail } = await import("../../services/client/mail.service.js");
@@ -345,7 +415,7 @@ async function sendFeedbackNotification(feedback, card) {
         date: new Date().toLocaleDateString("fr-FR"),
       },
       fallbackFn: () => ({
-        subject: `Feedback ${feedback.stars}/5 — ${card.locationName ?? ""}`,
+        subject: `⭐ Feedback ${feedback.stars}/5 — ${card.locationName ?? ""}`,
         html: `<p>Nouveau feedback <strong>${feedback.stars}/5</strong> pour "${card.locationName ?? "votre établissement"}".</p><p><strong>Message :</strong> ${feedback.message ?? ""}</p><p><em>${new Date().toLocaleDateString("fr-FR")}</em></p>`,
         text: `Feedback ${feedback.stars}/5 : ${feedback.message ?? ""}`,
       }),

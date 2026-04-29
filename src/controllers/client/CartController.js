@@ -207,6 +207,10 @@ async function resolveDesignDefaultsFromTemplate(product, company) {
     return {
       platform: product.reviewPlatform || template.platform || "google",
       orientation: template.orientation || "landscape",
+      orientations: template.orientations,
+      useLogo: template.useLogo,
+      selectedIconId: template.selectedIconId,
+      iconColor: template.iconColor,
       templateName: template.name,
       colorMode: resolvedColorMode,
       gradient1: gradientArray[0] || "#0D0D0D",
