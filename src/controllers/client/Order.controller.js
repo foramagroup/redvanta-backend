@@ -168,23 +168,21 @@ export const createOrder = async (req, res, next) => {
       // v1 : un CartItem sans location  → 1 OrderItem (comportement inchangé)
       const orderItemsData = cartItems.flatMap((item) => {
         const hasLocations = item.locations?.length > 0;
- 
         if (hasLocations) {
           // ── v2 : 1 OrderItem par location ──────────────────
-          return item.locations.map((loc) => ({
-            productId:     item.productId,
-            packageTierId: item.packageTierId ?? null,
-            // la quantité de l'OrderItem = quantité de cette location
-            totalCards:    loc.quantity,
-            quantity:      loc.quantity,
-            unitPrice:     Number(item.unitPrice),
-            totalPrice:    loc.quantity * Number(item.unitPrice),
-            // chaque location a son propre design
-            designId:      loc.designId ?? null,
-            cardTypeId:    item.cardTypeId ?? null,
-          }));
+              return item.locations.map((loc) => ({
+                productId:     item.productId,
+                packageTierId: item.packageTierId ?? null,
+                // la quantité de l'OrderItem = quantité de cette location
+                totalCards:    loc.quantity,
+                quantity:      loc.quantity,
+                unitPrice:     Number(item.unitPrice),
+                totalPrice:    loc.quantity * Number(item.unitPrice),
+                // chaque location a son propre design
+                designId:      loc.designId ?? null,
+                cardTypeId:    item.cardTypeId ?? null,
+              }));
         }
- 
         // ── v1 legacy : 1 OrderItem par CartItem ───────────
         return [{
           productId:     item.productId,
@@ -233,8 +231,12 @@ export const createOrder = async (req, res, next) => {
         data: { orderId: o.id, currency, rate, displayTotal, baseCurrency: "EUR", baseTotal: totalEUR },
       });
  
-      // Vider le panier (cascade supprime automatiquement les CartItemLocations)
-      await tx.cartItem.deleteMany({ where: { userId, companyId } });
+        if (isManual) {
+          await tx.cartItem.deleteMany({ where: { userId, companyId } });
+          console.log(`[order] Panier vidé pour paiement manuel - Order #${o.orderNumber}`);
+        } else {
+          console.log(`[order] Panier conservé pour paiement Stripe - Order #${o.orderNumber}`);
+        }
       return o;
     });
  
