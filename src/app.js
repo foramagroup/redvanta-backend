@@ -49,6 +49,7 @@ import roleRoutes from "./routes/superadmin/roleRoutes.js";
 import featureFlagRoutes from "./routes/superadmin/featureFlagsRoutes.js";
 import securityRoutes from "./routes/superadmin/securityRoutes.js";
 import auditLogRoutes from "./routes/superadmin/auditLogRoutes.js";
+import designsSuperadminRoutes from "./routes/superadmin/allDesigns.routes.js";
 import languageSettingRoutes from "./routes/superadmin/languageSettingRoutes.js";
 import globalCurrencyRoutes from "./routes/superadmin/globalCurrencyRoutes.js";
 import paymentGatewayRoutes from "./routes/superadmin/paymentGatewayRoutes.js";
@@ -306,6 +307,7 @@ app.use("/api/customization", customizationRoutes);
 
   // gestion product
   app.use('/api/superadmin/products', productAdminRoutes);
+  
   app.use('/api/superadmin/card-types', cardTypeAdminRoutes);
 
   //gestion Orders
@@ -313,6 +315,9 @@ app.use("/api/customization", customizationRoutes);
 
   //gestion NFC/design
   app.use('/api/superadmin/nfc', superNfcRouter);
+
+  //gestion superadmin
+  app.use("/api/superadmin/designs", designsSuperadminRoutes);
 
   //gestion NFCTAGS
   app.use('/api/superadmin/nfc-tags', nfcTagRoutes);

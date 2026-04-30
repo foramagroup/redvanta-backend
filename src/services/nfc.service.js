@@ -8,6 +8,7 @@ import prisma from "../config/database.js";
 import { v4 as uuidv4 } from "uuid";
 import { generateAllQrCodes, deriveQrUrls, deleteQrFiles } from "./qrcode.service.js";
 import { generateCardExport, deleteCardExportFiles, deriveCardUrls } from "./cardExport.service.js";
+import { sendNfcCardStatusEmail } from "../services/nfcCardStatus.email.js";
 
 const APP_URL = process.env.URL_PROD_BACKEND || "http://localhost:4000/api";
 
@@ -243,49 +244,125 @@ async function linkCardToLocation(card, companyId, googlePlaceId) {
 }
  
 // ─── Mettre à jour le statut des cartes (production → shipped) ─
+
+
 export async function updateCardsStatusForOrder(orderId, newOrderStatus) {
-  const items = await prisma.orderItem.findMany({ where: { orderId }, include: { nfcCard: true } });
-  const cards = items.filter((i) => i.nfcCard).map((i) => i.nfcCard);
+  // 1. Récupération des items avec les cartes NFC ET leurs relations pour l'email
+  const items = await prisma.orderItem.findMany({ 
+    where: { orderId }, 
+    include: { 
+      nfcCards: {
+        include: {
+          company: true, // Requis pour l'email
+          design: true   // Requis pour l'email
+        }
+      } 
+    } 
+  });
+
+  const cards = items.flatMap((i) => i.nfcCards);
   if (!cards.length) return 0;
- 
-  const statusMap = { production: "NOT_PROGRAMMED", printed: "PRINTED", shipped: "SHIPPED" };
+
+  // 2. Mapping des statuts
+  const statusMap = { 
+    production: "NOT_PROGRAMMED", 
+    printed: "PRINTED", 
+    shipped: "SHIPPED" 
+  };
+  
   const cardStatus = statusMap[newOrderStatus];
   if (!cardStatus) return 0;
- 
+
+  // 3. Mise à jour massive des statuts des cartes NFC
+  const cardIds = cards.map((c) => c.id);
   await prisma.nFCCard.updateMany({
-    where: { id: { in: cards.map((c) => c.id) } },
-    data:  { status: cardStatus },
+    where: { id: { in: cardIds } },
+    data: { status: cardStatus },
   });
- 
-  // Si printed → marquer les puces hardware liées comme PROGRAMMED
+
+  // 4. Logique spécifique au statut "PRINTED"
   if (newOrderStatus === "printed") {
-    for (const card of cards) {
-      if (card.tagId) {
-        await prisma.nFCTag.update({
-          where: { id: card.tagId },
-          data:  { status: "PROGRAMMED" },
-        }).catch(() => {});
-      }
+    // A. Tags Hardware
+    const tagIds = [...new Set(cards.map(c => c.tagId).filter(id => id != null))];
+    if (tagIds.length > 0) {
+      await prisma.nFCTag.updateMany({
+        where: { id: { in: tagIds } },
+        data: { status: "PROGRAMMED" },
+      }).catch((err) => console.error("[nfc] Erreur update tags:", err));
+    }
+
+    // B. Verrouillage Design
+    const designIds = [...new Set(cards.map(c => c.designId).filter(id => id != null))];
+    if (designIds.length > 0) {
+      await prisma.design.updateMany({
+        where: { id: { in: designIds } },
+        data: { status: "locked" }, 
+      }).catch((err) => console.error("[nfc] Erreur lock designs:", err));
     }
   }
- 
-  console.log(`[nfc] ${cards.length} NFCCard(s) → status=${cardStatus}`);
+
+  if (["PRINTED", "SHIPPED", "ACTIVE"].includes(cardStatus)) {
+    cards.forEach((card) => {
+      const updatedCard = { ...card, status: cardStatus };
+      sendNfcCardStatusEmail(updatedCard, cardStatus).catch((err) => {
+        console.error(`[nfc] ❌ Email ${cardStatus} error for card ${card.uid}:`, err.message);
+      });
+    });
+  }
+
+  console.log(`[nfc] ${cards.length} NFCCard(s) mis à jour → status=${cardStatus} (Emails envoyés)`);
   return cards.length;
 }
  
 // ─── Activer les cartes à la livraison (SEUL moment) ─────────
 export async function activateCardsForOrder(orderId) {
-  const items   = await prisma.orderItem.findMany({ where: { orderId }, include: { nfcCard: true } });
-  const cardIds = items.filter((i) => i.nfcCard).map((i) => i.nfcCard.id);
-  if (!cardIds.length) return 0;
- 
-  await prisma.nFCCard.updateMany({
-    where: { id: { in: cardIds } },
-    data:  { status: "ACTIVE", active: true, activatedAt: new Date() },
+  const items = await prisma.orderItem.findMany({ 
+    where: { orderId }, 
+    include: { 
+      nfcCards: {
+        include: {
+          company: true,
+          design: true
+        }
+      } 
+    } 
   });
- 
-  console.log(`[nfc] ${cardIds.length} NFCCard(s) ACTIVÉES pour commande #${orderId}`);
-  return cardIds.length;
+
+  const cards = items.flatMap((item) => item.nfcCards);
+
+  if (!cards.length) {
+    console.log(`[nfc] Aucune carte trouvée pour la commande #${orderId}`);
+    return 0;
+  }
+
+  const cardIds = cards.map((card) => card.id);
+
+  // 2. Mise à jour massive en base de données
+  const updateResult = await prisma.nFCCard.updateMany({
+    where: { id: { in: cardIds } },
+    data: { 
+      status: "ACTIVE", 
+      active: true, 
+      activatedAt: new Date() 
+    },
+  });
+
+  // 3. ENVOI DES EMAILS (uniquement pour le statut ACTIVE)
+  cards.forEach((card) => {
+    // On clone l'objet pour refléter l'état activé dans l'email
+    const activatedCard = { 
+      ...card, 
+      status: "ACTIVE", 
+      active: true, 
+      activatedAt: new Date() 
+    };
+    sendNfcCardStatusEmail(activatedCard, "ACTIVE").catch((err) => {
+      console.error(`[nfc] ❌ Email ACTIVE error for card ${card.uid}:`, err.message);
+    });
+  });
+
+  console.log(`[nfc] ${updateResult.count} NFCCard(s) ACTIVÉES et notifiées par email.`);
+  return updateResult.count;
 }
  
 // ─── Assigner une puce hardware à une carte ──────────────────

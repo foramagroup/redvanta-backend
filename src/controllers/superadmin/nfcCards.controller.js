@@ -25,6 +25,7 @@ import fs     from "fs";
 import prisma from "../../config/database.js";
 import { generateCardExport, deriveCardUrls, deleteCardExportFiles } from "../../services/cardExport.service.js";
 import { formatNfcCard, assignTagToCard, regenerateQrCode } from "../../services/nfc.service.js";
+import {sendNfcCardStatusEmail} from "../../services/nfcCardStatus.email.js"
 
 // ─── Include Prisma complet (superadmin voit tout) ────────────
 
@@ -278,11 +279,19 @@ export const updateCardStatus = async (req, res, next) => {
     if (normalizedStatus === "DISABLED") {
       updateData.active = false;
     }
-    if (normalizedStatus === "PRINTED" && card.tagId) {
-      await prisma.nFCTag.update({
-        where: { id: card.tagId },
-        data:  { status: "PROGRAMMED" },
-      }).catch(() => {});
+    if (normalizedStatus === "PRINTED") {
+          if (card.tagId) {
+            await prisma.nFCTag.update({
+              where: { id: card.tagId },
+              data:  { status: "PROGRAMMED" },
+            }).catch(() => {});
+          }
+          if (card.designId) {
+            await prisma.design.update({
+              where: { id: card.designId },
+              data:  { status: "locked" },
+            }).catch((err) => console.error("[nfc] Erreur lock design individuel:", err));
+          }
     }
     const updated = await prisma.nFCCard.update({
       where:   { uid },
