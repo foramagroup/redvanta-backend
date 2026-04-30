@@ -259,42 +259,47 @@ export const updateCardStatus = async (req, res, next) => {
     const normalizedStatus = STATUS_NORMALIZE[status?.toLowerCase()] ?? status?.toUpperCase();
 
     // Vérifier la transition valide
-    const allowed = VALID_STATUS_TRANSITIONS[card.status] ?? [];
-    if (!allowed.includes(normalizedStatus)) {
-      return res.status(422).json({
-        success: false,
-        error:   `Transition invalide : ${card.status} → ${normalizedStatus}`,
-        allowed,
-      });
-    }
+    // const allowed = VALID_STATUS_TRANSITIONS[card.status] ?? [];
+    // if (!allowed.includes(normalizedStatus)) {
+    //   return res.status(422).json({
+    //     success: false,
+    //     error:   `Transition invalide : ${card.status} → ${normalizedStatus}`,
+    //     allowed,
+    //   });
+    // }
 
     // Données à mettre à jour
     const updateData = { status: normalizedStatus };
 
     if (normalizedStatus === "ACTIVE") {
-      // Livraison → activer la carte
       updateData.active      = true;
       updateData.activatedAt = new Date();
     }
     if (normalizedStatus === "DISABLED") {
       updateData.active = false;
     }
-
     if (normalizedStatus === "PRINTED" && card.tagId) {
-      // Marquer la puce hardware comme PROGRAMMED
       await prisma.nFCTag.update({
         where: { id: card.tagId },
         data:  { status: "PROGRAMMED" },
       }).catch(() => {});
     }
-
     const updated = await prisma.nFCCard.update({
       where:   { uid },
       data:    updateData,
       include: CARD_INCLUDE,
     });
-
-    res.json({ success: true, message: `Carte → ${normalizedStatus}`, data: formatCardFull(updated) });
+    // ✅ Envoyer email pour PRINTED, SHIPPED, ACTIVE, DISABLED
+    if (["PRINTED", "SHIPPED", "DELIVERED", "ACTIVE", "DISABLED"].includes(normalizedStatus)) {
+      sendNfcCardStatusEmail(card, normalizedStatus).catch((err) => {
+        console.error(`[nfc] ❌ Email ${normalizedStatus} error:`, err.message);
+      });
+    }
+    res.json({ 
+      success: true, 
+      message: `Carte → ${normalizedStatus}`, 
+      data: formatCardFull(updated) 
+    });
   } catch (e) { next(e); }
 };
 

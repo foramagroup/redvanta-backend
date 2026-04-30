@@ -63,7 +63,7 @@ function formatDesign(d) {
 
     // Step 1
     slogan:          d.slogan          ?? "",
-    callToAction:    d.callToAction    ?? "Powered by RedVanta",
+    callToAction:    d.callToAction    ?? `${'Powered by'+process.env.MAIL_FROM_NAME}`,
     ctaPaddingTop:   d.ctaPaddingTop   ?? 8,
     googlePlaceId:   d.googlePlaceId   ?? null,
     googleReviewUrl: d.googleReviewUrl ?? null,

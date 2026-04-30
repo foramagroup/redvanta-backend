@@ -29,6 +29,7 @@
 
 import prisma from "../../config/database.js";
 import { productNeedsDesign } from "../../helpers/designResolver.helpers.js";
+import { getPlaceDetails } from "../../services/Googleplaces.service.js";
 
 // ─────────────────────────────────────────────────────────────
 // INCLUDES

@@ -525,17 +525,17 @@ async function sendOrderPendingEmail(order, invoice, manualMethod) {
         due_date:             new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString("fr-FR"),
       },
       fallbackFn: () => ({
-        subject: `Commande ${order.orderNumber} — En attente de paiement`,
-        html: `
-          <p>Bonjour ${order.user?.name ?? ""},</p>
-          <p>Votre commande <strong>${order.orderNumber}</strong> a été créée.</p>
-          <p>Facture : <strong>${invoice.invoiceNumber}</strong> — Montant : <strong>${Number(order.total).toFixed(2)} ${order.currency ?? "EUR"}</strong></p>
-          <p>Mode de paiement : <strong>${manualMethod.name}</strong></p>
-          ${manualMethod.instructions ? `<p>Instructions : ${manualMethod.instructions}</p>` : ""}
-          <p>Votre commande sera traitée dès réception du paiement.</p>
-        `,
-        text: `Commande ${order.orderNumber} créée. Facture ${invoice.invoiceNumber} - ${Number(order.total).toFixed(2)} ${order.currency ?? "EUR"} en attente de paiement via ${manualMethod.name}.`,
-      }),
+      subject: `Order ${order.orderNumber} — Awaiting payment`,
+      html: `
+        <p>Hello ${order.user?.name ?? ""},</p>
+        <p>Your order <strong>${order.orderNumber}</strong> has been created.</p>
+        <p>Invoice: <strong>${invoice.invoiceNumber}</strong> — Amount: <strong>${Number(order.total).toFixed(2)} ${order.currency ?? "EUR"}</strong></p>
+        <p>Payment Method: <strong>${manualMethod.name}</strong></p>
+        ${manualMethod.instructions ? `<p>Instructions: ${manualMethod.instructions}</p>` : ""}
+        <p>Your order will be processed as soon as payment is received.</p>
+      `,
+      text: `Order ${order.orderNumber} created. Invoice ${invoice.invoiceNumber} - ${Number(order.total).toFixed(2)} ${order.currency ?? "EUR"} awaiting payment via ${manualMethod.name}.`,
+    }),
     });
   } catch (e) {
     console.error("[order] Erreur email pending:", e.message);

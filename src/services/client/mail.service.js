@@ -25,7 +25,7 @@ function createTransporter() {
 export async function sendMail({ to, subject, html, text }) {
   const transporter = createTransporter();
   const info = await transporter.sendMail({
-    from: `"${process.env.MAIL_FROM_NAME || "REDVANTA"}" <${process.env.MAIL_FROM_ADDRESS || process.env.MAIL_FROM || "no-reply@redvanta.com"}>`,
+    from: `"${process.env.MAIL_FROM_NAME || "OPINOOR"}" <${process.env.MAIL_FROM_ADDRESS || process.env.MAIL_FROM || "no-reply@opinoor.com"}>`,
     to,
     subject,
     html,
