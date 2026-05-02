@@ -37,6 +37,7 @@ import reviewRequestRoutes from "./routes/reviewRequest.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
 import teamRoutes from "./routes/team.routes.js";
 import filteringRoutes from "./routes/filtering.routes.js";
+import planBuilderRoutes from "./routes/planBuilder.routes.js";
 
 // routes superadmin
 import superadminAuthRoutes from "./routes/superadmin/authRoutes.js";
@@ -267,6 +268,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/admin/team", teamRoutes);
   //ges filtering
   app.use("/api/admin/filtering", filteringRoutes);
+  //ges planBuilder
+  app.use("/api/admin/plan-builder", planBuilderRoutes);
 
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);

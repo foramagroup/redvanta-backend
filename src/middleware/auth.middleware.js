@@ -31,7 +31,7 @@ function makeAuthMiddleware(type = "any") {
         return res.status(401).json({
           success: false,
           error: "Not authenticated. Please sign in.",
-          code: "NO_TOKEN",
+          code: "NO_TOKEN"
         });
       }
 

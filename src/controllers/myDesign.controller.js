@@ -17,6 +17,8 @@
 
 import prisma from "../config/database.js";
 
+const PAYMENT_LOCK_MESSAGE = "Please pay the invoice first.";
+
 // ─── Helper ──────────────────────────────────────────────────
 
 function getCompanyId(req) {
@@ -25,9 +27,63 @@ function getCompanyId(req) {
   return parseInt(id);
 }
 
+async function getBlockingStatusMap(designIds = []) {
+  const ids = [...new Set(designIds.map((id) => parseInt(id)).filter(Boolean))];
+  const map = new Map();
+  if (!ids.length) return map;
+
+  const items = await prisma.orderItem.findMany({
+    where: {
+      designId: { in: ids },
+      OR: [
+        { order: { status: { not: "paid" } } },
+        { order: { invoice: { is: { status: { not: "paid" } } } } },
+      ],
+    },
+    select: {
+      designId: true,
+      order: {
+        select: {
+          status: true,
+          invoice: { select: { status: true } },
+        },
+      },
+    },
+  });
+
+  for (const item of items) {
+    if (!item.designId || map.has(item.designId)) continue;
+    map.set(item.designId, item.order?.invoice?.status ?? item.order?.status ?? "unpaid");
+  }
+
+  return map;
+}
+
+function resolveInvoiceStatus(d) {
+  const invoiceStatuses = [
+    ...(d.nfcCards ?? []).map((card) => card?.orderItem?.order?.invoice?.status).filter(Boolean),
+    ...(d.orderItem ?? []).map((item) => item?.order?.invoice?.status).filter(Boolean),
+  ];
+  const orderStatuses = [
+    ...(d.nfcCards ?? []).map((card) => card?.orderItem?.order?.status).filter(Boolean),
+    ...(d.orderItem ?? []).map((item) => item?.order?.status).filter(Boolean),
+  ];
+
+  const blockingInvoiceStatus = invoiceStatuses.find((status) => status !== "paid");
+  if (blockingInvoiceStatus) return blockingInvoiceStatus;
+
+  const blockingOrderStatus = orderStatuses.find((status) => status !== "paid");
+  if (blockingOrderStatus) return blockingOrderStatus;
+
+  return invoiceStatuses[0] ?? orderStatuses[0] ?? null;
+}
+
 // Format design pour la vue MyDesigns
 // Mappe les champs DB vers ce que le front attend dans DesignCard / DesignRow
 function formatDesign(d) {
+  const invoiceStatus = d.__blockingStatus ?? resolveInvoiceStatus(d);
+  const paymentLockActive = Boolean(invoiceStatus && invoiceStatus !== "paid");
+
   return {
     // ── Identifiants ──────────────────────────────────────
     id:        d.id,
@@ -52,6 +108,16 @@ function formatDesign(d) {
     linkedCard: d.nfcCards?.length > 0
       ? d.nfcCards[0].uid.slice(0, 8).toUpperCase()
       : null,
+    primaryCardUid: d.nfcCards?.[0]?.uid ?? null,
+    primaryCardPayload: paymentLockActive
+      ? PAYMENT_LOCK_MESSAGE
+      : d.nfcCards?.[0]?.payload ?? null,
+    primaryCardQrCodeUrl: paymentLockActive
+      ? null
+      : d.nfcCards?.[0]?.qrCodeUrl ?? null,
+    paymentLockActive,
+    paymentLockMessage: paymentLockActive ? PAYMENT_LOCK_MESSAGE : null,
+    invoiceStatus,
 
     // ── Dates ─────────────────────────────────────────────
     createdAt: d.createdAt?.toISOString().split("T")[0] ?? null,
@@ -149,6 +215,31 @@ function formatDesign(d) {
   };
 }
 
+async function formatDesignWithPayment(d) {
+  const blockingStatus = (await getBlockingStatusMap([d.id])).get(d.id) ?? null;
+  return formatDesign({ ...d, __blockingStatus: blockingStatus });
+}
+
+const DESIGN_PAYMENT_INCLUDE = {
+  nfcCards: {
+    select: {
+      uid: true,
+      payload: true,
+      qrCodeUrl: true,
+      orderItem: {
+        select: {
+          order: { select: { status: true, invoice: { select: { status: true } } } },
+        },
+      },
+    },
+  },
+  orderItem: {
+    select: {
+      order: { select: { status: true, invoice: { select: { status: true } } } },
+    },
+  },
+};
+
 // DesignStatus DB → statut front
 // La vue utilise "active" | "draft" | "archived"
 // On n'a pas de champ "archived" en DB — on le stocke en status="archived" (valeur custom)
@@ -239,16 +330,15 @@ export const listMyDesigns = async (req, res, next) => {
         orderBy: { updatedAt: "desc" },
         skip,
         take,
-        include: {
-          nfcCards: { select: { uid: true }, take: 1 },
-        },
+        include: DESIGN_PAYMENT_INCLUDE,
       }),
       prisma.design.count({ where }),
     ]);
 
+    const blockingStatusMap = await getBlockingStatusMap(designs.map((d) => d.id));
     res.json({
       success: true,
-      data:    designs.map(formatDesign),
+      data:    designs.map((d) => formatDesign({ ...d, __blockingStatus: blockingStatusMap.get(d.id) ?? null })),
       meta:    { total, page: pageNum, limit: take, pages: Math.ceil(total / take) },
     });
   } catch (e) { next(e); }
@@ -266,11 +356,11 @@ export const getMyDesign = async (req, res, next) => {
 
     const design = await prisma.design.findFirst({
       where:   { id, companyId, userId },
-      include: { nfcCards: { select: { uid: true }, take: 1 } },
+      include: DESIGN_PAYMENT_INCLUDE,
     });
     if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
 
-    res.json({ success: true, data: formatDesign(design) });
+    res.json({ success: true, data: await formatDesignWithPayment(design) });
   } catch (e) { next(e); }
 };
 
@@ -308,13 +398,13 @@ export const duplicateMyDesign = async (req, res, next) => {
         validatedAt:  null,
         lastAutoSave: null,
       },
-      include: { nfcCards: { select: { uid: true }, take: 1 } },
+      include: DESIGN_PAYMENT_INCLUDE,
     });
 
     res.status(201).json({
       success: true,
       message: `Design dupliqué`,
-      data:    formatDesign(copy),
+      data:    await formatDesignWithPayment(copy),
     });
   } catch (e) { next(e); }
 };
@@ -335,7 +425,10 @@ export const renameMyDesign = async (req, res, next) => {
       return res.status(422).json({ success: false, error: "Le nom ne peut pas être vide" });
     }
 
-    const design = await prisma.design.findFirst({ where: { id, companyId, userId } });
+    const design = await prisma.design.findFirst({
+      where: { id, companyId, userId },
+      include: DESIGN_PAYMENT_INCLUDE,
+    });
     if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
 
     // Un design locked (commande en cours) ne peut pas être renommé
@@ -346,10 +439,10 @@ export const renameMyDesign = async (req, res, next) => {
     const updated = await prisma.design.update({
       where: { id },
       data:  { businessName: name.trim() },
-      include: { nfcCards: { select: { uid: true }, take: 1 } },
+      include: DESIGN_PAYMENT_INCLUDE,
     });
 
-    res.json({ success: true, message: "Design renommé", data: formatDesign(updated) });
+    res.json({ success: true, message: "Design renommé", data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
@@ -363,7 +456,10 @@ export const archiveMyDesign = async (req, res, next) => {
     const userId    = req.user.userId;
     const id        = parseInt(req.params.id);
 
-    const design = await prisma.design.findFirst({ where: { id, companyId, userId } });
+    const design = await prisma.design.findFirst({
+      where: { id, companyId, userId },
+      include: DESIGN_PAYMENT_INCLUDE,
+    });
     if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
 
     if (design.status === "locked") {
@@ -376,10 +472,10 @@ export const archiveMyDesign = async (req, res, next) => {
     const updated = await prisma.design.update({
       where: { id },
       data:  { status: "archived" },
-      include: { nfcCards: { select: { uid: true }, take: 1 } },
+      include: DESIGN_PAYMENT_INCLUDE,
     });
 
-    res.json({ success: true, message: "Design archivé", data: formatDesign(updated) });
+    res.json({ success: true, message: "Design archivé", data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
@@ -393,7 +489,10 @@ export const restoreMyDesign = async (req, res, next) => {
     const userId    = req.user.userId;
     const id        = parseInt(req.params.id);
 
-    const design = await prisma.design.findFirst({ where: { id, companyId, userId } });
+    const design = await prisma.design.findFirst({
+      where: { id, companyId, userId },
+      include: DESIGN_PAYMENT_INCLUDE,
+    });
     if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
 
     if (design.status !== "archived") {
@@ -403,10 +502,10 @@ export const restoreMyDesign = async (req, res, next) => {
     const updated = await prisma.design.update({
       where: { id },
       data:  { status: "draft" },
-      include: { nfcCards: { select: { uid: true }, take: 1 } },
+      include: DESIGN_PAYMENT_INCLUDE,
     });
 
-    res.json({ success: true, message: "Design restauré en brouillon", data: formatDesign(updated) });
+    res.json({ success: true, message: "Design restauré en brouillon", data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
