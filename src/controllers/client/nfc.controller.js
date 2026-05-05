@@ -91,7 +91,7 @@ function formatCardForReview(card, company, design) {
       name:            company?.name            ?? null,
       logo:            company?.logo            ?? null,
       primaryColor:    company?.primaryColor    ?? "#E10600",
-      thankYouMessage: company?.thankYouMessage ?? "We value your feedback",
+      // thankYouMessage: company?.thankYouMessage ?? "We value your feedback",
     },
     platform,
     platformLabel:    platformLabel(platform),
@@ -234,7 +234,6 @@ export const getReviewPage = async (req, res, next) => {
     const ip = getIp(req);
     const ua = req.headers["user-agent"] || null;
     const deviceType = detectDevice(ua);
-
     const card = await prisma.nFCCard.findUnique({
       where:   { uid },
       include: {
@@ -253,7 +252,7 @@ export const getReviewPage = async (req, res, next) => {
 
     const company = await prisma.company.findUnique({
       where:  { id: card.companyId },
-      select: { name: true, logo: true, primaryColor: true, thankYouMessage: true, googleReviewUrl: true },
+      select: { name: true, logo: true, primaryColor: true, googleReviewUrl: true },
     });
 
     logEvent(uid, card.companyId, "PAGE_VIEW", {
@@ -313,6 +312,25 @@ export const submitRating = async (req, res, next) => {
       if (!redirectUrl) {
         console.warn(`[nfc] No redirectUrl for uid=${uid} platform=${platform}`);
         return res.json({ success: true, action: "INTERNAL_FEEDBACK", message: "Merci pour votre avis !", stars: starsNum, uid });
+      }
+
+      try {
+        await prisma.review.create({
+          data: {
+            companyId: card.companyId,              // ✅ TOUJOURS renseigné
+            locationId: card.locationId || null,    // ✅ Nullable si pas de location
+            rating: starsNum,
+            status: "posted",
+            source: platform,
+            comment: null,
+            userName: null,
+            email: null,
+            postedAt: new Date(),
+          },
+        });
+        console.log(`[nfc] ✅ Review created: ${starsNum}★ (posted) - company=${card.companyId}, location=${card.locationId || 'none'}`);
+      } catch (err) {
+        console.error(`[nfc] ❌ Failed to create Review:`, err);
       }
 
       // Tracker + incrémenter compteur
@@ -381,6 +399,25 @@ export const submitFeedback = async (req, res, next) => {
       where: { cardUid: uid }, orderBy: { scannedAt: "desc" }, select: { scanType: true },
     });
     const source = (lastScan?.scanType ?? "qr").toUpperCase();
+
+
+    try {
+      await prisma.review.create({
+        data: {
+          companyId: card.companyId,              // ✅ TOUJOURS renseigné
+          locationId: card.locationId || null,    // ✅ Nullable
+          rating: starsNum,
+          status: "pending",
+          source: "internal_feedback",
+          comment: message.trim(),
+          email: email?.trim() || null,
+          userName: null,
+        },
+      });
+      console.log(`[nfc] ✅ Review created: ${starsNum}★ (pending) - company=${card.companyId}, location=${card.locationId || 'none'}`);
+    } catch (err) {
+      console.error(`[nfc] ❌ Failed to create Review:`, err);
+    }
 
     const feedback = await prisma.feedback.create({
       data: {

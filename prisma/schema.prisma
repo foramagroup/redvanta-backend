@@ -251,7 +251,8 @@ model Conversion {
 
 model Review {
   id            String       @id @default(uuid()) @db.Char(36)
-  locationId    Int
+  locationId    Int?
+  companyId     Int
   userId        String?
   userName      String?
   rating        Int
@@ -266,7 +267,9 @@ model Review {
   postedAt      DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @default(now()) @updatedAt
-  location      Location     @relation(fields: [locationId], references: [id])
+  location      Location?     @relation(fields: [locationId], references: [id])
+
+  company       Company      @relation(fields: [companyId], references: [id])
 
   @@index([locationId])
   @@index([userId], map: "reviews_userId_fkey")
@@ -885,6 +888,7 @@ model AnalyticsEvent {
 
 // ─── Feedback (avis négatif interne — 1-3 étoiles) ───────────
 // Le scénario : "Cas négatif → affichage d'un formulaire interne"
+
 model Feedback {
   id         Int      @id @default(autoincrement())
   cardUid    String   @db.VarChar(36)
@@ -1843,6 +1847,7 @@ model Company {
   reviewRequests ReviewRequest[]
   userLocations       UserLocation[]
   teamActivityLogs    TeamActivityLog[]
+  reviews Review[]
   filteringConfig FeedbackFilteringConfig?
 
  cards    NFCCard[]

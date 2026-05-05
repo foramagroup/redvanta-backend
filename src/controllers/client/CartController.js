@@ -488,7 +488,6 @@ async function createLocations(tx, { cartItemId, locations, userId, companyId, p
 
   for (let i = 0; i < locations.length; i++) {
     const loc = locations[i];
-
     const design = await createLocationDesign(tx, {
       userId,
       companyId,

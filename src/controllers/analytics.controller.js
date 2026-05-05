@@ -85,12 +85,11 @@ export const getAnalytics = async (req, res, next) => {
     const pFromStr = toMysql(pFrom);
     const pToStr   = toMysql(pTo);
 
-    // Filtre location optionnel pour les reviews (joins via locations table)
-    const locationFilter = locationId ? Prisma.sql`AND l.id = ${locationId}` : Prisma.sql``;
+    const locationFilter = locationId 
+      ? Prisma.sql`AND r.locationId = ${locationId}` 
+      : Prisma.sql``;
 
-    // ──────────────────────────────────────────────────────────
-    // 1. KPIs — période courante
-    // ──────────────────────────────────────────────────────────
+    // ✅ NOUVEAU : Utilise r.companyId directement (plus besoin de JOIN)
     const [kpiCur] = await prisma.$queryRaw`
       SELECT
         COUNT(*)                                                    AS totalReviews,
@@ -98,34 +97,30 @@ export const getAnalytics = async (req, res, next) => {
         SUM(CASE WHEN r.rating <= 3 THEN 1 ELSE 0 END)            AS negativeCount,
         SUM(CASE WHEN r.status = 'posted' THEN 1 ELSE 0 END)      AS postedCount
       FROM reviews r
-      JOIN locations l ON r.locationId = l.id
-      WHERE l.companyId = ${companyId}
+      WHERE r.companyId = ${companyId}
         AND r.createdAt BETWEEN ${fromStr} AND ${toStr}
         ${locationFilter}
     `;
 
-    // KPIs — période précédente (pour les deltas)
     const [kpiPrev] = await prisma.$queryRaw`
       SELECT
         COUNT(*)                                                    AS totalReviews,
         ROUND(AVG(r.rating), 1)                                    AS avgRating,
         SUM(CASE WHEN r.rating <= 3 THEN 1 ELSE 0 END)            AS negativeCount
       FROM reviews r
-      JOIN locations l ON r.locationId = l.id
-      WHERE l.companyId = ${companyId}
+      WHERE r.companyId = ${companyId}
         AND r.createdAt BETWEEN ${pFromStr} AND ${pToStr}
         ${locationFilter}
     `;
 
-    // Scans (AnalyticsEvent SCAN) — pour le taux de conversion
     const [scanCur] = await prisma.$queryRaw`
       SELECT COUNT(*) AS scans
       FROM analytics_events
       WHERE companyId = ${companyId}
         AND type = 'SCAN'
         AND occurredAt BETWEEN ${fromStr} AND ${toStr}
-        ${locationId ? Prisma.sql`` : Prisma.sql``}
     `;
+    
     const [scanPrev] = await prisma.$queryRaw`
       SELECT COUNT(*) AS scans
       FROM analytics_events
@@ -136,13 +131,10 @@ export const getAnalytics = async (req, res, next) => {
 
     const totalCur  = Number(kpiCur.totalReviews)  || 0;
     const totalPrev = Number(kpiPrev.totalReviews) || 0;
-
-    const scansCur  = Number(scanCur.scans)  || 1; // éviter /0
+    const scansCur  = Number(scanCur.scans)  || 1;
     const scansPrev = Number(scanPrev.scans) || 1;
-
     const convCur   = Math.round((totalCur  / scansCur)  * 100);
     const convPrev  = Math.round((totalPrev / scansPrev) * 100);
-
     const negCur    = totalCur  ? Math.round((Number(kpiCur.negativeCount)  / totalCur)  * 100) : 0;
     const negPrev   = totalPrev ? Math.round((Number(kpiPrev.negativeCount) / totalPrev) * 100) : 0;
 
@@ -157,13 +149,9 @@ export const getAnalytics = async (req, res, next) => {
       negativeRateChange: negCur - negPrev,
     };
 
-    // ──────────────────────────────────────────────────────────
-    // 2. Chart : reviews + rating moyens groupés par période
-    // ──────────────────────────────────────────────────────────
     const { expr, label } = getGroupFormat(range);
 
-    // On ne peut pas interpoler directement des expressions SQL dans queryRaw
-    // → on utilise une requête raw avec Prisma.sql template
+    // ✅ Utilise r.companyId
     const chartRows = await prisma.$queryRaw`
       SELECT
         ${Prisma.raw(label)}          AS month,
@@ -171,8 +159,7 @@ export const getAnalytics = async (req, res, next) => {
         COUNT(*)                      AS reviews,
         ROUND(AVG(r.rating), 1)      AS rating
       FROM reviews r
-      JOIN locations l ON r.locationId = l.id
-      WHERE l.companyId = ${companyId}
+      WHERE r.companyId = ${companyId}
         AND r.createdAt BETWEEN ${fromStr} AND ${toStr}
         ${locationFilter}
       GROUP BY period, month
@@ -185,16 +172,12 @@ export const getAnalytics = async (req, res, next) => {
       rating:  Number(row.rating)  || 0,
     }));
 
-    // ──────────────────────────────────────────────────────────
-    // 3. Distribution des notes (1 → 5)
-    // ──────────────────────────────────────────────────────────
     const ratingRows = await prisma.$queryRaw`
       SELECT
-        r.rating                                          AS stars,
-        COUNT(*)                                          AS cnt
+        r.rating AS stars,
+        COUNT(*) AS cnt
       FROM reviews r
-      JOIN locations l ON r.locationId = l.id
-      WHERE l.companyId = ${companyId}
+      WHERE r.companyId = ${companyId}
         AND r.createdAt BETWEEN ${fromStr} AND ${toStr}
         ${locationFilter}
       GROUP BY r.rating
@@ -213,9 +196,6 @@ export const getAnalytics = async (req, res, next) => {
       };
     });
 
-    // ──────────────────────────────────────────────────────────
-    // 4. Funnel de conversion
-    // ──────────────────────────────────────────────────────────
     const [[funnelScans], [funnelPageViews], [funnelFeedback]] = await Promise.all([
       prisma.$queryRaw`
         SELECT COUNT(*) AS val
@@ -257,54 +237,54 @@ export const getAnalytics = async (req, res, next) => {
       publicPct:     Math.round((fPublic    / fBase) * 100),
     };
 
-    // ──────────────────────────────────────────────────────────
-    // 5. Comparatif par location
-    // ──────────────────────────────────────────────────────────
-    const locationRows = await prisma.$queryRaw`
-      SELECT
-        l.id,
-        l.name,
-        COUNT(r.id)              AS reviews,
-        ROUND(AVG(r.rating), 1) AS rating,
-
-        -- Scans NFC liés à cette location (via nfc_cards)
-        (
-          SELECT COUNT(*)
-          FROM analytics_events ae
-          WHERE ae.companyId = ${companyId}
-            AND ae.type = 'SCAN'
-            AND ae.occurredAt BETWEEN ${fromStr} AND ${toStr}
-            AND ae.cardUid IN (
-              SELECT nc.uid FROM nfc_cards nc WHERE nc.locationId = l.id
-            )
-        ) AS scans
-      FROM locations l
-      LEFT JOIN reviews r
-        ON r.locationId = l.id
-        AND r.createdAt BETWEEN ${fromStr} AND ${toStr}
-      WHERE l.companyId = ${companyId}
-        AND l.active = 1
-      GROUP BY l.id, l.name
-      ORDER BY reviews DESC
-    `;
-
-    const locationData = locationRows.map((row) => {
-      const scans      = Number(row.scans)   || 1;
-      const reviews    = Number(row.reviews) || 0;
-      const conversion = Math.round((reviews / scans) * 100);
-      return {
-        id:         row.id,
-        name:       row.name,
-        reviews,
-        rating:     Number(row.rating) || 0,
-        conversion: Math.min(conversion, 100), // cap à 100%
-        scans:      Number(row.scans) || 0,
-      };
+    let locationData = [];
+    
+    const hasLocations = await prisma.location.count({
+      where: { companyId, active: true }
     });
 
-    // ──────────────────────────────────────────────────────────
-    // Réponse finale
-    // ──────────────────────────────────────────────────────────
+    if (hasLocations > 0) {
+      const locationRows = await prisma.$queryRaw`
+        SELECT
+          l.id,
+          l.name,
+          COUNT(r.id)              AS reviews,
+          ROUND(AVG(r.rating), 1) AS rating,
+          (
+            SELECT COUNT(*)
+            FROM analytics_events ae
+            WHERE ae.companyId = ${companyId}
+              AND ae.type = 'SCAN'
+              AND ae.occurredAt BETWEEN ${fromStr} AND ${toStr}
+              AND ae.cardUid IN (
+                SELECT nc.uid FROM nfc_cards nc WHERE nc.locationId = l.id
+              )
+          ) AS scans
+        FROM locations l
+        LEFT JOIN reviews r
+          ON r.locationId = l.id
+          AND r.createdAt BETWEEN ${fromStr} AND ${toStr}
+        WHERE l.companyId = ${companyId}
+          AND l.active = 1
+        GROUP BY l.id, l.name
+        ORDER BY reviews DESC
+      `;
+
+      locationData = locationRows.map((row) => {
+        const scans      = Number(row.scans)   || 1;
+        const reviews    = Number(row.reviews) || 0;
+        const conversion = Math.round((reviews / scans) * 100);
+        return {
+          id:         row.id,
+          name:       row.name,
+          reviews,
+          rating:     Number(row.rating) || 0,
+          conversion: Math.min(conversion, 100),
+          scans:      Number(row.scans) || 0,
+        };
+      });
+    }
+
     res.json({
       success: true,
       data: {

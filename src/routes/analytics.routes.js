@@ -18,8 +18,8 @@ const auth = [authenticateAdmin, requireAdmin];
 // ── Analytics ─────────────────────────────────────────────────
 // IMPORTANT : /analytics/export et /analytics/locations avant /analytics
 // (sinon "export" et "locations" seraient capturés comme query params)
-router.get("/analytics/export",    ...auth, exportAnalytics);
-router.get("/analytics/locations", ...auth, getAnalyticsLocations);
-router.get("/analytics",           ...auth, getAnalytics);
+router.get("/export",    ...auth, exportAnalytics);
+router.get("/locations", ...auth, getAnalyticsLocations);
+router.get("/",           ...auth, getAnalytics);
 
 export default router;

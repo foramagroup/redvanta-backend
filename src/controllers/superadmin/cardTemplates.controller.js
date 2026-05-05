@@ -1,6 +1,16 @@
 import prisma from "../../config/database.js";
 
 function formatTemplate(template) {
+  let orientations = [];
+  if (template.orientations) {
+    try {
+      orientations = JSON.parse(template.orientations);
+    } catch {
+      orientations = [template.orientations];
+    }
+  } else if (template.orientation) {
+    orientations = [template.orientation];
+  }
   return {
     id: template.id.toString(),
     name: template.name,
@@ -14,7 +24,7 @@ function formatTemplate(template) {
     
     // ✅ Layout - NOUVEAU : Support orientations multiples
     orientation: template.orientation,
-    orientations: template.orientations || [template.orientation], // ✅ Fallback si ancien template
+    orientations: orientations,
     bandPosition: template.bandPosition,
     frontBandHeight: template.frontBandHeight,
     backBandHeight: template.backBandHeight,
@@ -223,6 +233,15 @@ export const createTemplate = async (req, res) => {
         }
       });
     }
+
+     let orientationsValue = null;
+    if (data.orientations) {
+      if (Array.isArray(data.orientations)) {
+        orientationsValue = JSON.stringify(data.orientations);
+      } else if (typeof data.orientations === 'string') {
+        orientationsValue = data.orientations;
+      }
+    }
     const template = await prisma.cardTemplate.create({
       data: {
         // Basic
@@ -237,9 +256,7 @@ export const createTemplate = async (req, res) => {
         
         // ✅ Layout - NOUVEAU : Support orientations multiples
         orientation: data.orientation || 'landscape',
-        orientations: data.orientations && Array.isArray(data.orientations) && data.orientations.length > 0
-          ? data.orientations
-          : [data.orientation || 'landscape'],
+        orientations: orientationsValue,
         bandPosition: data.bandPosition || 'bottom',
         frontBandHeight: data.frontBandHeight || 22,
         backBandHeight: data.backBandHeight || 12,
@@ -386,9 +403,9 @@ export const updateTemplate = async (req, res) => {
     // ✅ Layout - NOUVEAU : Support orientations multiples
     if (data.orientation) updateData.orientation = data.orientation;
     if (data.orientations !== undefined) {
-      updateData.orientations = Array.isArray(data.orientations) && data.orientations.length > 0
-        ? data.orientations
-        : [data.orientation || existing.orientation || 'landscape'];
+      if (Array.isArray(data.orientations)) {
+        updateData.orientations = JSON.stringify(data.orientations);
+      }
     }
     if (data.bandPosition) updateData.bandPosition = data.bandPosition;
     if (data.frontBandHeight !== undefined) updateData.frontBandHeight = data.frontBandHeight;
@@ -555,6 +572,22 @@ export const duplicateTemplate = async (req, res) => {
       });
     }
 
+     let orientationsValue = null;
+    if (original.orientations) {
+      if (typeof original.orientations === 'string') {
+        try {
+          const parsed = JSON.parse(original.orientations);
+          orientationsValue = JSON.stringify(parsed);  // Re-stringify pour la nouvelle entrée
+        } catch {
+          orientationsValue = original.orientations;  // Garder tel quel si parsing échoue
+        }
+      } else {
+        orientationsValue = original.orientations;
+      }
+    } else if (original.orientation) {
+      orientationsValue = JSON.stringify([original.orientation]);
+    }
+
     const duplicate = await prisma.cardTemplate.create({
        data: {
         // Basic
@@ -572,9 +605,8 @@ export const duplicateTemplate = async (req, res) => {
         bandPosition: original.bandPosition || 'bottom',
         frontBandHeight: original.frontBandHeight || 22,
         backBandHeight: original.backBandHeight || 12,
-        orientations: original.orientations && Array.isArray(original.orientations) && original.orientations.length > 0
-          ? original.orientations
-          : [original.orientation || 'landscape'],
+        orientations: orientationsValue,
+
         
         // Logo and QR
         logoPosition: original.logoPosition || 'left',
