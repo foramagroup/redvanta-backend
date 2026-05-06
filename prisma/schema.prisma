@@ -454,6 +454,8 @@ model customization {
   updatedAt DateTime
 }
 
+
+
 model dashboardstat {
   id        String   @id
   key       String   @unique(map: "dashboardStat_key_key")
@@ -649,8 +651,6 @@ model emailQueue {
   processedAt DateTime?
   @@map("emailqueue")
 }
-
-
 
 
 model NFCTag {
