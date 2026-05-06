@@ -48,7 +48,6 @@ model User {
   lastLogin        DateTime?       @db.DateTime(0)
   welcomeToken     String?         @unique @db.VarChar(255)
   welcomeTokenExp  DateTime?
-  affiliates       Affiliate?
   design           Design[]
   orders Order[]
   cartItems CartItem[]
@@ -400,37 +399,6 @@ model Payment {
 }
 
 
-model Affiliate {
-  id              String              @id @default(uuid()) @db.Char(36)
-  userId          Int?                @unique @db.UnsignedInt
-  name            String?
-  email           String?
-  refCode         String              @unique
-  revenue         Float               @default(0)
-  stripeAccountId String?
-  iban            String?
-  createdAt       DateTime            @default(now())
-  tracking        AffiliateTracking[]
-  user            User?               @relation(fields: [userId], references: [id], onDelete: Cascade, map: "affiliates_userId_key")
-  click           click[]
-  payoutrequest   payoutrequest[]
-
-  @@map("affiliates")
-}
-
-model AffiliateTracking {
-  id          String    @id @default(uuid()) @db.Char(36)
-  affiliateId String
-  orderId     String?
-  ip          String?
-  userAgent   String?
-  createdAt   DateTime  @default(now())
-  affiliate   Affiliate @relation(fields: [affiliateId], references: [id])
-
-  @@index([affiliateId], map: "affiliate_tracking_affiliateId_fkey")
-  @@index([orderId])
-  @@map("affiliate_tracking")
-}
 
 model NotificationLog {
   id         String           @id @default(uuid()) @db.Char(36)
@@ -474,18 +442,7 @@ model bundleproduct {
   @@index([productId], map: "BundleProduct_productId_fkey")
 }
 
-model click {
-  id          String    @id
-  affiliateId String
-  ip          String?
-  userAgent   String?
-  referer     String?
-  cookie      String?
-  createdAt   DateTime  @default(now())
-  affiliates  Affiliate @relation(fields: [affiliateId], references: [id], map: "Click_affiliateId_fkey")
 
-  @@index([affiliateId], map: "Click_affiliateId_fkey")
-}
 
 model customization {
   id        String   @id
@@ -965,23 +922,7 @@ model ReviewRequest {
 }
 
 
-model payoutrequest {
-  id               String    @id
-  affiliateId      String
-  amountCents      Int
-  currency         String    @default("EUR")
-  status           String    @default("pending")
-  stripeTransferId String?
-  stripePayoutId   String?
-  note             String?
-  requestedAt      DateTime  @default(now())
-  processedAt      DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime
-  affiliates       Affiliate @relation(fields: [affiliateId], references: [id], map: "PayoutRequest_affiliateId_fkey")
 
-  @@index([affiliateId], map: "PayoutRequest_affiliateId_fkey")
-}
 
 model ShippingRate {
   id          Int            @id @default(autoincrement())
