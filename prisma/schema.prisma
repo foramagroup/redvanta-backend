@@ -1418,6 +1418,9 @@ model Language {
   translations Translation[]
   translationEmails EmailTemplateTranslation[]
   prodTranslations ProductTranslation[]
+  pageTranslations StaticPageTranslation[]
+  faqTranslations FAQTranslation[]
+  faqCategoryTranslations FAQCategoryTranslation[]
   companies Company[]
   @@map("languages")
 }
@@ -1441,6 +1444,146 @@ model Translation {
   language  Language       @relation(fields: [languageId], references: [id])
   @@unique([keyId, languageId])
   @@map("translations")
+}
+
+
+model StaticPage {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique  // "terms", "privacy", "about" (slug de base en anglais)
+  
+  // SEO global
+  metaImage   String?  @db.Text  // Image meta par défaut
+  
+  // Statut global
+  status      PageStatus @default(draft)  // draft | published
+  isSystem    Boolean    @default(false)  // Pages système (non supprimables)
+  
+  // Analytics
+  views       Int      @default(0)
+  
+  // Dates
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+  
+  // Relations
+  translations StaticPageTranslation[]
+  
+  @@index([slug])
+  @@index([status])
+  @@map("static_pages")
+}
+
+
+model StaticPageTranslation {
+  id         Int      @id @default(autoincrement())
+  pageId     Int
+  languageId Int
+  
+  // Contenu traduit
+  title      String
+  slug       String        // slug traduit (ex: "terms" → "conditions" en FR)
+  content    String   @db.LongText
+  
+  // SEO traduit
+  metaTitle  String?
+  metaDesc   String?  @db.Text
+  
+  // Dates
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relations
+  page       StaticPage @relation(fields: [pageId],     references: [id], onDelete: Cascade)
+  language   Language   @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  
+  @@unique([pageId, languageId])
+  @@unique([languageId, slug])  // slug unique par langue
+  @@index([slug])
+  @@map("static_page_translations")
+}
+
+
+model FAQCategory {
+  id           Int      @id @default(autoincrement())
+  slug         String   @unique
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  translations FAQCategoryTranslation[]
+  faqs         FAQ[]
+  
+  @@index([slug])
+  @@index([displayOrder])
+  @@map("faq_categories")
+}
+
+model FAQCategoryTranslation {
+  id         Int      @id @default(autoincrement())
+  categoryId Int
+  languageId Int
+  name       String   @db.VarChar(100)
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  category   FAQCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  language   Language    @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  
+  @@unique([categoryId, languageId])
+  @@map("faq_category_translations")
+}
+
+model FAQ {
+  id          Int      @id @default(autoincrement())
+  
+  // Catégorie (relation au lieu d'enum)
+  categoryId  Int
+  category    FAQCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  
+  displayOrder Int     @default(0)
+  
+  // Statut
+  status      PageStatus @default(draft)
+  
+  // Analytics
+  views       Int      @default(0)
+  helpful     Int      @default(0)
+  notHelpful  Int      @default(0)
+  
+  // Dates
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  publishedAt DateTime?
+  
+  // Relations
+  translations FAQTranslation[]
+  
+  @@index([categoryId])
+  @@index([status])
+  @@index([displayOrder])
+  @@map("faqs")
+}
+
+model FAQTranslation {
+  id         Int      @id @default(autoincrement())
+  faqId      Int
+  languageId Int
+  question   String   @db.VarChar(500)
+  answer     String   @db.Text
+  metaTitle  String?  @db.VarChar(255)
+  metaDesc   String?  @db.VarChar(500)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  faq        FAQ      @relation(fields: [faqId],     references: [id], onDelete: Cascade)
+  language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  
+  @@unique([faqId, languageId])
+  @@index([faqId])
+  @@map("faq_translations")
 }
 
 
@@ -2328,4 +2471,9 @@ enum FilterRedirectPlatform {
   facebook
   custom
 }
+enum PageStatus {
+  draft
+  published
+}
+
 

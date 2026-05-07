@@ -73,6 +73,9 @@ import generalSettingsRoutes from './routes/superadmin/generalSetting.routes.js'
 import cardTemplatesRoutes from './routes/superadmin/cardTemplates.routes.js';
 import superadminSubscriptionsRoutes from "./routes/superadmin/subscriptions.routes.js";
 import startBillingCron from './cron/billing.cron.js';
+import superadminFAQsRoutes from "./routes/superadmin/faqs.routes.js";
+import superadminStaticPageRoutes from "./routes/superadmin/staticPages.routes.js";
+import faqCategoriesRoutes from "./routes/superadmin/faqCategories.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -83,6 +86,8 @@ import clientAuthRoutes from "./routes/client/clientAuthRoutes.js";
 import placesRoutes from "./routes/client/Googleplaces.routes.js";
 import orderClientRoutes   from "./routes/client/Order.route.js";
 import { scanRouter, reviewRouter } from "./routes/client/nfc.routes.js";
+import clientFAQsRoutes from "./routes/client/faqs.routes.js";
+import clientStaticPageRoutes from "./routes/client/staticPages.routes.js";
 
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
@@ -248,6 +253,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/r",        scanRouter);
   app.use("/api/review",   reviewRouter);
   app.use("/api/client/subscriptions", subscriptionsRoutes);
+  app.use("/api/client", clientFAQsRoutes);
+  app.use("/api/client", clientStaticPageRoutes);
   suspendUnverifiedAccounts();
 
 
@@ -316,7 +323,10 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/superadmin/billing", billingRoutes);
   app.use('/api/superadmin/general-settings', generalSettingsRoutes);
   app.use('/api/superadmin/card-templates', cardTemplatesRoutes);
-  app.use("/api/superadmin", superadminSubscriptionsRoutes);
+  app.use("/api/superadmin/subscription", superadminSubscriptionsRoutes);
+  app.use("/api/superadmin/faqs", superadminFAQsRoutes);
+  app.use("/api/superadmin", superadminStaticPageRoutes);
+  app.use("/api/superadmin", faqCategoriesRoutes);
   startBillingCron();
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");

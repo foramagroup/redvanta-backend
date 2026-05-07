@@ -47,7 +47,8 @@ export const listMyOrders = async (req, res, next) => {
                 }
               },
               packageTier: true,
-              cardType: true
+              cardType: true,
+              design: true,
             }
           },
         payments: true,
@@ -116,7 +117,8 @@ export const getOrderDetails = async (req, res, next) => {
           include: {
             product: true,
             packageTier: true,
-            cardType: true
+            cardType: true,
+            design: true,
           }
         },
         company: true

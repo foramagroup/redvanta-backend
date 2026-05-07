@@ -18,14 +18,14 @@ const router = express.Router();
 router.use(authenticateSuperAdmin, requireSuperAdmin);
 
 // ─── Subscriptions Management ─────────────────────────────────
-router.get("/subscriptions", listAllSubscriptions);
-router.get("/subscriptions/:id", getSubscriptionDetails);
-router.put("/subscriptions/:id/status", updateSubscriptionStatus);
+router.get("/", listAllSubscriptions);
+router.get("/:id", getSubscriptionDetails);
+router.put("/:id/status", updateSubscriptionStatus);
 
 // ─── Invoices Management ──────────────────────────────────────
-router.get("/subscriptions/invoices/pending", getPendingSubscriptionInvoices);
+router.get("/invoices/pending", getPendingSubscriptionInvoices);
 
 // ─── MARK PAID (identique au webhook Stripe) ──────────────────
-router.post("/subscriptions/invoices/:invoiceId/mark-paid", markSubscriptionInvoicePaid);
+router.post("/invoices/:invoiceId/mark-paid", markSubscriptionInvoicePaid);
 
 export default router;
