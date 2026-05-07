@@ -1,5 +1,7 @@
 // src/services/emails/nfcCardStatus.email.js
 import prisma from "../config/database.js";
+import  SettingService  from '../services/superadmin/settingService.js';      
+const appName = await SettingService.getCompanyName(); 
 import { sendTemplatedMail } from "../services/client/mail.service.js";
 
 /**
@@ -348,7 +350,7 @@ function buildEmailHtml({ emoji, gradient, title, greeting, message, status, sta
             Questions? Contact us at <a href="mailto:support@opinoor.com" style="color: #2563eb; text-decoration: none;">support@opinnor.com</a>
           </p>
           <p style="color: #9ca3af; font-size: 12px; margin: 12px 0 0 0;">
-            © ${new Date().getFullYear()} Opinoor. All rights reserved.
+            © ${new Date().getFullYear()} ${appName}. All rights reserved.
           </p>
         </div>
 
@@ -381,6 +383,6 @@ ${footer}
 
 Questions? Contact us at support@opinoor.com
 
-© ${new Date().getFullYear()} Opinoor. All rights reserved.
+© ${new Date().getFullYear()} ${appName}. All rights reserved.
   `.trim();
 }

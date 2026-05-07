@@ -71,9 +71,12 @@ import nfcTagRoutes from "./routes/superadmin/nfcTag.routes.js";
 import nfcCardRoutes from "./routes/superadmin/nfcListCard.routes.js";
 import generalSettingsRoutes from './routes/superadmin/generalSetting.routes.js';
 import cardTemplatesRoutes from './routes/superadmin/cardTemplates.routes.js';
+import superadminSubscriptionsRoutes from "./routes/superadmin/subscriptions.routes.js";
+import startBillingCron from './cron/billing.cron.js';
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
+import subscriptionsRoutes from "./routes/client/subscriptions.routes.js";
 import shopRoutes from "./routes/client/Shop.routes.js";
 import settingClientRoutes from "./routes/client/settingClientRoutes.js";
 import clientAuthRoutes from "./routes/client/clientAuthRoutes.js";
@@ -146,10 +149,20 @@ app.use(cors({
 }));
 
 app.post(
-  "/api/orders/webhook",
+  "/api/client/shop/webhook",
   express.raw({ type: "application/json" }),
   (req, res, next) => { req.rawBody = req.body; next(); },
-  stripeWebhook
+  // stripeWebhook
+  shopRoutes
+);
+app.post(
+  "/api/client/subscriptions/webhook",
+   express.raw({ type: "application/json" }),
+  (req, res, next) => {
+    req.rawBody = req.body;
+    next();
+  },
+  subscriptionsRoutes
 );
 // --------------------
 // BODY PARSERS
@@ -234,6 +247,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/orders", orderClientRoutes);
   app.use("/api/r",        scanRouter);
   app.use("/api/review",   reviewRouter);
+  app.use("/api/client/subscriptions", subscriptionsRoutes);
   suspendUnverifiedAccounts();
 
 
@@ -302,6 +316,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/superadmin/billing", billingRoutes);
   app.use('/api/superadmin/general-settings', generalSettingsRoutes);
   app.use('/api/superadmin/card-templates', cardTemplatesRoutes);
+  app.use("/api/superadmin", superadminSubscriptionsRoutes);
+  startBillingCron();
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
     // app.use("/uploads", express.static(uploadDir));

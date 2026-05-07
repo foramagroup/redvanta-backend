@@ -1,4 +1,5 @@
 import prisma from "../../config/database.js";
+import SettingService from "../../services/superadmin/settingService.js";
 
 export const getSettings = async (req, res) => {
     try {
@@ -60,6 +61,8 @@ export const updateSettings = async (req, res) => {
                 }
             });
         }
+
+        SettingService.flushCache();
         res.json({
             message: "Paramètres de la plateforme mis à jour avec succès",
             data: settings

@@ -71,4 +71,7 @@ router.get  ("/orders/:id",            ...auth, getOrder);
 // GET /api/payment-methods
 router.get("/payment-methods", ...auth, getPaymentMethods);
 
+
+router.post("/webhook", stripeWebhook);
+
 export default router;

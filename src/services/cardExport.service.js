@@ -7,7 +7,9 @@ import fsP from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import QRCode from "qrcode";
+import  SettingService  from '../services/superadmin/settingService.js';      
 
+const appName = await SettingService.getCompanyName(); 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "../..");
@@ -173,7 +175,7 @@ function normalizeDesign(design, card) {
 
     businessName: esc(d.businessName ?? card?.locationName ?? "Business Name"),
     sloganText: d.slogan ? esc(d.slogan) : null,
-    ctaText: esc(d.callToAction ?? "Powered by RedVanta"),
+    ctaText: esc(d.callToAction ?? `Powered by ${appName}`),
     ctaPaddingTop: d.ctaPaddingTop ?? 8,
 
     frontInstruction1: esc(d.frontInstruction1 ?? "Approach the phone to the card"),

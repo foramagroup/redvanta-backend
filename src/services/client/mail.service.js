@@ -1,6 +1,8 @@
 
 import nodemailer from "nodemailer";
 import prisma     from "../../config/database.js";
+import  SettingService  from '../../services/superadmin/settingService.js';      
+const appName = await SettingService.getCompanyName(); 
 
 
 function createTransporter() {
@@ -25,7 +27,7 @@ function createTransporter() {
 export async function sendMail({ to, subject, html, text }) {
   const transporter = createTransporter();
   const info = await transporter.sendMail({
-    from: `"${process.env.MAIL_FROM_NAME || "OPINOOR"}" <${process.env.MAIL_FROM_ADDRESS || process.env.MAIL_FROM || "no-reply@opinoor.com"}>`,
+    from: `"${appName || "OPINOOR"}" <${process.env.MAIL_FROM_ADDRESS || process.env.MAIL_FROM || "no-reply@opinoor.com"}>`,
     to,
     subject,
     html,

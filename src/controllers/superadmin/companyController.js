@@ -4,6 +4,7 @@ import { processLogo, deleteLogo }                              from "../../serv
 import { generatePassword, hashPassword, generateWelcomeToken } from "../../services/superadmin/password.service.js";
 import { sendMail }                                             from "../../services/superadmin/mail.service.js";
 import { buildWelcomeEmailFromTemplate }     from "../../services/superadmin/emailTemplate.service.js";
+import  SettingService  from '../../services/superadmin/settingService.js';  
 // import { buildWelcomeEmail }                                    from "../../templates/superadmin/welcome.email.js";
 
 
@@ -33,6 +34,8 @@ const COMPANY_INCLUDE = {
     },
   },
 };
+
+const appName = await SettingService.getCompanyName(); 
 
 
 function formatCompany(c) {
@@ -301,7 +304,7 @@ export const createCompany = async (req, res, next) => {
       sendMail({
         to:      adminEmail,
         subject: `Nouvelle entreprise rattachée à votre compte`,
-        html:    `<p>Bonjour ${existingAdmin.name || adminEmail},<br>L'entreprise <strong>${result.company.name}</strong> a été rattachée à votre compte REDVANTA.<br><a href="${loginUrl}">Accéder à votre espace</a></p>`,
+        html:    `<p>Bonjour ${existingAdmin.name || adminEmail},<br>L'entreprise <strong>${result.company.name}</strong> a été rattachée à votre compte ${appName}.<br><a href="${loginUrl}">Accéder à votre espace</a></p>`,
         text:    `L'entreprise "${result.company.name}" a été rattachée à votre compte. Connexion : ${loginUrl}`,
       }).catch(console.error);
     }

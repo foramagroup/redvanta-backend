@@ -1,4 +1,6 @@
 // src/templates/confirmEmail.template.js
+import  SettingService  from '../../services/superadmin/settingService.js';      
+const appName = await SettingService.getCompanyName(); 
 
 export function buildConfirmEmailTemplate({ name, companyName, confirmUrl, expiresHours = 48, primaryColor = "#E10600" }) {
 return {
@@ -30,13 +32,13 @@ return {
 <body>
 <div class="wrap">
   <div class="header">
-    <h1>REDVANTA</h1>
+    <h1>${appName}</h1>
     <p>Confirmation d'adresse email</p>
   </div>
   <div class="body">
     <p class="greeting">Bonjour ${name} 👋</p>
     <p class="text">
-      Merci d'avoir créé votre compte <strong>${companyName}</strong> sur REDVANTA.<br/>
+      Merci d'avoir créé votre compte <strong>${companyName}</strong> sur ${appName}.<br/>
       Pour activer votre accès, veuillez confirmer votre adresse email en cliquant sur le bouton ci-dessous.
     </p>
     <div class="btn-wrap">
@@ -52,7 +54,7 @@ return {
     </div>
   </div>
   <div class="footer">
-    <p>© ${new Date().getFullYear()} REDVANTA. Si vous n'avez pas créé ce compte, ignorez cet email.</p>
+    <p>© ${new Date().getFullYear()} ${appName}. Si vous n'avez pas créé ce compte, ignorez cet email.</p>
   </div>
 </div>
 </body>
@@ -60,7 +62,7 @@ return {
     text: `
 Bonjour ${name},
 
-Merci d'avoir créé votre compte "${companyName}" sur REDVANTA.
+Merci d'avoir créé votre compte "${companyName}" sur ${appName}.
 
 Confirmez votre email en cliquant sur ce lien :
 ${confirmUrl}
@@ -68,7 +70,7 @@ ${confirmUrl}
 Ce lien est valable ${expiresHours} heures.
 Sans confirmation, votre compte sera suspendu.
 
-© ${new Date().getFullYear()} REDVANTA
+© ${new Date().getFullYear()} ${appName}
 `.trim(),
   };
 }

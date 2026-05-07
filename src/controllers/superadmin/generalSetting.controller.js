@@ -1,7 +1,7 @@
 import prisma from "../../config/database.js";
 import path from 'path';
 import fs from 'fs/promises';
-
+import SettingService from "../../services/superadmin/settingService.js";
 /**
  * GET /api/superadmin/platform-settings
  * Récupère les paramètres de la plateforme
@@ -83,6 +83,8 @@ export const updateGeneralSettings = async (req, res) => {
         data: updateData
       });
     }
+
+      SettingService.flushCache();
 
     res.json({
       success: true,

@@ -1,14 +1,16 @@
 
+import  SettingService  from '../../services/superadmin/settingService.js';      
+const appName = await SettingService.getCompanyName(); 
 export function buildWelcomeEmail({ companyName, adminName, email, password, loginUrl, primaryColor = "#E10600" }) {
   return {
-    subject: `Bienvenue sur REDVANTA — Vos accès pour ${companyName}`,
+    subject: `Bienvenue sur ${appName} — Vos accès pour ${companyName}`,
     html: `
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bienvenue sur REDVANTA</title>
+  <title>Bienvenue sur ${appName}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f4f5; color: #18181b; }
@@ -41,7 +43,7 @@ export function buildWelcomeEmail({ companyName, adminName, email, password, log
 <body>
   <div class="wrapper">
     <div class="header">
-      <h1>REDVANTA</h1>
+      <h1>${appName}</h1>
       <p>Plateforme de gestion des avis clients</p>
     </div>
 
@@ -49,7 +51,7 @@ export function buildWelcomeEmail({ companyName, adminName, email, password, log
       <p class="greeting">Bonjour ${adminName} 👋</p>
 
       <p class="text">
-        Félicitations ! Votre compte <strong>${companyName}</strong> a été créé avec succès sur la plateforme REDVANTA.
+        Félicitations ! Votre compte <strong>${companyName}</strong> a été créé avec succès sur la plateforme ${appName}.
         Vous pouvez dès maintenant accéder à votre espace et commencer à gérer vos avis clients.
       </p>
 
@@ -81,7 +83,7 @@ export function buildWelcomeEmail({ companyName, adminName, email, password, log
 
       <div class="divider"></div>
 
-      <p class="text" style="font-size: 14px;">Avec votre compte REDVANTA, vous pouvez :</p>
+      <p class="text" style="font-size: 14px;">Avec votre compte ${appName}, vous pouvez :</p>
       <ul class="feature-list">
         <li>Gérer vos emplacements et points de vente</li>
         <li>Collecter et analyser les avis clients</li>
@@ -100,16 +102,16 @@ export function buildWelcomeEmail({ companyName, adminName, email, password, log
 
     <div class="footer">
       <p>
-        Cet email a été envoyé automatiquement par REDVANTA.<br />
+        Cet email a été envoyé automatiquement par ${appName}.<br />
         <a href="${loginUrl}">Se connecter</a> · <a href="mailto:support@redvanta.com">Support</a>
       </p>
-      <p style="margin-top: 8px;">© ${new Date().getFullYear()} REDVANTA. Tous droits réservés.</p>
+      <p style="margin-top: 8px;">© ${new Date().getFullYear()} ${appName}. Tous droits réservés.</p>
     </div>
   </div>
 </body>
 </html>`,
     text: `
-Bienvenue sur REDVANTA — ${companyName}
+Bienvenue sur ${appName} — ${companyName}
 
 Bonjour ${adminName},
 
@@ -125,7 +127,7 @@ Vos identifiants :
 Accéder à votre espace : ${loginUrl}
 
 Support : support@redvanta.com
-© ${new Date().getFullYear()} REDVANTA
+© ${new Date().getFullYear()} ${appName}
 `.trim(),
   };
 }

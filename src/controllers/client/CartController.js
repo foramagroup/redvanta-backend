@@ -30,6 +30,7 @@
 import prisma from "../../config/database.js";
 import { productNeedsDesign } from "../../helpers/designResolver.helpers.js";
 import { getPlaceDetails } from "../../services/Googleplaces.service.js";
+import  SettingService  from '../../services/superadmin/settingService.js';
 
 // ─────────────────────────────────────────────────────────────
 // INCLUDES
@@ -51,6 +52,9 @@ const CART_INCLUDE = {
     orderBy: { sortOrder: "asc" },
   },
 };
+
+
+const appName = await SettingService.getCompanyName();
 
 // ─────────────────────────────────────────────────────────────
 // HELPERS — FORMAT
@@ -408,7 +412,7 @@ async function createLocationDesign(tx, { userId, companyId, productId, company,
 
     // Couleur accent depuis la company
     accentColor: company?.primaryColor || defaults.accentColor,
-    callToAction: "Powered by RedVanta",
+    callToAction: `Powered by ${appName}`
   };
 
   const design = await tx.design.create({ data: designData });
@@ -440,7 +444,7 @@ async function createDefaultDesign(tx, { userId, companyId, productId, company, 
       googleReviewUrl: company?.googleReviewUrl ?? null,
       ...defaults,
       accentColor: company?.primaryColor || defaults.accentColor,
-      callToAction: "Powered by RedVanta",
+      callToAction: `Powered by ${appName}`,
     },
   });
 }

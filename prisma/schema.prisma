@@ -444,16 +444,6 @@ model bundleproduct {
 
 
 
-model customization {
-  id        String   @id
-  orderId   String   @unique(map: "Customization_orderId_key")
-  frontData String   @db.Text
-  backData  String   @db.Text
-  costCents Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime
-}
-
 
 
 model dashboardstat {
@@ -937,21 +927,6 @@ model ShippingRate {
 }
 
 
-
-
-
-model scanlog {
-  id       String   @id
-  nfcTagId Int
-  ip       String?
-  agent    String?
-  lat      Float?
-  lon      Float?
-  country  String?
-  city     String?
-  at       DateTime @default(now())
-  
-}
 
 model setting {
   id        String   @id
@@ -1736,6 +1711,7 @@ model Company {
   googlePlaceId        String?
   googleReviewUrl        String?
   logoScale      Int      @default(100)
+  activeSubscriptionId Int? @unique
   vatNumber      String?
   tradeNumber    String?
   email          String   
@@ -1790,6 +1766,7 @@ model Company {
   teamActivityLogs    TeamActivityLog[]
   reviews Review[]
   filteringConfig FeedbackFilteringConfig?
+  activeSubscription Subscription? @relation("ActiveSubscription", fields: [activeSubscriptionId], references: [id], onDelete: SetNull)
 
  cards    NFCCard[]
  scans    NfcScan[]
@@ -1913,6 +1890,7 @@ model Subscription {
   
   // Relations
   company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  activeCompany   Company?        @relation("ActiveSubscription")
   plan            PlanSetting     @relation(fields: [planId], references: [id], onDelete: Restrict)
   addons          SubscriptionAddon[]
   usageRecords    UsageRecord[]

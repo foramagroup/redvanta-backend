@@ -1,6 +1,9 @@
 // src/templates/orderEmails.js
 // Templates hardcodés (fallback si absents en DB)
 
+import  SettingService  from '../../services/superadmin/settingService.js';      
+const appName = await SettingService.getCompanyName(); 
+
 // ─── Email client — confirmation de commande ─────────────────
 export function buildOrderConfirmationCustomer({ order, items, currency, displayTotal }) {
   const itemRows = items.map((item) =>
@@ -12,13 +15,13 @@ export function buildOrderConfirmationCustomer({ order, items, currency, display
   ).join("");
 
   return {
-    subject: `Order Confirmation #${order.orderNumber} — OPINOOR`,
+    subject: `Order Confirmation #${order.orderNumber} — ${appName}`,
     html: `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"/></head>
 <body style="margin:0;padding:0;background:#0d0d0d;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#fff">
 <div style="max-width:600px;margin:40px auto;background:#111;border-radius:12px;overflow:hidden">
   <div style="background:#E10600;padding:28px 40px">
-    <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff">OPINOOR</h1>
+    <h1 style="margin:0;font-size:22px;font-weight:700;color:#fff">${appName}</h1>
     <p style="margin:6px 0 0;color:rgba(255,255,255,.8);font-size:13px">Order Confirmation</p>
   </div>
   <div style="padding:36px 40px">
@@ -66,7 +69,7 @@ export function buildOrderConfirmationCustomer({ order, items, currency, display
     </p>
   </div>
   <div style="background:#0d0d0d;padding:20px 40px;text-align:center;font-size:11px;color:#555">
-    © ${new Date().getFullYear()} OPINOOR — Order #{{order_number}}
+    © ${new Date().getFullYear()} ${appName} — Order #{{order_number}}
   </div>
 </div>
 </body></html>`,
@@ -106,7 +109,7 @@ export function buildOrderNotificationAdmin({ order, items, companyName, currenc
       </div>
     </div>
     <div style="background:#f4f4f5;padding:16px 32px;text-align:center;font-size:11px;color:#a1a1aa">
-      © ${new Date().getFullYear()} OPINOOR · Automatic email
+      © ${new Date().getFullYear()} ${appName} · Automatic email
     </div>
   </div>
   </body></html>`,
@@ -133,7 +136,7 @@ export function buildOrderNotificationSuperAdmin({ order, companyName, adminEmai
     <div><span style="color:#666">Date:</span> {{order_date}}</div>
   </div>
   <p style="font-size:11px;color:#555;margin:20px 0 0;text-align:center">
-    © ${new Date().getFullYear()} OPINOOR SuperAdmin
+    © ${new Date().getFullYear()} ${appName} SuperAdmin
   </p>
 </div>
 </body></html>`,

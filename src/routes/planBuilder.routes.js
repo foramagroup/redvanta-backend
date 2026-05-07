@@ -14,6 +14,7 @@ import {
   previewSubscription,
   subscribe,
   updateAddons,
+  checkoutUpgrade,
   updateInterval,
 } from "../controllers/planBuilder.controller.js";
 
@@ -38,6 +39,9 @@ router.post("/preview", ...auth, previewSubscription);      // POST /api/admin/p
 
 // Crée ou change de plan complet (upgrade / downgrade)
 router.post("/subscribe",        ...auth, subscribe);       // POST /api/admin/plan-builder/subscribe
+
+// Payer l'upgrade (Stripe ou Manuel)
+router.post("/checkout", ...auth, checkoutUpgrade);
 
 // Met à jour uniquement les add-ons sur le plan courant
 router.patch("/addons",          ...auth, updateAddons);    // PATCH /api/admin/plan-builder/addons

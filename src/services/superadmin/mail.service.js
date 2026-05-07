@@ -2,6 +2,8 @@
 // Service d'envoi d'emails via Nodemailer (SMTP configurable)
 
 import nodemailer from "nodemailer";
+import  SettingService  from '../../services/superadmin/settingService.js';      
+const appName = await SettingService.getCompanyName(); 
 
 // ─── Transporter ──────────────────────────────────────────────
 
@@ -22,7 +24,7 @@ function createTransporter() {
 export async function sendMail({ to, subject, html, text }) {
   const transporter = createTransporter();
   const info = await transporter.sendMail({
-    from:    `"${process.env.MAIL_FROM_NAME || "REDVANTA"}" <${process.env.MAIL_FROM_ADDRESS || "no-reply@redvanta.com"}>`,
+    from:    `"${appName || "OPINOOR"}" <${process.env.MAIL_FROM_ADDRESS || "no-reply@redvanta.com"}>`,
     to,
     subject,
     html,

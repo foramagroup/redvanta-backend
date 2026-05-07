@@ -29,7 +29,7 @@ export const listMyOrders = async (req, res, next) => {
       ...(search && {
         OR: [
           { orderNumber: { contains: search } },
-          { items: { some: { product: { name: { contains: search } } } } }
+          { items: { some: { product: { translations: { some: { title: { contains: search } } } } } } }
         ]
       })
     };

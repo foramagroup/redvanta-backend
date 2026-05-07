@@ -1,5 +1,6 @@
 // src/templates/client/verificationCode.template.js
-
+import  SettingService  from '../../services/superadmin/settingService.js';      
+const appName = await SettingService.getCompanyName(); 
 export function buildVerificationCodeTemplate({ 
   name, 
   companyName, 
@@ -39,13 +40,13 @@ export function buildVerificationCodeTemplate({
 <body>
 <div class="wrap">
   <div class="header">
-    <h1>REDVANTA</h1>
+    <h1>${appName}</h1>
     <p>Vérification de votre compte</p>
   </div>
   <div class="body">
     <p class="greeting">Bonjour ${name} 👋</p>
     <p class="text">
-      Merci d'avoir créé votre compte <strong>${companyName}</strong> sur REDVANTA.<br/>
+      Merci d'avoir créé votre compte <strong>${companyName}</strong> sur ${appName}.<br/>
       Pour activer votre accès, veuillez saisir le code de vérification ci-dessous :
     </p>
     
@@ -65,11 +66,11 @@ export function buildVerificationCodeTemplate({
     
     <div class="info">
       💡 <strong>Conseil de sécurité :</strong><br/>
-      Ne partagez jamais ce code avec qui que ce soit. L'équipe REDVANTA ne vous demandera jamais ce code.
+      Ne partagez jamais ce code avec qui que ce soit. L'équipe ${appName} ne vous demandera jamais ce code.
     </div>
   </div>
   <div class="footer">
-    <p>© ${new Date().getFullYear()} REDVANTA. Si vous n'avez pas créé ce compte, ignorez cet email.</p>
+    <p>© ${new Date().getFullYear()} ${appName}. Si vous n'avez pas créé ce compte, ignorez cet email.</p>
   </div>
 </div>
 </body>
@@ -77,7 +78,7 @@ export function buildVerificationCodeTemplate({
     text: `
 Bonjour ${name},
 
-Merci d'avoir créé votre compte "${companyName}" sur REDVANTA.
+Merci d'avoir créé votre compte "${companyName}" sur ${appName}.
 
 Votre code de vérification :
 
@@ -90,7 +91,7 @@ Sans vérification, votre compte sera suspendu automatiquement.
 
 Ne partagez jamais ce code avec qui que ce soit.
 
-© ${new Date().getFullYear()} REDVANTA
+© ${new Date().getFullYear()} ${appName}
 `.trim(),
   };
 }
