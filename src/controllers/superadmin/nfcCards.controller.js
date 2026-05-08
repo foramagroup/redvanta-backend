@@ -67,6 +67,7 @@ function formatCardFull(card) {
       bgColor:      card.design.bgColor,
       accentColor:  card.design.accentColor,
     } : null,
+    design: card.design,
   };
 }
 
