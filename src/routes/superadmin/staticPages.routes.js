@@ -21,17 +21,17 @@ const router = express.Router();
 router.use(authenticateSuperAdmin, requireSuperAdmin);
 
 // ─── Stats ─────────────────────────────────────────────────
-router.get("/pages/stats", getPagesStats);
+router.get("/stats", getPagesStats);
 
 // ─── CRUD ──────────────────────────────────────────────────
-router.get("/pages", listPages);
-router.post("/pages", createPage);
-router.get("/pages/:id", getPage);
-router.put("/pages/:id", updatePage);
-router.delete("/pages/:id", deletePage);
+router.get("/", listPages);
+router.post("/", createPage);
+router.get("/:id", getPage);
+router.put("/:id", updatePage);
+router.delete("/:id", deletePage);
 
 // ─── Actions ───────────────────────────────────────────────
-router.post("/pages/:id/duplicate", duplicatePage);
-router.patch("/pages/:id/status", updatePageStatus);
+router.post("/:id/duplicate", duplicatePage);
+router.patch("/:id/status", updatePageStatus);
 
 export default router;

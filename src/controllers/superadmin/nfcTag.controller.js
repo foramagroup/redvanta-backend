@@ -89,7 +89,7 @@ export const createTags = async (req, res, next) => {
     res.status(201).json({ 
         success: true, 
         count: created.count, 
-        message: `${created.count} tags ajoutés à l'inventaire` 
+        message: req.t("superadmin.nfc.tags_added", { count: created.count })
     });
   } catch (e) { next(e); }
 };
@@ -101,7 +101,7 @@ export const updateTagStatus = async (req, res, next) => {
     const { status } = req.body; // "PROGRAMMED" ou "DEFECTIVE"
 
     const currentTag = await prisma.nFCTag.findUnique({ where: { id: parseInt(id) } });
-    if (!currentTag) return res.status(404).json({ success: false, error: "Tag non trouvé" });
+    if (!currentTag) return res.status(404).json({ success: false, error: req.t("superadmin.nfc.tag_not_found") });
 
     const updateData = { status };
 

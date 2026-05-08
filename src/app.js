@@ -253,8 +253,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/r",        scanRouter);
   app.use("/api/review",   reviewRouter);
   app.use("/api/client/subscriptions", subscriptionsRoutes);
-  app.use("/api/client", clientFAQsRoutes);
-  app.use("/api/client", clientStaticPageRoutes);
+  app.use("/api/client/faqs", clientFAQsRoutes);
+  app.use("/api/client/all-pages", clientStaticPageRoutes);
   suspendUnverifiedAccounts();
 
 
@@ -325,8 +325,8 @@ app.use("/api/customization", customizationRoutes);
   app.use('/api/superadmin/card-templates', cardTemplatesRoutes);
   app.use("/api/superadmin/subscription", superadminSubscriptionsRoutes);
   app.use("/api/superadmin/faqs", superadminFAQsRoutes);
-  app.use("/api/superadmin", superadminStaticPageRoutes);
-  app.use("/api/superadmin", faqCategoriesRoutes);
+  app.use("/api/superadmin/all-pages", superadminStaticPageRoutes);
+  app.use("/api/superadmin/faq-categories", faqCategoriesRoutes);
   startBillingCron();
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");

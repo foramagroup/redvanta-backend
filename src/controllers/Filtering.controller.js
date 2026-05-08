@@ -12,7 +12,7 @@ import prisma from "../config/database.js";
 
 function getCompanyId(req) {
   const id = req.user?.companyId;
-  if (!id) throw Object.assign(new Error("Aucune company active"), { status: 403 });
+  if (!id) throw Object.assign(new Error(req.t("errors.forbidden")), { status: 403 });
   return parseInt(id);
 }
 
@@ -131,7 +131,7 @@ export const saveFilteringConfig = async (req, res, next) => {
     if (isNaN(parsedThreshold) || parsedThreshold < 1 || parsedThreshold > 5) {
       return res.status(422).json({
         success: false,
-        error:   "threshold doit être un entier entre 1 et 5",
+        error:   req.t("admin.filtering.invalid_threshold"),
       });
     }
 
@@ -139,14 +139,14 @@ export const saveFilteringConfig = async (req, res, next) => {
     if (redirectPlatform && !validPlatforms.includes(redirectPlatform)) {
       return res.status(422).json({
         success: false,
-        error:   `redirectPlatform invalide. Valeurs : ${validPlatforms.join(", ")}`,
+        error:   req.t("admin.filtering.invalid_platform"),
       });
     }
 
     if (redirectPlatform === "custom" && !customUrl?.trim()) {
       return res.status(422).json({
         success: false,
-        error:   "customUrl est requis quand redirectPlatform = custom",
+        error:   req.t("admin.filtering.custom_url_required"),
       });
     }
 
@@ -158,7 +158,7 @@ export const saveFilteringConfig = async (req, res, next) => {
       if (!member) {
         return res.status(422).json({
           success: false,
-          error:   "L'utilisateur assigné n'est pas membre de cette company",
+          error:   req.t("admin.filtering.assigned_user_not_member"),
         });
       }
     }
@@ -212,7 +212,7 @@ export const testFiltering = async (req, res, next) => {
     if (isNaN(rating) || rating < 1 || rating > 5) {
       return res.status(422).json({
         success: false,
-        error:   "rating doit être un entier entre 1 et 5",
+        error:   req.t("admin.filtering.invalid_rating"),
       });
     }
 
@@ -253,7 +253,7 @@ export const testFiltering = async (req, res, next) => {
           ? {
               platform:    redirectPlatform,
               redirectUrl,
-              message:     `Rating ${rating} ≥ ${threshold} → redirection vers ${redirectPlatform}`,
+              message:     req.t("admin.filtering.test_public_message", { rating, threshold, platform: redirectPlatform }),
             }
           : null,
         // Détails du chemin privé
@@ -265,7 +265,7 @@ export const testFiltering = async (req, res, next) => {
                 ? (config?.autoEmailAddress ?? null)
                 : null,
               assignedUserId:      config?.assignedUserId ?? null,
-              message:             `Rating ${rating} < ${threshold} → formulaire privé`,
+              message:             req.t("admin.filtering.test_private_message", { rating, threshold }),
             }
           : null,
       },

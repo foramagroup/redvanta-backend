@@ -26,7 +26,7 @@ export const login = async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(422).json({ success: false, error: "Email et mot de passe requis" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.auth.credentials_required") });
     }
 
     // Charger le user avec toutes ses companies
@@ -35,20 +35,20 @@ export const login = async (req, res, next) => {
     // Vérifier que c'est un admin actif
     if (!user || !user.isAdmin) {
       await logActivity(null, email, ip, userAgent, "failed");
-      return res.status(401).json({ success: false, error: "Identifiants invalides ou accès non autorisé" });
+      return res.status(401).json({ success: false, error: req.t("auth.login_failed") });
     }
 
     // Bloquer les superadmins purs sur cette route
     if (user.isSuperadmin && !user.isAdmin) {
       await logActivity(user.id, user.name, ip, userAgent, "failed");
-      return res.status(401).json({ success: false, error: "Utilisez le portail SuperAdmin" });
+      return res.status(401).json({ success: false, error: req.t("admin.auth.use_superadmin_portal") });
     }
 
     // Vérifier le mot de passe
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       await logActivity(user.id, user.name, ip, userAgent, "failed");
-      return res.status(401).json({ success: false, error: "Identifiants invalides" });
+      return res.status(401).json({ success: false, error: req.t("auth.login_failed") });
     }
 
       const activeCompanies = user.companies
@@ -62,7 +62,7 @@ export const login = async (req, res, next) => {
 
       if (!activeCompanies || activeCompanies.length === 0) {
         await logActivity(user.id, user.name, ip, userAgent, "failed");
-        return res.status(403).json({ success: false, error: "Aucune entreprise active associée a ce compte" });
+        return res.status(403).json({ success: false, error: req.t("auth.no_company") });
       }
 
       if (activeCompanies.length > 1) {
@@ -97,7 +97,7 @@ export const login = async (req, res, next) => {
   
     return res.json({
       success: true,
-      message: "Connexion réussie",
+      message: req.t("auth.login_success"),
       user:    formatAdmin(user),
     });
   } catch (e) {
@@ -119,7 +119,7 @@ export const selectCompany = async (req, res, next) => {
       uc.companyId === companyId && ["active", "trial"].includes(uc.company.status)
     );
     if (!hasAccess) {
-      return res.status(403).json({ success: false, error: "Accès refusé à cette entreprise" });
+      return res.status(403).json({ success: false, error: req.t("company.access_denied") });
     }
     const token = generateToken({
       userId: user.id,
@@ -146,7 +146,7 @@ export const me = async (req, res, next) => {
   try {
     const user = await loadUserForAuth(req.user.userId, "admin");
     if (!user || !user.isAdmin) {
-      return res.status(403).json({ success: false, error: "Accès refusé" });
+      return res.status(403).json({ success: false, error: req.t("errors.forbidden") });
     }
     return res.json({ success: true, user: formatAdmin(user) });
   } catch (e) { next(e); }
@@ -157,7 +157,7 @@ export const me = async (req, res, next) => {
 export const switchCompany = async (req, res, next) => {
   try {
     const { companyId } = req.body;
-    if (!companyId) return res.status(422).json({ success: false, error: "companyId requis" });
+    if (!companyId) return res.status(422).json({ success: false, error: req.t("admin.auth.company_id_required") });
 
     // Vérifier que cet admin est lié à cette company
     const link = await prisma.userCompany.findUnique({
@@ -165,9 +165,9 @@ export const switchCompany = async (req, res, next) => {
       include: { company: true },
     });
 
-    if (!link) return res.status(403).json({ success: false, error: "Accès à cette entreprise refusé" });
+    if (!link) return res.status(403).json({ success: false, error: req.t("company.access_denied") });
     if (!["active", "trial"].includes(link.company.status)) {
-      return res.status(403).json({ success: false, error: "Cette entreprise est suspendue" });
+      return res.status(403).json({ success: false, error: req.t("company.suspended") });
     }
 
     // Blacklister l'ancien token
@@ -187,7 +187,7 @@ export const switchCompany = async (req, res, next) => {
 
     return res.json({
       success:       true,
-      message:       `Basculé vers "${link.company.name}"`,
+      message:       req.t("company.switched_success", { name: link.company.name }),
       activeCompany: { id: link.company.id, name: link.company.name, status: link.company.status },
     });
   } catch (e) { next(e); }
@@ -201,7 +201,7 @@ export const logout = async (req, res, next) => {
       await logActivity(req.user.userId, null, getIp(req), req.headers["user-agent"], "logout");
     }
     res.clearCookie("admin_token", { path: "/" });
-    return res.json({ success: true, message: "Déconnecté avec succès" });
+    return res.json({ success: true, message: req.t("auth.logout_success") });
   } catch (e) { next(e); }
 };
 

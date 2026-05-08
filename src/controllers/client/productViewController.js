@@ -176,7 +176,7 @@ export const getShopProduct = async (req, res) => {
     });
 
     if (!product) {
-      return res.status(404).json({ message: "Produit non trouvé" });
+      return res.status(404).json({ message: req.t("cart.product_not_found") });
     }
     const bundles = product.packageTiers.map(tier => {
       const basePrice = product.packageTiers[0].price;
@@ -197,7 +197,7 @@ export const getShopProduct = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Erreur lors de la récupération du produit" });
+    res.status(500).json({ error: req.t("errors.server_error") });
   }
 };
 
@@ -238,7 +238,7 @@ export const getShopProductBySlug = async (req, res, next) => {
     });
  
     if (!translation || !translation.product.active) {
-      return res.status(404).json({ success: false, error: "Produit introuvable" });
+      return res.status(404).json({ success: false, error: req.t("cart.product_not_found") });
     }
  
     res.json({
@@ -270,7 +270,7 @@ export const getProductPackageTiers = async (req, res, next) => {
       include: { packageTiers: { orderBy: { qty: "asc" } } },
     });
  
-    if (!product) return res.status(404).json({ success: false, error: "Produit introuvable" });
+    if (!product) return res.status(404).json({ success: false, error: req.t("cart.product_not_found") });
  
     const tiers = product.packageTiers.map((t) => ({
       id:        t.id,
@@ -302,7 +302,7 @@ export const getProductCardTypes = async (req, res, next) => {
       },
     });
  
-    if (!product) return res.status(404).json({ success: false, error: "Produit introuvable" });
+    if (!product) return res.status(404).json({ success: false, error: req.t("cart.product_not_found") });
  
     const cardTypes = product.cardTypePrices
       .filter((c) => c.cardType?.active)

@@ -86,7 +86,7 @@ export const getSubscriptionDetails = async (req, res, next) => {
     });
 
     if (!subscription) {
-      return res.status(404).json({ success: false, error: "Subscription introuvable" });
+      return res.status(404).json({ success: false, error: req.t("superadmin.subscription.not_found") });
     }
 
     res.json({
@@ -161,20 +161,20 @@ export const markSubscriptionInvoicePaid = async (req, res, next) => {
     });
 
     if (!invoice) {
-      return res.status(404).json({ success: false, error: "Facture introuvable" });
+      return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
     }
 
     if (!invoice.isRecurring) {
       return res.status(422).json({
         success: false,
-        error: "Cette facture n'est pas liée à un abonnement",
+        error: req.t("superadmin.subscription.not_subscription_invoice"),
       });
     }
 
     if (invoice.status === "paid") {
       return res.status(422).json({
         success: false,
-        error: "Cette facture est déjà payée",
+        error: req.t("superadmin.billing.already_paid"),
       });
     }
 
@@ -183,7 +183,7 @@ export const markSubscriptionInvoicePaid = async (req, res, next) => {
     if (!billingHistory) {
       return res.status(422).json({
         success: false,
-        error: "BillingHistory introuvable",
+        error: req.t("superadmin.subscription.billing_not_found"),
       });
     }
 
@@ -192,7 +192,7 @@ export const markSubscriptionInvoicePaid = async (req, res, next) => {
     if (!subscription) {
       return res.status(422).json({
         success: false,
-        error: "Subscription introuvable",
+        error: req.t("superadmin.subscription.not_found"),
       });
     }
 
@@ -201,7 +201,7 @@ export const markSubscriptionInvoicePaid = async (req, res, next) => {
     if (!order) {
       return res.status(422).json({
         success: false,
-        error: "Order introuvable pour cette facture",
+        error: req.t("superadmin.subscription.order_not_found"),
       });
     }
 
@@ -291,7 +291,7 @@ export const markSubscriptionInvoicePaid = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Facture ${invoice.invoiceNumber} marquée comme payée. Abonnement activé.`,
+      message: req.t("superadmin.subscription.invoice_paid", { invoiceNumber: invoice.invoiceNumber }),
       data: {
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
@@ -330,7 +330,7 @@ export const updateSubscriptionStatus = async (req, res, next) => {
     });
 
     if (!subscription) {
-      return res.status(404).json({ success: false, error: "Subscription introuvable" });
+      return res.status(404).json({ success: false, error: req.t("superadmin.subscription.not_found") });
     }
 
     const updateData = { status };
@@ -349,7 +349,7 @@ export const updateSubscriptionStatus = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Subscription ${id} mise à jour: ${status}`,
+      message: req.t("superadmin.subscription.status_updated", { id, status }),
     });
   } catch (e) {
     next(e);

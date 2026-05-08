@@ -49,7 +49,7 @@ export const assignTag = async (req, res, next) => {
     const tagId   = parseInt(req.params.id);
     const { cardUid } = req.body;
     await assignTagToCard(cardUid, tagId);
-    res.json({ success: true, message: `NFCTag #${tagId} assigné à NFCCard uid=${cardUid}` });
+    res.json({ success: true, message: req.t("superadmin.nfc.tag_assigned", { tagId, uid: cardUid }) });
   } catch (e) { next(e); }
 };
 
@@ -58,7 +58,7 @@ export const toggleCard = async (req, res, next) => {
   try {
     const { uid }  = req.params;
     const card     = await prisma.nFCCard.findUnique({ where: { uid } });
-    if (!card) return res.status(404).json({ success: false, error: "Carte introuvable" });
+    if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
     const updated = await prisma.nFCCard.update({ where: { uid }, data: { active: !card.active, status: !card.active ? card.status : "DISABLED" } });
     res.json({ success: true, data: formatNfcCard(updated) });
   } catch (e) { next(e); }

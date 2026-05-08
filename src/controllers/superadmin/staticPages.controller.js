@@ -80,7 +80,7 @@ export const getPage = async (req, res, next) => {
     if (!page) {
       return res.status(404).json({
         success: false,
-        error: "Page introuvable",
+        error: req.t("page.not_found"),
       });
     }
 
@@ -120,7 +120,7 @@ export const createPage = async (req, res, next) => {
     if (!slug || !translations || translations.length === 0) {
       return res.status(422).json({
         success: false,
-        error: "slug et au moins une traduction sont requis",
+        error: req.t("superadmin.page.fields_required"),
       });
     }
 
@@ -140,7 +140,7 @@ export const createPage = async (req, res, next) => {
     if (!/^[a-z0-9-]+$/.test(slug)) {
       return res.status(422).json({
         success: false,
-        error: "Le slug doit contenir uniquement des lettres minuscules, chiffres et tirets",
+        error: req.t("superadmin.page.invalid_slug"),
       });
     }
 
@@ -153,7 +153,7 @@ export const createPage = async (req, res, next) => {
     if (languages.length !== languageIds.length) {
       return res.status(422).json({
         success: false,
-        error: "Une ou plusieurs langues sont invalides",
+        error: req.t("superadmin.page.invalid_languages"),
       });
     }
 
@@ -192,7 +192,7 @@ export const createPage = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: "Page créée avec succès",
+      message: req.t("superadmin.page.created"),
       data: formatPage(page),
     });
   } catch (e) {
@@ -222,7 +222,7 @@ export const updatePage = async (req, res, next) => {
     if (!existing) {
       return res.status(404).json({
         success: false,
-        error: "Page introuvable",
+        error: req.t("page.not_found"),
       });
     }
 
@@ -301,7 +301,7 @@ export const updatePage = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Page mise à jour",
+      message: req.t("superadmin.page.updated"),
       data: formatPage(page),
     });
   } catch (e) {
@@ -324,14 +324,14 @@ export const deletePage = async (req, res, next) => {
     if (!page) {
       return res.status(404).json({
         success: false,
-        error: "Page introuvable",
+        error: req.t("page.not_found"),
       });
     }
 
     if (page.isSystem) {
       return res.status(403).json({
         success: false,
-        error: "Impossible de supprimer une page système",
+        error: req.t("superadmin.page.cannot_delete_system"),
       });
     }
 
@@ -341,7 +341,7 @@ export const deletePage = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Page supprimée",
+      message: req.t("superadmin.page.deleted"),
     });
   } catch (e) {
     next(e);
@@ -361,7 +361,7 @@ export const updatePageStatus = async (req, res, next) => {
     if (!["draft", "published"].includes(status)) {
       return res.status(422).json({
         success: false,
-        error: "Status invalide (draft | published)",
+        error: req.t("superadmin.page.invalid_status"),
       });
     }
 
@@ -375,7 +375,7 @@ export const updatePageStatus = async (req, res, next) => {
     if (!existing) {
       return res.status(404).json({
         success: false,
-        error: "Page introuvable",
+        error: req.t("page.not_found"),
       });
     }
 
@@ -398,7 +398,7 @@ export const updatePageStatus = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Page ${status === "published" ? "publiée" : "mise en brouillon"}`,
+      message: status === "published" ? req.t("superadmin.page.published") : req.t("superadmin.page.unpublished"),
       data: formatPage(page),
     });
   } catch (e) {
@@ -424,7 +424,7 @@ export const duplicatePage = async (req, res, next) => {
     if (!original) {
       return res.status(404).json({
         success: false,
-        error: "Page introuvable",
+        error: req.t("page.not_found"),
       });
     }
 
@@ -484,7 +484,7 @@ export const duplicatePage = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: "Page dupliquée",
+      message: req.t("superadmin.page.duplicated"),
       data: formatPage(duplicate),
     });
   } catch (e) {

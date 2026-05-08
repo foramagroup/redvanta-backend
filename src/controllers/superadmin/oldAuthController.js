@@ -12,19 +12,19 @@ export async function login(req, res) {
     const password = String(req.body?.password || "");
 
     if (!email || !password) {
-      return res.status(400).json({ error: "Email & password required" });
+      return res.status(400).json({ error: req.t("superadmin.auth.credentials_required") });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    if (!user) return res.status(401).json({ error: req.t("auth.login_failed") });
 
     const ok = await bcrypt.compare(password, user.password || "");
-    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+    if (!ok) return res.status(401).json({ error: req.t("auth.login_failed") });
 
     const role = String(user.role || "").toLowerCase();
     const isSuperadmin = Boolean(user.isSuperadmin) || role === "superadmin" || LEGACY_SUPERADMIN_ROLES.has(role);
     if (!isSuperadmin) {
-      return res.status(403).json({ error: "Forbidden: superadmin only" });
+      return res.status(403).json({ error: req.t("superadmin.auth.forbidden") });
     }
 
     const token = jwt.sign(
@@ -60,12 +60,12 @@ export async function login(req, res) {
 export async function me(req, res) {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user) return res.status(404).json({ error: req.t("auth.user_not_found") });
 
     const role = String(user.role || "").toLowerCase();
     const isSuperadmin = Boolean(user.isSuperadmin) || role === "superadmin" || LEGACY_SUPERADMIN_ROLES.has(role);
     if (!isSuperadmin) {
-      return res.status(403).json({ error: "Forbidden: superadmin only" });
+      return res.status(403).json({ error: req.t("superadmin.auth.forbidden") });
     }
 
     return res.json({

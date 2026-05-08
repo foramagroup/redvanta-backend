@@ -117,7 +117,7 @@ export const getLocation = async (req, res, next) => {
         },
       },
     });
-    if (!loc) return res.status(404).json({ success: false, error: "Location introuvable" });
+    if (!loc) return res.status(404).json({ success: false, error: req.t("location.not_found") });
 
     res.json({ success: true, data: formatLocation(loc) });
   } catch (e) { next(e); }
@@ -131,7 +131,7 @@ export const createLocation = async (req, res, next) => {
     const { name, address, placeId, cards } = req.body;
 
     if (!name?.trim()) {
-      return res.status(422).json({ success: false, error: "Le nom de la location est requis" });
+      return res.status(422).json({ success: false, error: req.t("admin.location.name_required") });
     }
 
     // Vérifier la limite du plan
@@ -140,7 +140,7 @@ export const createLocation = async (req, res, next) => {
     if (settings && currentCount >= settings.maxLocations) {
       return res.status(403).json({
         success: false,
-        error:   `Limite atteinte : votre plan autorise ${settings.maxLocations} location(s). Passez au plan supérieur.`,
+        error:   req.t("admin.location.limit_reached", { max: settings.maxLocations }),
         code:    "LOCATION_LIMIT_REACHED",
       });
     }
@@ -190,7 +190,7 @@ export const createLocation = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: `Location "${location.name}" créée`,
+      message: req.t("location.created"),
       data:    formatLocation(location),
     });
   } catch (e) { next(e); }
@@ -206,7 +206,7 @@ export const updateLocation = async (req, res, next) => {
     const { name, address, placeId, cards } = req.body;
 
     const existing = await prisma.location.findFirst({ where: { id, companyId } });
-    if (!existing) return res.status(404).json({ success: false, error: "Location introuvable" });
+    if (!existing) return res.status(404).json({ success: false, error: req.t("location.not_found") });
 
     let googleData = {};
     if (placeId && placeId !== existing.googlePlaceId) {
@@ -236,7 +236,7 @@ export const updateLocation = async (req, res, next) => {
       include: { _count: { select: { nfcCards: true } } },
     });
 
-    res.json({ success: true, message: "Location mise à jour", data: formatLocation(updated) });
+    res.json({ success: true, message: req.t("location.updated"), data: formatLocation(updated) });
   } catch (e) { next(e); }
 };
 
@@ -247,7 +247,7 @@ export const toggleLocation = async (req, res, next) => {
     const companyId = getCompanyId(req);
 
     const existing = await prisma.location.findFirst({ where: { id, companyId } });
-    if (!existing) return res.status(404).json({ success: false, error: "Location introuvable" });
+    if (!existing) return res.status(404).json({ success: false, error: req.t("location.not_found") });
 
     const updated = await prisma.location.update({
       where:   { id },
@@ -257,7 +257,7 @@ export const toggleLocation = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Location ${updated.active ? "activée" : "désactivée"}`,
+      message: updated.active ? req.t("location.activated") : req.t("location.deactivated"),
       data:    formatLocation(updated),
     });
   } catch (e) { next(e); }
@@ -270,7 +270,7 @@ export const deleteLocation = async (req, res, next) => {
     const companyId = getCompanyId(req);
 
     const existing = await prisma.location.findFirst({ where: { id, companyId } });
-    if (!existing) return res.status(404).json({ success: false, error: "Location introuvable" });
+    if (!existing) return res.status(404).json({ success: false, error: req.t("location.not_found") });
 
     // ✅ Détacher les NFCCards liées (SetNull sur locationId)
     await prisma.nFCCard.updateMany({
@@ -280,7 +280,7 @@ export const deleteLocation = async (req, res, next) => {
 
     await prisma.location.delete({ where: { id } });
 
-    res.json({ success: true, message: `Location "${existing.name}" supprimée` });
+    res.json({ success: true, message: req.t("location.deleted") });
   } catch (e) { next(e); }
 };
 
@@ -331,7 +331,7 @@ export const getLocationAnalytics = async (req, res, next) => {
       where:   { id, companyId },
       include: { _count: { select: { nfcCards: true } } },
     });
-    if (!loc) return res.status(404).json({ success: false, error: "Location introuvable" });
+    if (!loc) return res.status(404).json({ success: false, error: req.t("location.not_found") });
 
     const nfcCards = await prisma.nFCCard.findMany({
       where:  { locationId: id },
@@ -375,9 +375,9 @@ export const refreshGoogleData = async (req, res, next) => {
     const companyId = getCompanyId(req);
 
     const loc = await prisma.location.findFirst({ where: { id, companyId } });
-    if (!loc) return res.status(404).json({ success: false, error: "Location introuvable" });
+    if (!loc) return res.status(404).json({ success: false, error: req.t("location.not_found") });
     if (!loc.googlePlaceId) {
-      return res.status(422).json({ success: false, error: "Aucun Google Place ID associé à cette location" });
+      return res.status(422).json({ success: false, error: req.t("admin.location.no_google_place_id") });
     }
 
     const { invalidateCache } = await import("../services/Googleplaces.service.js");
@@ -395,7 +395,7 @@ export const refreshGoogleData = async (req, res, next) => {
       include: { _count: { select: { nfcCards: true } } },
     });
 
-    res.json({ success: true, message: "Données Google mises à jour", data: formatLocation(updated) });
+    res.json({ success: true, message: req.t("admin.location.google_data_updated"), data: formatLocation(updated) });
   } catch (e) { next(e); }
 };
 
@@ -407,14 +407,14 @@ export const assignNfcCard = async (req, res, next) => {
     // ✅ cardId (plus tagId — on travaille avec NFCCard.id)
     const { cardId } = req.body;
 
-    if (!cardId) return res.status(422).json({ success: false, error: "cardId requis" });
+    if (!cardId) return res.status(422).json({ success: false, error: req.t("admin.location.card_id_required") });
 
     const loc = await prisma.location.findFirst({ where: { id, companyId } });
-    if (!loc) return res.status(404).json({ success: false, error: "Location introuvable" });
+    if (!loc) return res.status(404).json({ success: false, error: req.t("location.not_found") });
 
     // ✅ Chercher par id (NFCCard.id) et companyId
     const card = await prisma.nFCCard.findFirst({ where: { id: cardId, companyId } });
-    if (!card) return res.status(404).json({ success: false, error: "NFCCard introuvable" });
+    if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
 
     // ✅ Mettre à jour la NFCCard (champs corrects du modèle v3)
     await prisma.nFCCard.update({
@@ -432,7 +432,7 @@ export const assignNfcCard = async (req, res, next) => {
     const cardCount = await prisma.nFCCard.count({ where: { locationId: id } });
     await prisma.location.update({ where: { id }, data: { cardCount } });
 
-    res.json({ success: true, message: `NFCCard #${cardId} assignée à "${loc.name}"` });
+    res.json({ success: true, message: req.t("nfc.assign_success") });
   } catch (e) { next(e); }
 };
 

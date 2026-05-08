@@ -221,7 +221,7 @@ export const getReview = async (req, res, next) => {
       include: { location: { select: { id: true, name: true, address: true } } },
     });
 
-    if (!feedback) return res.status(404).json({ success: false, error: "Feedback introuvable" });
+    if (!feedback) return res.status(404).json({ success: false, error: req.t("admin.review.not_found") });
 
     res.json({ success: true, data: formatReview(feedback) });
   } catch (e) { next(e); }
@@ -247,11 +247,11 @@ export const updateReviewStatus = async (req, res, next) => {
 
     const validStatuses = ["PUBLIC", "PRIVATE", "RESOLVED", "PENDING"];
     if (!status || !validStatuses.includes(status)) {
-      return res.status(422).json({ success: false, error: `status invalide. Valeurs : ${validStatuses.join(", ")}` });
+      return res.status(422).json({ success: false, error: req.t("admin.review.invalid_status") });
     }
 
     const existing = await prisma.feedback.findFirst({ where: { id, companyId } });
-    if (!existing) return res.status(404).json({ success: false, error: "Feedback introuvable" });
+    if (!existing) return res.status(404).json({ success: false, error: req.t("admin.review.not_found") });
 
     const updated = await prisma.feedback.update({
       where:   { id },
@@ -261,7 +261,7 @@ export const updateReviewStatus = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Statut mis à jour : ${status}`,
+      message: req.t("admin.review.status_updated", { status }),
       data:    formatReview(updated),
     });
   } catch (e) { next(e); }
@@ -279,10 +279,10 @@ export const updateInternalNotes = async (req, res, next) => {
     const companyId = getCompanyId(req);
     const { notes } = req.body;
 
-    if (notes === undefined) return res.status(422).json({ success: false, error: "notes requis" });
+    if (notes === undefined) return res.status(422).json({ success: false, error: req.t("admin.review.notes_required") });
 
     const existing = await prisma.feedback.findFirst({ where: { id, companyId } });
-    if (!existing) return res.status(404).json({ success: false, error: "Feedback introuvable" });
+    if (!existing) return res.status(404).json({ success: false, error: req.t("admin.review.not_found") });
 
     const updated = await prisma.feedback.update({
       where:   { id },
@@ -290,7 +290,7 @@ export const updateInternalNotes = async (req, res, next) => {
       include: { location: { select: { id: true, name: true } } },
     });
 
-    res.json({ success: true, message: "Notes sauvegardées", data: formatReview(updated) });
+    res.json({ success: true, message: req.t("admin.review.notes_saved"), data: formatReview(updated) });
   } catch (e) { next(e); }
 };
 
@@ -307,13 +307,13 @@ export const replyToReview = async (req, res, next) => {
     const companyId = getCompanyId(req);
     const { reply } = req.body;
 
-    if (!reply?.trim()) return res.status(422).json({ success: false, error: "reply requis" });
+    if (!reply?.trim()) return res.status(422).json({ success: false, error: req.t("admin.review.reply_required") });
 
     const feedback = await prisma.feedback.findFirst({
       where:   { id, companyId },
       include: { location: { select: { name: true } } },
     });
-    if (!feedback) return res.status(404).json({ success: false, error: "Feedback introuvable" });
+    if (!feedback) return res.status(404).json({ success: false, error: req.t("admin.review.not_found") });
 
     const updated = await prisma.feedback.update({
       where: { id },
@@ -335,7 +335,7 @@ export const replyToReview = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Réponse envoyée" + (feedback.email ? " et email notifié" : ""),
+      message: feedback.email ? req.t("admin.review.reply_sent_email") : req.t("admin.review.reply_sent"),
       data:    formatReview(updated),
     });
   } catch (e) { next(e); }
@@ -357,10 +357,10 @@ export const bulkUpdateStatus = async (req, res, next) => {
 
     const validStatuses = ["PUBLIC", "PRIVATE", "RESOLVED", "PENDING"];
     if (!status || !validStatuses.includes(status)) {
-      return res.status(422).json({ success: false, error: "status invalide" });
+      return res.status(422).json({ success: false, error: req.t("admin.review.invalid_status") });
     }
     if (!Array.isArray(ids) || !ids.length) {
-      return res.status(422).json({ success: false, error: "ids[] requis (tableau non vide)" });
+      return res.status(422).json({ success: false, error: req.t("admin.review.ids_required") });
     }
 
     // Sécurité : ne mettre à jour que les feedbacks appartenant à la company
@@ -374,7 +374,7 @@ export const bulkUpdateStatus = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `${result.count} feedback(s) mis à jour → ${status}`,
+      message: req.t("admin.review.bulk_updated", { count: result.count, status }),
       updated: result.count,
     });
   } catch (e) { next(e); }

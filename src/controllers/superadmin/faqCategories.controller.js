@@ -55,7 +55,7 @@ export const getFAQCategory = async (req, res, next) => {
     if (!category) {
       return res.status(404).json({
         success: false,
-        error: "Catégorie introuvable",
+        error: req.t("superadmin.faq_category.not_found"),
       });
     }
 
@@ -88,7 +88,7 @@ export const createFAQCategory = async (req, res, next) => {
     if (!slug || !translations || translations.length === 0) {
       return res.status(422).json({
         success: false,
-        error: "slug et au moins une traduction sont requis",
+        error: req.t("superadmin.faq_category.fields_required"),
       });
     }
 
@@ -108,7 +108,7 @@ export const createFAQCategory = async (req, res, next) => {
     if (!/^[a-z0-9-]+$/.test(slug)) {
       return res.status(422).json({
         success: false,
-        error: "Le slug doit contenir uniquement des lettres minuscules, chiffres et tirets",
+        error: req.t("superadmin.faq_category.invalid_slug"),
       });
     }
 
@@ -121,7 +121,7 @@ export const createFAQCategory = async (req, res, next) => {
     if (languages.length !== languageIds.length) {
       return res.status(422).json({
         success: false,
-        error: "Une ou plusieurs langues sont invalides",
+        error: req.t("superadmin.faq_category.invalid_languages"),
       });
     }
 
@@ -162,7 +162,7 @@ export const createFAQCategory = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: "Catégorie créée",
+      message: req.t("superadmin.faq_category.created"),
       data: formatCategory(category),
     });
   } catch (e) {
@@ -187,7 +187,7 @@ export const updateFAQCategory = async (req, res, next) => {
     if (!existing) {
       return res.status(404).json({
         success: false,
-        error: "Catégorie introuvable",
+        error: req.t("superadmin.faq_category.not_found"),
       });
     }
 
@@ -249,7 +249,7 @@ export const updateFAQCategory = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Catégorie mise à jour",
+      message: req.t("superadmin.faq_category.updated"),
       data: formatCategory(category),
     });
   } catch (e) {
@@ -275,7 +275,7 @@ export const deleteFAQCategory = async (req, res, next) => {
     if (!category) {
       return res.status(404).json({
         success: false,
-        error: "Catégorie introuvable",
+        error: req.t("superadmin.faq_category.not_found"),
       });
     }
 
@@ -283,7 +283,7 @@ export const deleteFAQCategory = async (req, res, next) => {
     if (category._count.faqs > 0) {
       return res.status(422).json({
         success: false,
-        error: `Impossible de supprimer. ${category._count.faqs} FAQ(s) utilisent cette catégorie.`,
+        error: req.t("superadmin.faq_category.cannot_delete_has_faqs", { count: category._count.faqs }),
       });
     }
 
@@ -293,7 +293,7 @@ export const deleteFAQCategory = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Catégorie supprimée",
+      message: req.t("superadmin.faq_category.deleted"),
     });
   } catch (e) {
     next(e);
@@ -314,7 +314,7 @@ export const reorderFAQCategories = async (req, res, next) => {
     if (!orders || !Array.isArray(orders)) {
       return res.status(422).json({
         success: false,
-        error: "orders requis (array)",
+        error: req.t("superadmin.faq_category.orders_required"),
       });
     }
 
@@ -329,7 +329,7 @@ export const reorderFAQCategories = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Ordre mis à jour",
+      message: req.t("superadmin.faq_category.order_updated"),
     });
   } catch (e) {
     next(e);

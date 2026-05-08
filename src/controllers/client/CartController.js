@@ -453,30 +453,30 @@ async function createDefaultDesign(tx, { userId, companyId, productId, company, 
  * Valide le tableau de locations reçu depuis le front.
  * Retourne { valid: true } ou { valid: false, error: String }
  */
-function validateLocations(locations, expectedTotal) {
+function validateLocations(locations, expectedTotal, req) {
   if (!Array.isArray(locations) || locations.length === 0) {
-    return { valid: false, error: "Le tableau locations[] est vide ou invalide" };
+    return { valid: false, error: req.t("order.cart_locations_empty") };
   }
 
   const locTotal = locations.reduce((s, l) => s + (parseInt(l.quantity) || 0), 0);
   if (locTotal !== expectedTotal) {
     return {
       valid: false,
-      error: `La somme des quantités des locations (${locTotal}) doit être égale au total (${expectedTotal})`,
+      error: req.t("order.cart_quantity_mismatch", { actual: locTotal, expected: expectedTotal }),
     };
   }
 
   for (let i = 0; i < locations.length; i++) {
     const loc = locations[i];
     if (!loc.platform) {
-      return { valid: false, error: `Location #${i + 1} : plateforme manquante` };
+      return { valid: false, error: req.t("order.cart_missing_platform", { index: i + 1 }) };
     }
     const hasData = loc.data?.businessName?.trim() || loc.data?.handle?.trim() || loc.data?.url?.trim();
     if (!hasData) {
-      return { valid: false, error: `Location #${i + 1} : données de plateforme manquantes` };
+      return { valid: false, error: req.t("order.cart_missing_platform_data", { index: i + 1 }) };
     }
     if ((parseInt(loc.quantity) || 0) < 1) {
-      return { valid: false, error: `Location #${i + 1} : quantité invalide` };
+      return { valid: false, error: req.t("order.cart_invalid_quantity", { index: i + 1 }) };
     }
   }
 
@@ -591,7 +591,7 @@ export const addToCart = async (req, res, next) => {
     const { productId, packageTierId, quantity, cardTypeId, locations } = req.body;
 
     if (!productId) {
-      return res.status(422).json({ success: false, error: "productId requis" });
+      return res.status(422).json({ success: false, error: req.t("cart.product_required") });
     }
 
     // ── Charger le produit ─────────────────────────────────────
@@ -604,7 +604,7 @@ export const addToCart = async (req, res, next) => {
     });
 
     if (!product || !product.active) {
-      return res.status(404).json({ success: false, error: "Produit introuvable ou inactif" });
+      return res.status(404).json({ success: false, error: req.t("cart.product_not_found") });
     }
 
     const hasTiers = product.packageTiers.length > 0;
@@ -613,7 +613,7 @@ export const addToCart = async (req, res, next) => {
     if (hasTiers && !packageTierId) {
       return res.status(422).json({
         success: false,
-        error: "Ce produit requiert un packageTierId",
+        error: req.t("cart.tier_required"),
         availableTiers: product.packageTiers.map((t) => ({
           id: t.id,
           qty: t.qty,
@@ -623,7 +623,7 @@ export const addToCart = async (req, res, next) => {
     }
 
     if (!hasTiers && !product.price) {
-      return res.status(422).json({ success: false, error: "Ce produit n'a pas de prix configuré" });
+      return res.status(422).json({ success: false, error: req.t("cart.no_price") });
     }
 
     // ── Résoudre le tier ───────────────────────────────────────
@@ -631,7 +631,7 @@ export const addToCart = async (req, res, next) => {
     if (packageTierId) {
       tier = product.packageTiers.find((t) => t.id === parseInt(packageTierId));
       if (!tier) {
-        return res.status(422).json({ success: false, error: "Palier de prix introuvable pour ce produit" });
+        return res.status(422).json({ success: false, error: req.t("cart.tier_not_found") });
       }
     }
 
@@ -655,7 +655,7 @@ export const addToCart = async (req, res, next) => {
 
     if (hasLocations) {
       const expectedTotal = totalCards || resolvedQty;
-      const validation = validateLocations(locations, expectedTotal);
+      const validation = validateLocations(locations, expectedTotal, req);
       if (!validation.valid) {
         return res.status(422).json({ success: false, error: validation.error });
       }
@@ -742,7 +742,7 @@ export const syncCart = async (req, res, next) => {
     const { items } = req.body;
 
     if (!items || !Array.isArray(items)) {
-      return res.status(400).json({ success: false, error: "Format de panier invalide" });
+      return res.status(400).json({ success: false, error: req.t("cart.invalid_format") });
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -790,7 +790,7 @@ export const syncCart = async (req, res, next) => {
         // Validation rapide des locations
         if (hasLocations) {
           const expectedTotal = totalCards || resolvedQty;
-          const validation = validateLocations(locations, expectedTotal);
+          const validation = validateLocations(locations, expectedTotal, req);
           if (!validation.valid) {
             console.warn(`⚠️ Sync: locations invalides pour produit ${productId} - skipped:`, validation.error);
             continue;
@@ -853,7 +853,7 @@ export const syncCart = async (req, res, next) => {
     res.status(201).json({
       success: true,
       count: result.length,
-      message: "Panier synchronisé avec succès",
+      message: req.t("cart.synced"),
     });
   } catch (e) {
     next(e);
@@ -880,7 +880,7 @@ export const updateCartItem = async (req, res, next) => {
       },
     });
     if (!existing) {
-      return res.status(404).json({ success: false, error: "Item introuvable" });
+      return res.status(404).json({ success: false, error: req.t("cart.item_not_found") });
     }
 
     const hasTiers = existing.product?.packageTiers?.length > 0;
@@ -890,7 +890,7 @@ export const updateCartItem = async (req, res, next) => {
     if (hasTiers && packageTierId && packageTierId !== existing.packageTierId) {
       const tier = existing.product.packageTiers.find((t) => t.id === parseInt(packageTierId));
       if (!tier) {
-        return res.status(422).json({ success: false, error: "Palier introuvable" });
+        return res.status(422).json({ success: false, error: req.t("cart.tier_invalid") });
       }
       updateData = {
         packageTierId: tier.id,
@@ -916,7 +916,7 @@ export const updateCartItem = async (req, res, next) => {
     }
 
     if (!Object.keys(updateData).length) {
-      return res.status(422).json({ success: false, error: "Aucun champ à modifier" });
+      return res.status(422).json({ success: false, error: req.t("cart.no_fields") });
     }
 
     const updated = await prisma.cartItem.update({
@@ -946,7 +946,7 @@ export const updateCartItemLocations = async (req, res, next) => {
     const { locations } = req.body;
 
     if (!Array.isArray(locations) || locations.length === 0) {
-      return res.status(422).json({ success: false, error: "locations[] requis et non vide" });
+      return res.status(422).json({ success: false, error: req.t("cart.locations_required") });
     }
 
     // Charger le CartItem avec ses données
@@ -959,7 +959,7 @@ export const updateCartItemLocations = async (req, res, next) => {
     });
 
     if (!existing) {
-      return res.status(404).json({ success: false, error: "Item introuvable" });
+      return res.status(404).json({ success: false, error: req.t("cart.item_not_found") });
     }
 
     // Total de cartes attendu
@@ -1024,7 +1024,7 @@ export const removeFromCart = async (req, res, next) => {
     });
 
     if (!existing) {
-      return res.status(404).json({ success: false, error: "Item introuvable" });
+      return res.status(404).json({ success: false, error: req.t("cart.item_not_found") });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -1050,7 +1050,7 @@ export const removeFromCart = async (req, res, next) => {
       }
     });
 
-    res.json({ success: true, message: "Item supprimé du panier" });
+    res.json({ success: true, message: req.t("cart.item_deleted") });
   } catch (e) {
     next(e);
   }
@@ -1094,7 +1094,7 @@ export const clearCart = async (req, res, next) => {
       }
     });
 
-    res.json({ success: true, message: "Panier vidé" });
+    res.json({ success: true, message: req.t("cart.cleared") });
   } catch (e) {
     next(e);
   }

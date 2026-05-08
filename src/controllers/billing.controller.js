@@ -25,7 +25,7 @@ export const getBillingOverview = async (req, res, next) => {
     if (!subscription) {
       return res.status(404).json({
         success: false,
-        message: "Aucun abonnement trouvé"
+        message: req.t("admin.billing.no_subscription")
       });
     }
     
@@ -224,7 +224,7 @@ export const getAvailableAddons = async (req, res, next) => {
     if (!subscription) {
       return res.status(404).json({
         success: false,
-        message: "Aucun abonnement trouvé"
+        message: req.t("admin.billing.no_subscription")
       });
     }
     
@@ -276,7 +276,7 @@ export const activateAddon = async (req, res, next) => {
     if (!addon) {
       return res.status(404).json({
         success: false,
-        message: "Add-on introuvable"
+        message: req.t("errors.not_found")
       });
     }
     
@@ -288,7 +288,7 @@ export const activateAddon = async (req, res, next) => {
     if (!subscription) {
       return res.status(404).json({
         success: false,
-        message: "Aucun abonnement trouvé"
+        message: req.t("admin.billing.no_subscription")
       });
     }
     
@@ -305,7 +305,7 @@ export const activateAddon = async (req, res, next) => {
     if (existing && existing.status === 'active') {
       return res.status(409).json({
         success: false,
-        message: "Add-on déjà activé"
+        message: req.t("admin.billing.addon_already_active")
       });
     }
     
@@ -359,7 +359,7 @@ export const activateAddon = async (req, res, next) => {
     
     res.json({
       success: true,
-      message: `Add-on "${addon.name}" activé avec succès`,
+      message: req.t("admin.billing.addon_activated", { name: addon.name }),
       data: {
         addon: {
           id: addon.id,
@@ -394,7 +394,7 @@ export const deactivateAddon = async (req, res, next) => {
     if (!subscription) {
       return res.status(404).json({
         success: false,
-        message: "Aucun abonnement trouvé"
+        message: req.t("admin.billing.no_subscription")
       });
     }
     
@@ -413,7 +413,7 @@ export const deactivateAddon = async (req, res, next) => {
       });
       
       if (subscriptionAddon.count === 0) {
-        throw new Error("Add-on non trouvé ou déjà désactivé");
+        throw Object.assign(new Error("ADDON_NOT_FOUND"), { status: 404 });
       }
       
       // Recalculer le total
@@ -440,7 +440,7 @@ export const deactivateAddon = async (req, res, next) => {
     
     res.json({
       success: true,
-      message: "Add-on désactivé avec succès",
+      message: req.t("admin.billing.addon_deactivated"),
       data: {
         subscription: {
           addonsAmount: result.addonsAmount,
@@ -450,10 +450,10 @@ export const deactivateAddon = async (req, res, next) => {
     });
     
   } catch (e) {
-    if (e.message === "Add-on non trouvé ou déjà désactivé") {
+    if (e.message === "ADDON_NOT_FOUND") {
       return res.status(404).json({
         success: false,
-        message: e.message
+        message: req.t("errors.not_found")
       });
     }
     next(e);
@@ -472,7 +472,7 @@ export const trackUsage = async (req, res, next) => {
     if (!['api', 'sms', 'webhook'].includes(type)) {
       return res.status(400).json({
         success: false,
-        message: "Type invalide. Valeurs acceptées : api, sms, webhook"
+        message: req.t("admin.billing.invalid_usage_type")
       });
     }
     

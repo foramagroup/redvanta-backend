@@ -64,7 +64,7 @@ export const updateSettings = async (req, res) => {
 
         SettingService.flushCache();
         res.json({
-            message: "Paramètres de la plateforme mis à jour avec succès",
+            message: req.t("superadmin.platform.updated"),
             data: settings
         });
 

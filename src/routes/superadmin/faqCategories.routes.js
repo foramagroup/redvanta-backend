@@ -17,11 +17,11 @@ const router = express.Router();
 
 router.use(authenticateSuperAdmin, requireSuperAdmin);
 
-router.get("/faq-categories", listFAQCategories);
-router.post("/faq-categories", createFAQCategory);
-router.get("/faq-categories/:id", getFAQCategory);
-router.put("/faq-categories/:id", updateFAQCategory);
-router.delete("/faq-categories/:id", deleteFAQCategory);
-router.post("/faq-categories/reorder", reorderFAQCategories);
+router.get("/", listFAQCategories);
+router.post("/reorder", reorderFAQCategories);
+router.post("/", createFAQCategory);
+router.get("/:id", getFAQCategory);
+router.put("/:id", updateFAQCategory);
+router.delete("/:id", deleteFAQCategory);
 
 export default router;

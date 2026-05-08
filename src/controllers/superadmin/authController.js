@@ -28,12 +28,12 @@ export const login = async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(422).json({ success: false, error: "Email and password are required" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.auth.credentials_required") });
     }
 
     // Charger l'utilisateur
     const user = await loadUserByEmail(email, "superadmin");
-
+ console.log(req);
     // Vérifier que c'est un superadmin
     if (!user || !user.isSuperadmin) {
       await logActivity(null, email, ip, userAgent, "failed");
@@ -46,6 +46,8 @@ export const login = async (req, res, next) => {
       await logActivity(user.id, user.name, ip, userAgent, "failed");
       return errorResponse(res, "auth.login_failed", {}, 401, null);
     }
+
+   
 
     // Générer le JWT
     const token = generateToken({
@@ -77,7 +79,7 @@ export const me = async (req, res, next) => {
   try {
     const user = await loadUserForAuth(req.user.userId, "superadmin");
     if (!user || !user.isSuperadmin) {
-      return res.status(403).json({ success: false, error: "Access denied" });
+      return res.status(403).json({ success: false, error: req.t("superadmin.auth.forbidden") });
     }
     return res.json({ success: true, user: formatSuperAdmin(user) });
   } catch (e) { next(e); }
@@ -96,7 +98,7 @@ export const logout = async (req, res, next) => {
     }
     // Effacer le cookie
     res.clearCookie("sa_token", { path: "/" });
-    return res.json({ success: true, message: "Logged out successfully" });
+    return res.json({ success: true, message: req.t("auth.logout_success") });
     
   } catch (e) { next(e); }
 };

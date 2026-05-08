@@ -37,7 +37,7 @@ export const details = async (req, res, next) => {
     const sessionToken = req.query.session || null;
 
     if (!placeId) {
-      return res.status(422).json({ success: false, error: "placeId requis" });
+      return res.status(422).json({ success: false, error: req.t("google.place_id_required") });
     }
 
     const place = await getPlaceDetails(placeId, sessionToken);
@@ -58,7 +58,7 @@ export const linkToCompany = async (req, res, next) => {
     const companyId = parseInt(req.user.companyId);
 
     if (!placeId) {
-      return res.status(422).json({ success: false, error: "placeId requis" });
+      return res.status(422).json({ success: false, error: req.t("google.place_id_required") });
     }
 
     // Récupérer les détails (depuis cache ou API)
@@ -115,14 +115,14 @@ export const linkToDesign = async (req, res, next) => {
     const companyId = parseInt(req.user.companyId);
 
     if (!placeId || !designId) {
-      return res.status(422).json({ success: false, error: "placeId et designId requis" });
+      return res.status(422).json({ success: false, error: req.t("google.design_and_place_id_required") });
     }
 
     const design = await prisma.design.findFirst({
       where: { id: parseInt(designId), userId, companyId },
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
-    if (design.status === "locked") return res.status(409).json({ success: false, error: "Design verrouillé" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
+    if (design.status === "locked") return res.status(409).json({ success: false, error: req.t("design.locked") });
 
     // Récupérer les détails depuis cache ou API
     const place = await getPlaceDetails(placeId);
@@ -158,10 +158,10 @@ export const linkToDesign = async (req, res, next) => {
 export const invalidatePlaceCache = async (req, res, next) => {
   try {
     const { placeId } = req.body;
-    if (!placeId) return res.status(422).json({ success: false, error: "placeId requis" });
+    if (!placeId) return res.status(422).json({ success: false, error: req.t("google.place_id_required") });
 
     await invalidateCache(placeId);
-    res.json({ success: true, message: `Cache invalidé pour placeId: ${placeId}` });
+    res.json({ success: true, message: req.t("google.cache_invalidated", { placeId }) });
   } catch (e) { next(e); }
 };
 

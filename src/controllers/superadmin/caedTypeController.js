@@ -25,7 +25,7 @@ export const listCardTypes = async (req, res, next) => {
 export const getCardType = async (req, res, next) => {
   try {
     const ct = await prisma.cardType.findUnique({ where: { id: req.params.id } });
-    if (!ct) return res.status(404).json({ success: false, message: "Type de carte introuvable" });
+    if (!ct) return res.status(404).json({ success: false, message: req.t("superadmin.card_type.not_found") });
     res.json({ success: true, data: format(ct) });
   } catch (e) { next(e); }
 };
@@ -36,7 +36,7 @@ export const createCardType = async (req, res, next) => {
  
     const id = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || `type-${Date.now()}`;
     const exists = await prisma.cardType.findUnique({ where: { id } });
-    if (exists) return res.status(409).json({ success: false, message: `L'id "${id}" existe déjà` });
+    if (exists) return res.status(409).json({ success: false, message: req.t("superadmin.card_type.id_taken", { id }) });
  
     // Sauvegarder l'image sur disque
     const uploaded = await processFile(image, DIRS.card_type, "image");
@@ -53,7 +53,7 @@ export const createCardType = async (req, res, next) => {
 export const updateCardType = async (req, res, next) => {
   try {
     const existing = await prisma.cardType.findUnique({ where: { id: req.params.id } });
-    if (!existing) return res.status(404).json({ success: false, message: "Type de carte introuvable" });
+    if (!existing) return res.status(404).json({ success: false, message: req.t("superadmin.card_type.not_found") });
  
     const { name, color, image, active } = req.validatedBody;
  
@@ -86,21 +86,21 @@ export const updateCardType = async (req, res, next) => {
 export const deleteCardType = async (req, res, next) => {
   try {
     const existing = await prisma.cardType.findUnique({ where: { id: req.params.id } });
-    if (!existing) return res.status(404).json({ success: false, message: "Type de carte introuvable" });
+    if (!existing) return res.status(404).json({ success: false, message: req.t("superadmin.card_type.not_found") });
  
     deleteLocalFile(existing.image);   // supprimer le fichier disque
       await prisma.$transaction([
         prisma.cardTypePrice.deleteMany({ where: { cardTypeId: req.params.id } }),
         prisma.cardType.delete({ where: { id: req.params.id } }),
       ]);
-    res.json({ success: true, message: "Type de carte supprimé" });
+    res.json({ success: true, message: req.t("superadmin.card_type.deleted") });
   } catch (e) { next(e); }
 };
 
 export const toggleCardType = async (req, res, next) => {
   try {
     const ct = await prisma.cardType.findUnique({ where: { id: req.params.id } });
-    if (!ct) return res.status(404).json({ success: false, message: "Type de carte introuvable" });
+    if (!ct) return res.status(404).json({ success: false, message: req.t("superadmin.card_type.not_found") });
     const updated = await prisma.cardType.update({
       where: { id: req.params.id }, data: { active: !ct.active },
     });

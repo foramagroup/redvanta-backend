@@ -185,16 +185,16 @@ export const previewSubscription = async (req, res, next) => {
     const { planId, addonIds = [], extraLocations = 0, interval = "monthly" } = req.body;
 
     if (!planId) {
-      return res.status(422).json({ success: false, error: "planId requis" });
+      return res.status(422).json({ success: false, error: req.t("subscription.plan_id_required") });
     }
     if (!["monthly", "yearly"].includes(interval)) {
-      return res.status(422).json({ success: false, error: "interval invalide" });
+      return res.status(422).json({ success: false, error: req.t("subscription.invalid_interval") });
     }
 
     const plan = await prisma.planSetting.findFirst({
       where: { id: parseInt(planId), status: "Active" },
     });
-    if (!plan) return res.status(404).json({ success: false, error: "Plan introuvable" });
+    if (!plan) return res.status(404).json({ success: false, error: req.t("subscription.plan_not_found") });
 
     let addons = [];
     if (addonIds.length > 0) {
@@ -249,15 +249,15 @@ export const subscribe = async (req, res, next) => {
     const companyId = getCompanyId(req);
     const { planId, addonIds = [], extraLocations = 0, interval = "monthly" } = req.body;
 
-    if (!planId) return res.status(422).json({ success: false, error: "planId requis" });
+    if (!planId) return res.status(422).json({ success: false, error: req.t("subscription.plan_id_required") });
     if (!["monthly", "yearly"].includes(interval)) {
-      return res.status(422).json({ success: false, error: "interval invalide" });
+      return res.status(422).json({ success: false, error: req.t("subscription.invalid_interval") });
     }
 
     const plan = await prisma.planSetting.findFirst({
       where: { id: parseInt(planId), status: "Active" },
     });
-    if (!plan) return res.status(404).json({ success: false, error: "Plan introuvable" });
+    if (!plan) return res.status(404).json({ success: false, error: req.t("subscription.plan_not_found") });
 
     let addons = [];
     const parsedAddonIds = addonIds.map(Number);
@@ -266,7 +266,7 @@ export const subscribe = async (req, res, next) => {
         where: { id: { in: parsedAddonIds }, status: "active" },
       });
       if (addons.length !== parsedAddonIds.length) {
-        return res.status(422).json({ success: false, error: "Addons invalides" });
+        return res.status(422).json({ success: false, error: req.t("admin.plan_builder.addons_invalid") });
       }
     }
 
@@ -374,7 +374,7 @@ export const subscribe = async (req, res, next) => {
 
     res.status(existing ? 200 : 201).json({
       success: true,
-      message: existing ? "Abonnement mis à jour" : "Abonnement créé",
+      message: existing ? req.t("admin.plan_builder.subscription_updated") : req.t("admin.plan_builder.subscription_created"),
       data: formatSubscription(fresh),
     });
   } catch (e) {
@@ -399,7 +399,7 @@ export const checkoutUpgrade = async (req, res, next) => {
     if (!isStripe && !isManual) {
       return res.status(422).json({
         success: false,
-        error: "paymentMethod invalide : 'stripe' | 'manual'",
+        error: req.t("order.invalid_payment_method"),
       });
     }
 
@@ -407,7 +407,7 @@ export const checkoutUpgrade = async (req, res, next) => {
     let manualMethod = null;
     if (isManual) {
       if (!paymentMethodId) {
-        return res.status(422).json({ success: false, error: "paymentMethodId requis" });
+        return res.status(422).json({ success: false, error: req.t("order.payment_method_id_required") });
       }
 
       manualMethod = await prisma.manualPaymentMethod.findFirst({
@@ -415,7 +415,7 @@ export const checkoutUpgrade = async (req, res, next) => {
       });
 
       if (!manualMethod) {
-        return res.status(422).json({ success: false, error: "Méthode manuelle invalide" });
+        return res.status(422).json({ success: false, error: req.t("subscription.invalid_manual_method") });
       }
     }
 
@@ -429,7 +429,7 @@ export const checkoutUpgrade = async (req, res, next) => {
     });
 
     if (!subscription) {
-      return res.status(404).json({ success: false, error: "Aucun abonnement" });
+      return res.status(404).json({ success: false, error: req.t("admin.billing.no_subscription") });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -466,7 +466,7 @@ export const checkoutUpgrade = async (req, res, next) => {
           success: true,
           requiresPaymentMethod: true,
           clientSecret: setupIntent.client_secret,
-          message: "Veuillez enregistrer une carte",
+          message: req.t("subscription.requires_card"),
         });
       }
 
@@ -533,7 +533,7 @@ export const checkoutUpgrade = async (req, res, next) => {
       return res.json({
         success: true,
         clientSecret: paymentIntent.client_secret,
-        message: "Veuillez confirmer le paiement",
+        message: req.t("subscription.confirm_payment"),
         data: {
           orderNumber,
           totalAmount: subscription.totalAmount,
@@ -610,7 +610,7 @@ export const checkoutUpgrade = async (req, res, next) => {
 
       return res.json({
         success: true,
-        message: `Commande ${result.order.orderNumber} créée. Facture ${result.invoice.invoiceNumber} en attente de paiement.`,
+        message: req.t("subscription.order_created", { orderNumber: result.order.orderNumber, invoiceNumber: result.invoice.invoiceNumber }),
         data: {
           orderNumber: result.order.orderNumber,
           invoiceNumber: result.invoice.invoiceNumber,
@@ -637,10 +637,10 @@ export const updateAddons = async (req, res, next) => {
       where: { companyId },
       include: { plan: true, addons: { include: { addon: true } } },
     });
-    if (!sub) return res.status(404).json({ success: false, error: "Aucun abonnement" });
+    if (!sub) return res.status(404).json({ success: false, error: req.t("admin.billing.no_subscription") });
 
     if (sub.status === "canceled") {
-      return res.status(409).json({ success: false, error: "Abonnement annulé" });
+      return res.status(409).json({ success: false, error: req.t("admin.plan_builder.subscription_cancelled") });
     }
     const parsedAddonIds = addonIds.map(Number);
     let addons = [];
@@ -649,7 +649,7 @@ export const updateAddons = async (req, res, next) => {
         where: { id: { in: parsedAddonIds }, status: "active" },
       });
       if (addons.length !== parsedAddonIds.length) {
-        return res.status(422).json({ success: false, error: "Addons invalides" });
+        return res.status(422).json({ success: false, error: req.t("admin.plan_builder.addons_invalid") });
       }
     }
     const amounts = computeAmounts({
@@ -706,7 +706,7 @@ export const updateAddons = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Add-ons mis à jour",
+      message: req.t("admin.plan_builder.addons_updated"),
       data: formatSubscription(fresh),
     });
   } catch (e) {
@@ -723,7 +723,7 @@ export const updateInterval = async (req, res, next) => {
     const { interval } = req.body;
 
     if (!["monthly", "yearly"].includes(interval)) {
-      return res.status(422).json({ success: false, error: "interval invalide" });
+      return res.status(422).json({ success: false, error: req.t("subscription.invalid_interval") });
     }
 
     const sub = await prisma.subscription.findUnique({
@@ -733,10 +733,10 @@ export const updateInterval = async (req, res, next) => {
         addons: { include: { addon: true }, where: { status: "active" } },
       },
     });
-    if (!sub) return res.status(404).json({ success: false, error: "Aucun abonnement" });
+    if (!sub) return res.status(404).json({ success: false, error: req.t("admin.billing.no_subscription") });
 
     if (sub.status === "canceled") {
-      return res.status(409).json({ success: false, error: "Abonnement annulé" });
+      return res.status(409).json({ success: false, error: req.t("admin.plan_builder.subscription_cancelled") });
     }
 
     const activeAddons = sub.addons.map((sa) => sa.addon);
@@ -782,7 +782,7 @@ export const updateInterval = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `Facturation ${interval === "yearly" ? "annuelle" : "mensuelle"}`,
+      message: interval === "yearly" ? req.t("admin.plan_builder.billing_yearly") : req.t("admin.plan_builder.billing_monthly"),
       data: formatSubscription(fresh),
     });
   } catch (e) {

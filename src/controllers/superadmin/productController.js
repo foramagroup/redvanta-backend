@@ -611,13 +611,13 @@ export const deleteProduct = async (req, res, next) => {
     });
     if (!existing) return res.status(404).json({
       success: false,
-      message: "Produit introuvable"
+      message: req.t("superadmin.product.not_found")
     });
     
     deleteProductFiles(existing);
     await prisma.product.delete({ where: { id } });
     
-    res.json({ success: true, message: "Produit supprimé" });
+    res.json({ success: true, message: req.t("superadmin.product.deleted") });
   } catch (e) {
     next(e);
   }
@@ -629,7 +629,7 @@ export const toggleProduct = async (req, res, next) => {
     const p = await prisma.product.findUnique({ where: { id } });
     if (!p) return res.status(404).json({
       success: false,
-      message: "Produit introuvable"
+      message: req.t("superadmin.product.not_found")
     });
     
     const updated = await prisma.product.update({

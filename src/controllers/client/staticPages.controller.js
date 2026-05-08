@@ -24,7 +24,7 @@ export const getPageBySlug = async (req, res, next) => {
     if (!language) {
       return res.status(404).json({
         success: false,
-        error: "Langue non trouvée",
+        error: req.t("page.language_not_found"),
       });
     }
 
@@ -46,7 +46,7 @@ export const getPageBySlug = async (req, res, next) => {
     if (!translation) {
       return res.status(404).json({
         success: false,
-        error: "Page introuvable",
+        error: req.t("page.not_found"),
       });
     }
 
@@ -93,7 +93,7 @@ export const listPublicPages = async (req, res, next) => {
     if (!language) {
       return res.status(404).json({
         success: false,
-        error: "Langue non trouvée",
+        error: req.t("page.language_not_found"),
       });
     }
 

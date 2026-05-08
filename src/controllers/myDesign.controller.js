@@ -358,7 +358,7 @@ export const getMyDesign = async (req, res, next) => {
       where:   { id, companyId, userId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     res.json({ success: true, data: await formatDesignWithPayment(design) });
   } catch (e) { next(e); }
@@ -379,7 +379,7 @@ export const duplicateMyDesign = async (req, res, next) => {
     const source = await prisma.design.findFirst({
       where: { id, companyId, userId },
     });
-    if (!source) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!source) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     // Copier tous les champs sauf les métadonnées système
     const {
@@ -403,7 +403,7 @@ export const duplicateMyDesign = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: `Design dupliqué`,
+      message: req.t("admin.design.duplicated"),
       data:    await formatDesignWithPayment(copy),
     });
   } catch (e) { next(e); }
@@ -422,18 +422,18 @@ export const renameMyDesign = async (req, res, next) => {
     const { name }  = req.body;
 
     if (!name?.trim()) {
-      return res.status(422).json({ success: false, error: "Le nom ne peut pas être vide" });
+      return res.status(422).json({ success: false, error: req.t("admin.design.name_required") });
     }
 
     const design = await prisma.design.findFirst({
       where: { id, companyId, userId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     // Un design locked (commande en cours) ne peut pas être renommé
     if (design.status === "locked") {
-      return res.status(409).json({ success: false, error: "Impossible de renommer un design verrouillé" });
+      return res.status(409).json({ success: false, error: req.t("admin.design.rename_locked") });
     }
 
     const updated = await prisma.design.update({
@@ -442,7 +442,7 @@ export const renameMyDesign = async (req, res, next) => {
       include: DESIGN_PAYMENT_INCLUDE,
     });
 
-    res.json({ success: true, message: "Design renommé", data: await formatDesignWithPayment(updated) });
+    res.json({ success: true, message: req.t("admin.design.renamed"), data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
@@ -460,13 +460,13 @@ export const archiveMyDesign = async (req, res, next) => {
       where: { id, companyId, userId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     if (design.status === "locked") {
-      return res.status(409).json({ success: false, error: "Impossible d'archiver un design verrouillé (commande en cours)" });
+      return res.status(409).json({ success: false, error: req.t("superadmin.design.cannot_archive_locked") });
     }
     if (design.status === "archived") {
-      return res.status(409).json({ success: false, error: "Design déjà archivé" });
+      return res.status(409).json({ success: false, error: req.t("superadmin.design.already_archived") });
     }
 
     const updated = await prisma.design.update({
@@ -475,7 +475,7 @@ export const archiveMyDesign = async (req, res, next) => {
       include: DESIGN_PAYMENT_INCLUDE,
     });
 
-    res.json({ success: true, message: "Design archivé", data: await formatDesignWithPayment(updated) });
+    res.json({ success: true, message: req.t("superadmin.design.archived"), data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
@@ -493,10 +493,10 @@ export const restoreMyDesign = async (req, res, next) => {
       where: { id, companyId, userId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     if (design.status !== "archived") {
-      return res.status(409).json({ success: false, error: "Seuls les designs archivés peuvent être restaurés" });
+      return res.status(409).json({ success: false, error: req.t("admin.design.only_archived_restorable") });
     }
 
     const updated = await prisma.design.update({
@@ -505,7 +505,7 @@ export const restoreMyDesign = async (req, res, next) => {
       include: DESIGN_PAYMENT_INCLUDE,
     });
 
-    res.json({ success: true, message: "Design restauré en brouillon", data: await formatDesignWithPayment(updated) });
+    res.json({ success: true, message: req.t("admin.design.restored"), data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
@@ -529,13 +529,13 @@ export const deleteMyDesign = async (req, res, next) => {
     });
 
 
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     // Bloquer si commande en cours
     if (design.status === "locked") {
       return res.status(409).json({
         success: false,
-        error:   "Impossible de supprimer un design associé à une commande en cours",
+        error:   req.t("superadmin.design.cannot_delete_locked"),
       });
     }
 
@@ -544,12 +544,12 @@ export const deleteMyDesign = async (req, res, next) => {
     if (activeCards.length > 0) {
       return res.status(409).json({
         success: false,
-        error:   `Ce design est utilisé par ${activeCards.length} carte(s) NFC active(s)`,
+        error:   req.t("admin.design.used_by_nfc_cards", { count: activeCards.length }),
       });
     }
 
     await prisma.design.delete({ where: { id } });
 
-    res.json({ success: true, message: "Design supprimé définitivement" });
+    res.json({ success: true, message: req.t("superadmin.design.permanently_deleted") });
   } catch (e) { next(e); }
 };

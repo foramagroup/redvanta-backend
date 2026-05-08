@@ -151,7 +151,7 @@ export const getInvoice = async (req, res, next) => {
       where:   { id },
       include: { items: true, company: true, refunds: true },
     });
-    if (!inv) return res.status(404).json({ success: false, error: "Facture introuvable" });
+    if (!inv) return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
     res.json({ success: true, data: formatInvoice(inv) });
   } catch (e) { next(e); }
 };
@@ -170,7 +170,7 @@ export const createInvoice = async (req, res, next) => {
     } = req.body;
 
     if (!companyId || !userId) {
-      return res.status(422).json({ success: false, error: "companyId et userId requis" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.billing.required_fields") });
     }
 
     const subtotal  = items.reduce((s, i) => s + (i.qty * i.price - (i.discount ?? 0)), 0);
@@ -230,7 +230,7 @@ export const updateInvoice = async (req, res, next) => {
     const { status, dueDate, notes, terms, billingVat, reference } = req.body;
 
     const inv = await prisma.invoice.findUnique({ where: { id } });
-    if (!inv) return res.status(404).json({ success: false, error: "Facture introuvable" });
+    if (!inv) return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
 
     const updated = await prisma.invoice.update({
       where: { id },
@@ -260,9 +260,9 @@ export const refundInvoice = async (req, res, next) => {
       where:   { id },
       include: { order: true },
     });
-    if (!inv) return res.status(404).json({ success: false, error: "Facture introuvable" });
+    if (!inv) return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
     if (inv.status !== "paid") {
-      return res.status(422).json({ success: false, error: "Seules les factures payées peuvent être remboursées" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.billing.only_paid_refundable") });
     }
 
     let stripeRefundId = null;
@@ -289,7 +289,7 @@ export const refundInvoice = async (req, res, next) => {
       ] : []),
     ]);
 
-    res.json({ success: true, message: "Remboursement effectué", stripeRefundId });
+    res.json({ success: true, message: req.t("superadmin.billing.refund_done"), stripeRefundId });
   } catch (e) { next(e); }
 };
 
@@ -309,12 +309,12 @@ export const addManualPayment = async (req, res, next) => {
     } = req.body;
  
     if (!invoiceId || !amount) {
-      return res.status(422).json({ success: false, error: "invoiceId et amount requis" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.billing.id_amount_required") });
     }
  
     const amountPaid = parseFloat(amount);
     if (isNaN(amountPaid) || amountPaid <= 0) {
-      return res.status(422).json({ success: false, error: "Montant invalide" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.billing.invalid_amount") });
     }
  
     const invoice = await prisma.invoice.findUnique({
@@ -337,13 +337,13 @@ export const addManualPayment = async (req, res, next) => {
     });
  
     if (!invoice) {
-      return res.status(404).json({ success: false, error: "Facture introuvable" });
+      return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
     }
     if (invoice.status === "paid") {
-      return res.status(422).json({ success: false, error: "Cette facture est déjà payée" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.billing.already_paid") });
     }
     if (invoice.status === "refunded") {
-      return res.status(422).json({ success: false, error: "Cette facture a été remboursée" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.billing.already_refunded") });
     }
  
     const invoiceTotal  = Number(invoice.total);
@@ -383,7 +383,7 @@ export const addManualPayment = async (req, res, next) => {
         console.log(`[billing] Facture #${invoice.invoiceNumber} payée (sans commande)`);
         return res.json({
           success: true,
-          message: "Paiement enregistré — facture marquée comme payée",
+          message: req.t("superadmin.billing.payment_recorded"),
           data:    formatInvoice(updatedInvoice),
         });
       }
@@ -393,7 +393,7 @@ export const addManualPayment = async (req, res, next) => {
       if (!allowedStatuses.includes(order.status)) {
         return res.status(422).json({
           success: false,
-          error:   `La commande est déjà au statut "${order.status}"`,
+          error:   req.t("superadmin.billing.order_already_status", { status: order.status }),
         });
       }
  
@@ -460,7 +460,7 @@ export const addManualPayment = async (req, res, next) => {
  
       return res.json({
         success: true,
-        message: `Commande #${order.orderNumber} marquée comme payée — NFC en cours de génération`,
+        message: req.t("superadmin.billing.order_paid", { orderNumber: order.orderNumber }),
         data:    formatInvoice(updatedInvoice),
       });
     }
@@ -510,7 +510,7 @@ export const addManualPayment = async (req, res, next) => {
  
     return res.json({
       success:          true,
-      message:          `Paiement partiel enregistré — reste ${remainingBalance.toFixed(2)} ${invoice.currency ?? "EUR"} à recevoir`,
+      message:          req.t("superadmin.billing.partial_payment", { remaining: remainingBalance.toFixed(2), currency: invoice.currency ?? "EUR" }),
       paidAmount:       newTotalPaid,
       remainingBalance,
       isFullPayment:    false,
@@ -575,9 +575,9 @@ export const retryPayment = async (req, res, next) => {
   try {
     const { invoiceId } = req.body;
     const inv = await prisma.invoice.findUnique({ where: { id: parseInt(invoiceId) } });
-    if (!inv) return res.status(404).json({ success: false, error: "Facture introuvable" });
+    if (!inv) return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
     if (!inv.stripePaymentIntentId) {
-      return res.status(422).json({ success: false, error: "Pas de PaymentIntent Stripe associé" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.billing.no_stripe_intent") });
     }
 
     const stripe = await getStripe();

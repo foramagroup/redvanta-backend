@@ -3,17 +3,40 @@
     "login_success": "Connexion réussie",
     "login_failed": "Identifiants invalides",
     "logout_success": "Déconnexion réussie",
-    "token_invalid": "Token invalide ou expiré",
+    "token_invalid": "Jeton invalide ou expiré",
     "unauthorized": "Accès non autorisé",
-    "email_required": "L'email est requis",
+    "email_required": "L'adresse e-mail est requise",
     "password_required": "Le mot de passe est requis",
-    "user_not_found": "Utilisateur non trouvé",
+    "user_not_found": "Utilisateur introuvable",
     "account_disabled": "Votre compte a été désactivé",
     "create_account_success": "Compte créé avec succès. Un code de vérification a été envoyé à votre adresse e-mail.",
-
-"email_exists": "Adresse e-mail déjà utilisée."
+    "email_exists": "Adresse e-mail déjà utilisée.",
+    "login_account": "Connectez-vous, puis ajoutez votre nouvelle entreprise.",
+    "account_exists": "Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.",
+    "signup_success": "Compte créé avec succès. Veuillez vérifier votre adresse e-mail.",
+    "invalid_credentials": "Adresse e-mail ou mot de passe invalide",
+    "account_suspended": "Votre compte a été suspendu. Veuillez contacter l'assistance.",
+    "verification_code_expired": "Votre code de vérification a expiré. Votre compte a été suspendu.",
+    "email_not_verified": "Veuillez vérifier votre adresse e-mail avant de vous connecter.",
+    "no_company": "Aucune entreprise n'est associée à ce compte.",
+    "already_verified": "Votre adresse e-mail est déjà vérifiée. Vous pouvez vous connecter.",
+    "too_many_attempts": "Trop de tentatives infructueuses. Votre compte a été suspendu pour des raisons de sécurité.",
+    "invalid_verification_code": "Code incorrect. Veuillez réessayer.",
+    "verification_success": "Adresse e-mail vérifiée avec succès. Vous êtes maintenant connecté.",
+    "verification_code_sent": "Si un compte existe avec cette adresse e-mail, un nouveau code a été envoyé.",
+    "token_missing": "Jeton manquant.",
+    "token_expired": "Ce lien a expiré. Veuillez demander un nouveau lien de confirmation.",
+    "email_verified_success": "E-mail confirmé. Vous êtes maintenant connecté.",
+    "invalid_code_format": "Code invalide. Le code doit contenir 6 chiffres.",
+    "verification_email_sent": "Si un compte correspondant existe, un e-mail de confirmation vous sera envoyé.",
+    "resend_code_sent": "Un nouveau code de vérification a été envoyé à votre adresse e-mail.",
+    "company_id_required": "L'identifiant de l'entreprise est requis.",
+    "company_name_required": "Le nom de l'entreprise est requis.",
+    "invalid_id": "Identifiant invalide.",
+    "invalid_token": "Lien invalide ou déjà utilisé.",
+    "password_updated": "Mot de passe mis à jour."
   },
-  "validation": {
+  "company": {
     "created": "Entreprise \"{{name}}\" créée avec succès",
     "deleted": "Entreprise supprimée avec succès",
     "not_found": "Entreprise introuvable",
@@ -22,7 +45,22 @@
     "switched_success": "Passage à \"{{name}}\"",
     "cannot_delete_last": "Vous ne pouvez pas supprimer votre seule entreprise",
     "name": "Nom de l'entreprise",
-    "invalid": "Invalide {{field}}"
+    "updated": "Paramètres de l'entreprise mis à jour avec succès",
+    "plan_upgraded": "Plan amélioré avec succès",
+    "limit_reached": "Limite d'entreprise atteinte pour le plan actuel"
+  },
+  "validation": {
+    "required": "{{field}} est requis",
+    "invalid_email": "Format d'adresse e-mail invalide",
+    "min_length": "{{field}} doit contenir au moins {{min}} caractères",
+    "max_length": "{{field}} ne doit pas dépasser {{max}} caractères",
+    "invalid_phone": "Format de numéro de téléphone invalide",
+    "invalid": "{{field}} invalide"
+  },
+  "success": {
+    "operation_completed": "Opération terminée avec succès",
+    "saved": "Enregistré avec succès",
+    "deleted": "Supprimé avec succès"
   },
   "nfc": {
     "card_not_found": "Carte NFC introuvable",
@@ -32,27 +70,100 @@
     "assign_success": "Carte assignée à l'emplacement avec succès",
     "unassign_success": "Carte désassignée avec succès",
     "already_assigned": "La carte est déjà assignée à un emplacement",
-    "invalid_status": "Statut de carte invalide"
+    "invalid_status": "Statut de carte invalide",
+    "card_not_active": "Cette carte n'est pas encore active.",
+    "invalid_stars": "Les étoiles doivent être un entier entre 1 et 5.",
+    "message_required": "Le message est requis.",
+    "redirect_message": "Merci ! Vous allez être redirigé vers {{platform}}.",
+    "feedback_appreciated": "Votre avis compte beaucoup pour nous.",
+    "feedback_submitted": "Merci pour votre retour. Nous allons l'examiner et améliorer notre service.",
+    "thank_you": "Merci pour votre avis !"
   },
   "design": {
     "created": "Design créé avec succès",
     "updated": "Design mis à jour avec succès",
     "deleted": "Design supprimé avec succès",
     "not_found": "Design introuvable",
-    "duplicate_failed": "Échec de la duplication du design"
+    "duplicate_failed": "Échec de la duplication du design",
+    "locked": "Design verrouillé, modification impossible.",
+    "locked_order": "Design verrouillé (commande déjà passée).",
+    "business_name_required": "Le nom du business est requis pour valider.",
+    "step1_saved": "Brouillon étape 1 sauvegardé.",
+    "step2_saved": "Brouillon étape 2 sauvegardé.",
+    "validated": "Design validé !",
+    "version_restored": "Version restaurée.",
+    "version_not_found": "Version introuvable.",
+    "cart_item_required": "cartItemId et productId sont requis."
   },
   "location": {
     "created": "Emplacement créé avec succès",
     "updated": "Emplacement mis à jour avec succès",
     "deleted": "Emplacement supprimé avec succès",
     "not_found": "Emplacement introuvable",
-    "invalid_google_place": "ID Google Place invalide"
+    "invalid_google_place": "ID Google Place invalide",
+    "activated": "Emplacement activé.",
+    "deactivated": "Emplacement désactivé."
   },
-  "company": {
-    "not_found": "Entreprise introuvable",
-    "updated": "Paramètres de l'entreprise mis à jour avec succès",
-    "plan_upgraded": "Plan amélioré avec succès",
-    "limit_reached": "Limite d'entreprise atteinte pour le plan actuel"
+  "cart": {
+    "synced": "Panier synchronisé avec succès.",
+    "item_deleted": "Item supprimé du panier.",
+    "cleared": "Panier vidé.",
+    "item_not_found": "Item introuvable.",
+    "product_required": "productId est requis.",
+    "product_not_found": "Produit introuvable ou inactif.",
+    "tier_required": "Ce produit requiert un packageTierId.",
+    "no_price": "Ce produit n'a pas de prix configuré.",
+    "tier_not_found": "Palier de prix introuvable pour ce produit.",
+    "invalid_format": "Format de panier invalide.",
+    "tier_invalid": "Palier introuvable.",
+    "no_fields": "Aucun champ à modifier.",
+    "locations_required": "locations[] est requis et ne doit pas être vide.",
+    "locations_invalid": "Le tableau locations[] est vide ou invalide."
+  },
+  "google": {
+    "place_id_required": "placeId est requis.",
+    "design_and_place_id_required": "placeId et designId sont requis.",
+    "cache_invalidated": "Cache invalidé pour placeId : {{placeId}}."
+  },
+  "order": {
+    "invalid_payment_method": "Méthode de paiement invalide : 'stripe' | 'manual'",
+    "payment_method_id_required": "paymentMethodId est requis.",
+    "manual_method_not_found": "Méthode de paiement manuelle introuvable ou inactive.",
+    "cart_empty": "Votre panier est vide.",
+    "not_found": "Commande introuvable.",
+    "no_stripe_payment": "Aucun paiement Stripe associé à cette commande.",
+    "no_stripe_charge": "Aucune charge Stripe trouvée.",
+    "designs_locked": "{{count}} design(s) déjà verrouillé(s) par une commande existante.",
+    "order_created": "Commande {{orderNumber}} créée. Votre facture {{invoiceNumber}} est en attente de paiement.",
+    "cart_locations_empty": "Le tableau locations[] est vide ou invalide.",
+    "cart_quantity_mismatch": "La somme des quantités des locations ({{actual}}) doit être égale au total ({{expected}})).",
+    "cart_missing_platform": "Location #{{index}} : plateforme manquante.",
+    "cart_missing_platform_data": "Location #{{index}} : données de plateforme manquantes.",
+    "cart_invalid_quantity": "Location #{{index}} : quantité invalide."
+  },
+  "page": {
+    "not_found": "Page introuvable.",
+    "language_not_found": "Langue non trouvée."
+  },
+  "subscription": {
+    "plan_id_required": "planId est requis.",
+    "invalid_interval": "Intervalle invalide. Utilisez 'monthly' ou 'yearly'.",
+    "invalid_manual_method": "Méthode de paiement manuelle invalide ou inactive.",
+    "plan_not_found": "Plan introuvable ou inactif.",
+    "already_exists": "Un abonnement existe déjà pour cette entreprise.",
+    "requires_card": "Veuillez enregistrer une carte de paiement.",
+    "confirm_payment": "Veuillez confirmer le paiement.",
+    "order_created": "Commande {{orderNumber}} créée. Facture {{invoiceNumber}} en attente de paiement."
+  },
+  "settings": {
+    "fetch_error": "Erreur lors de la récupération des réglages."
+  },
+  "faq": {
+    "language_not_found": "Langue non trouvée.",
+    "not_found": "FAQ introuvable.",
+    "helpful_required": "helpful est requis (booléen).",
+    "feedback_thanks": "Merci pour votre feedback.",
+    "search_too_short": "Recherche trop courte (min 2 caractères)."
   },
   "errors": {
     "server_error": "Erreur interne du serveur",
@@ -61,9 +172,237 @@
     "validation_failed": "Échec de la validation",
     "database_error": "Erreur de base de données"
   },
-  "success": {
-    "operation_completed": "Opération terminée avec succès",
-    "saved": "Enregistré avec succès",
-    "deleted": "Supprimé avec succès"
+  "superadmin": {
+    "auth": {
+      "credentials_required": "Email et mot de passe requis.",
+      "forbidden": "Accès interdit : superadmin uniquement."
+    },
+    "company": {
+      "not_found": "Entreprise introuvable.",
+      "email_taken": "L'email \"{{email}}\" est déjà utilisé par une autre entreprise.",
+      "email_duplicate": "Email déjà utilisé.",
+      "updated": "Entreprise mise à jour.",
+      "status_active": "Entreprise réactivée.",
+      "status_suspended": "Entreprise suspendue.",
+      "status_cancelled": "Entreprise annulée.",
+      "status_trial": "Entreprise en essai.",
+      "deleted": "Entreprise supprimée.",
+      "no_owner": "Aucun admin propriétaire trouvé pour cette entreprise.",
+      "impersonate_success": "Impersonnification active pour \"{{name}}\".",
+      "main_admin_not_found": "Admin principal introuvable.",
+      "welcome_email_sent": "Email de bienvenue renvoyé à {{email}}.",
+      "admin_already_linked": "Cet admin est déjà rattaché à cette entreprise.",
+      "admin_duplicate": "Admin déjà rattaché à cette entreprise.",
+      "link_not_found": "Ce lien admin-company n'existe pas.",
+      "cannot_remove_owner": "Impossible de retirer le propriétaire principal. Transférez d'abord la propriété.",
+      "admin_removed": "Admin retiré de l'entreprise.",
+      "admin_created_linked": "Nouvel admin créé et rattaché à \"{{company}}\". Email envoyé.",
+      "admin_linked": "Admin \"{{email}}\" rattaché à \"{{company}}\".",
+      "created_new_admin": "Entreprise \"{{name}}\" créée. Email de bienvenue envoyé à {{email}}.",
+      "created_existing": "Entreprise \"{{name}}\" créée et rattachée au compte existant {{email}}."
+    },
+    "nfc": {
+      "invalid_format": "Le format doit être svg | png | pdf.",
+      "no_payload": "Carte sans payload.",
+      "generation_failed": "Échec de génération.",
+      "status_required": "status requis.",
+      "card_activated": "Carte activée manuellement.",
+      "card_deleted": "Carte supprimée.",
+      "status_updated": "Carte → {{status}}.",
+      "qr_not_found": "Fichier QR introuvable.",
+      "qr_failed": "Échec de génération du QR Code.",
+      "uid_required": "cardUid requis.",
+      "tag_assigned": "Puce #{{tagId}} assignée à la carte uid={{uid}}.",
+      "ids_required": "IDs requis.",
+      "assign_success": "Assignation réussie.",
+      "no_tag_linked": "Aucun tag lié.",
+      "unassign_success": "Tag désassigné et remis en stock.",
+      "tags_added": "{{count}} tags ajoutés à l'inventaire.",
+      "tag_not_found": "Tag non trouvé.",
+      "exports_regenerated": "Exports régénérés pour carte uid={{uid}}.",
+      "qr_regenerated": "QR Code régénéré pour uid={{uid}}."
+    },
+    "design": {
+      "already_flagged": "Design déjà flaggé.",
+      "cannot_flag_archived": "Impossible de flagguer un design archivé.",
+      "flagged": "Design flaggé pour révision.",
+      "not_flagged": "Flag retiré — design restauré en brouillon.",
+      "cannot_archive_locked": "Impossible d'archiver un design verrouillé (commande en cours).",
+      "already_archived": "Design déjà archivé.",
+      "archived": "Design archivé.",
+      "cannot_delete_locked": "Impossible de supprimer un design lié à une commande en cours.",
+      "permanently_deleted": "Design supprimé définitivement.",
+      "referenced_by_orders": "Ce design est référencé par {{count}} ligne(s) de commande. Archivez-le plutôt.",
+      "used_by_nfc_cards": "Ce design est utilisé par {{count}} carte(s) NFC active(s)."
+    },
+    "billing": {
+      "invoice_not_found": "Facture introuvable.",
+      "required_fields": "companyId et userId requis.",
+      "refund_done": "Remboursement effectué.",
+      "id_amount_required": "invoiceId et amount requis.",
+      "invalid_amount": "Montant invalide.",
+      "already_paid": "Cette facture est déjà payée.",
+      "already_refunded": "Cette facture a été remboursée.",
+      "only_paid_refundable": "Seules les factures payées peuvent être remboursées.",
+      "payment_recorded": "Paiement enregistré — facture marquée comme payée.",
+      "order_paid": "Commande #{{orderNumber}} marquée comme payée — NFC en cours de génération.",
+      "partial_payment": "Paiement partiel enregistré — reste {{remaining}} {{currency}} à recevoir.",
+      "no_stripe_intent": "Pas de PaymentIntent Stripe associé.",
+      "order_already_status": "La commande est déjà au statut \"{{status}}\"."
+    },
+    "subscription": {
+      "not_found": "Subscription introuvable.",
+      "not_subscription_invoice": "Cette facture n'est pas liée à un abonnement.",
+      "billing_not_found": "BillingHistory introuvable.",
+      "order_not_found": "Order introuvable pour cette facture.",
+      "invoice_paid": "Facture {{invoiceNumber}} marquée comme payée. Abonnement activé.",
+      "status_updated": "Subscription {{id}} mise à jour : {{status}}."
+    },
+    "order": {
+      "status_required": "status requis.",
+      "status_updated": "Statut mis à jour : {{status}}."
+    },
+    "faq": {
+      "category_id_required": "categoryId et translations requis.",
+      "invalid_category": "Catégorie invalide.",
+      "invalid_languages": "Une ou plusieurs langues sont invalides.",
+      "created": "FAQ créée.",
+      "updated": "FAQ mise à jour.",
+      "deleted": "FAQ supprimée.",
+      "ids_required": "ids requis (array).",
+      "action_required": "action requise.",
+      "invalid_action": "Action invalide.",
+      "bulk_updated": "{{count}} FAQ(s) modifiée(s).",
+      "orders_required": "orders requis (array).",
+      "order_updated": "Ordre mis à jour."
+    },
+    "faq_category": {
+      "not_found": "Catégorie introuvable.",
+      "fields_required": "slug et au moins une traduction sont requis.",
+      "invalid_slug": "Le slug doit contenir uniquement des lettres minuscules, chiffres et tirets.",
+      "invalid_languages": "Une ou plusieurs langues sont invalides.",
+      "created": "Catégorie créée.",
+      "updated": "Catégorie mise à jour.",
+      "deleted": "Catégorie supprimée.",
+      "orders_required": "orders requis (array).",
+      "order_updated": "Ordre mis à jour.",
+      "cannot_delete_has_faqs": "Impossible de supprimer. {{count}} FAQ(s) utilisent cette catégorie."
+    },
+    "page": {
+      "fields_required": "slug et au moins une traduction sont requis.",
+      "invalid_slug": "Le slug doit contenir uniquement des lettres minuscules, chiffres et tirets.",
+      "invalid_languages": "Une ou plusieurs langues sont invalides.",
+      "created": "Page créée avec succès.",
+      "updated": "Page mise à jour.",
+      "cannot_delete_system": "Impossible de supprimer une page système.",
+      "deleted": "Page supprimée.",
+      "invalid_status": "Status invalide (draft | published).",
+      "published": "Page publiée.",
+      "unpublished": "Page mise en brouillon.",
+      "duplicated": "Page dupliquée."
+    },
+    "product": {
+      "not_found": "Produit introuvable.",
+      "deleted": "Produit supprimé."
+    },
+    "card_type": {
+      "not_found": "Type de carte introuvable.",
+      "id_taken": "L'id \"{{id}}\" existe déjà.",
+      "deleted": "Type de carte supprimé."
+    },
+    "platform": {
+      "updated": "Paramètres de la plateforme mis à jour avec succès."
+    }
+  },
+  "admin": {
+    "auth": {
+      "use_superadmin_portal": "Veuillez utiliser le portail SuperAdmin.",
+      "company_id_required": "companyId est requis."
+    },
+    "billing": {
+      "no_subscription": "Aucun abonnement trouvé.",
+      "addon_already_active": "Add-on déjà activé.",
+      "addon_activated": "Add-on \"{{name}}\" activé avec succès.",
+      "addon_deactivated": "Add-on désactivé avec succès.",
+      "invalid_usage_type": "Type invalide. Valeurs acceptées : api, sms, webhook."
+    },
+    "location": {
+      "name_required": "Le nom de la location est requis.",
+      "no_google_place_id": "Aucun Google Place ID associé à cette location.",
+      "google_data_updated": "Données Google mises à jour.",
+      "card_id_required": "cardId est requis.",
+      "limit_reached": "Limite atteinte : votre plan autorise {{max}} location(s). Passez au plan supérieur."
+    },
+    "design": {
+      "name_required": "Le nom ne peut pas être vide.",
+      "rename_locked": "Impossible de renommer un design verrouillé.",
+      "renamed": "Design renommé.",
+      "duplicated": "Design dupliqué.",
+      "only_archived_restorable": "Seuls les designs archivés peuvent être restaurés.",
+      "used_by_nfc_cards": "Ce design est utilisé par {{count}} carte(s) NFC active(s).",
+      "restored": "Design restauré en brouillon."
+    },
+    "team": {
+      "email_required": "L'email est requis.",
+      "name_required": "Le nom est requis.",
+      "already_member": "Cet utilisateur est déjà membre de la company.",
+      "invite_sent_new": "Invitation envoyée à {{email}}. Un lien de création de compte a été généré.",
+      "invite_sent_existing": "{{email}} ajouté à la company.",
+      "member_not_found": "Membre introuvable.",
+      "cannot_change_owner_role": "Impossible de modifier le rôle du propriétaire.",
+      "role_not_found": "Rôle \"{{role}}\" introuvable.",
+      "role_updated": "Rôle mis à jour : {{role}}.",
+      "cannot_disable_owner": "Impossible de désactiver le propriétaire.",
+      "member_activated": "Membre activé.",
+      "member_deactivated": "Membre désactivé.",
+      "cannot_remove_owner": "Impossible de retirer le propriétaire.",
+      "member_removed": "Membre retiré de la company."
+    },
+    "review_request": {
+      "customer_name_required": "Le nom du client est requis.",
+      "email_required": "L'email est requis pour la méthode email.",
+      "phone_required": "Le téléphone est requis pour la méthode SMS.",
+      "contacts_required": "Le tableau contacts[] est requis.",
+      "max_contacts": "Maximum 500 contacts par import.",
+      "not_found": "Demande introuvable.",
+      "already_completed": "Cette demande est déjà complétée.",
+      "already_cancelled": "Cette demande est déjà annulée.",
+      "deleted": "Demande supprimée.",
+      "bulk_result": "{{created}} demande(s) créée(s), {{failed}} ignorée(s)."
+    },
+    "nfc": {
+      "not_assigned": "Cette carte n'est assignée à aucune location.",
+      "card_disabled": "Carte désactivée avec succès."
+    },
+    "review": {
+      "not_found": "Feedback introuvable.",
+      "invalid_status": "Statut invalide.",
+      "status_updated": "Statut mis à jour : {{status}}.",
+      "notes_required": "notes est requis.",
+      "notes_saved": "Notes sauvegardées.",
+      "reply_required": "reply est requis.",
+      "reply_sent": "Réponse envoyée.",
+      "reply_sent_email": "Réponse envoyée et client notifié par email.",
+      "ids_required": "ids[] est requis (tableau non vide).",
+      "bulk_updated": "{{count}} feedback(s) mis à jour → {{status}}."
+    },
+    "filtering": {
+      "invalid_threshold": "threshold doit être un entier entre 1 et 5.",
+      "invalid_platform": "redirectPlatform invalide.",
+      "custom_url_required": "customUrl est requis quand redirectPlatform = custom.",
+      "assigned_user_not_member": "L'utilisateur assigné n'est pas membre de cette company.",
+      "invalid_rating": "rating doit être un entier entre 1 et 5.",
+      "test_public_message": "Rating {{rating}} ≥ {{threshold}} → redirection vers {{platform}}",
+      "test_private_message": "Rating {{rating}} < {{threshold}} → formulaire privé"
+    },
+    "plan_builder": {
+      "subscription_updated": "Abonnement mis à jour.",
+      "subscription_created": "Abonnement créé.",
+      "addons_invalid": "Add-ons invalides.",
+      "subscription_cancelled": "Abonnement annulé.",
+      "addons_updated": "Add-ons mis à jour.",
+      "billing_yearly": "Facturation annuelle.",
+      "billing_monthly": "Facturation mensuelle."
+    }
   }
 }

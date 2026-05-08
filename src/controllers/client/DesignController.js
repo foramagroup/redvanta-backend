@@ -247,7 +247,7 @@ export const getDesignById = async (req, res, next) => {
       where: { id: parseInt(req.params.id), userId, companyId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
     res.json({ success: true, data: await formatDesignWithPayment(design) });
   } catch (e) { next(e); }
 };
@@ -268,7 +268,7 @@ export const getDesignByCartItem = async (req, res, next) => {
         },
       },
     });
-    if (!cartItem) return res.status(404).json({ success: false, error: "Item introuvable" });
+    if (!cartItem) return res.status(404).json({ success: false, error: req.t("cart.item_not_found") });
     const locationDesign = locationId
       ? cartItem.locations?.find((location) => location.id === locationId && location.design)?.design || null
       : cartItem.locations?.find((location) => location.design)?.design || null;
@@ -285,7 +285,7 @@ export const createDesign = async (req, res, next) => {
     const { cartItemId, productId, locationId } = req.body;
 
     if (!cartItemId || !productId) {
-      return res.status(422).json({ success: false, error: "cartItemId et productId requis" });
+      return res.status(422).json({ success: false, error: req.t("design.cart_item_required") });
     }
 
     const cartItem = await prisma.cartItem.findFirst({
@@ -298,7 +298,7 @@ export const createDesign = async (req, res, next) => {
         },
       },
     });
-    if (!cartItem) return res.status(404).json({ success: false, error: "Item panier introuvable" });
+    if (!cartItem) return res.status(404).json({ success: false, error: req.t("cart.item_not_found") });
 
     if (cartItem.designId) {
       const existing = await prisma.design.findUnique({
@@ -375,8 +375,8 @@ export const saveStep1 = async (req, res, next) => {
       where: { id, userId, companyId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
-    if (design.status === "locked") return res.status(409).json({ success: false, error: "Design verrouillé" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
+    if (design.status === "locked") return res.status(409).json({ success: false, error: req.t("design.locked") });
 
     const isLinkInput = LINK_INPUT_PLATFORMS.has(design.platform ?? "google");
 
@@ -425,7 +425,7 @@ export const saveStep1 = async (req, res, next) => {
 
     const result = await regenerateCardExportsForDesign(design.id);
 
-    res.json({ success: true, message: "Brouillon étape 1 sauvegardé", data: await formatDesignWithPayment(updated) });
+    res.json({ success: true, message: req.t("design.step1_saved"), data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
@@ -441,8 +441,8 @@ export const saveStep2 = async (req, res, next) => {
       where: { id, userId, companyId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
-    if (design.status === "locked") return res.status(409).json({ success: false, error: "Design verrouillé" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
+    if (design.status === "locked") return res.status(409).json({ success: false, error: req.t("design.locked") });
 
     // Upload logo base64 → WebP
     let logoUrl = body.logoUrl;
@@ -535,7 +535,7 @@ export const saveStep2 = async (req, res, next) => {
 
     const result = await regenerateCardExportsForDesign(design.id);
 
-    res.json({ success: true, message: "Brouillon étape 2 sauvegardé", data: await formatDesignWithPayment(updated) });
+    res.json({ success: true, message: req.t("design.step2_saved"), data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
@@ -550,12 +550,12 @@ export const validateDesign = async (req, res, next) => {
       where: { id, userId, companyId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
     if (!design.businessName) {
-      return res.status(422).json({ success: false, error: "Le nom du business est requis pour valider" });
+      return res.status(422).json({ success: false, error: req.t("design.business_name_required") });
     }
     if (design.status === "locked") {
-      return res.status(409).json({ success: false, error: "Design verrouillé (commande déjà passée)" });
+      return res.status(409).json({ success: false, error: req.t("design.locked_order") });
     }
 
     const updated = await prisma.design.update({
@@ -566,7 +566,7 @@ export const validateDesign = async (req, res, next) => {
 
      const result = await regenerateCardExportsForDesign(id);
 
-    res.json({ success: true, message: "Design validé !", data: await formatDesignWithPayment(updated) });
+    res.json({ success: true, message: req.t("design.validated"), data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 
@@ -581,7 +581,7 @@ export const getVersions = async (req, res, next) => {
       where: { id, userId, companyId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     const versions = await prisma.designVersion.findMany({
       where:   { designId: id },
@@ -604,12 +604,12 @@ export const restoreVersion = async (req, res, next) => {
       where: { id, userId, companyId },
       include: DESIGN_PAYMENT_INCLUDE,
     });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     const version = await prisma.designVersion.findFirst({
       where: { id: versionId, designId: id },
     });
-    if (!version) return res.status(404).json({ success: false, error: "Version introuvable" });
+    if (!version) return res.status(404).json({ success: false, error: req.t("design.version_not_found") });
 
     // Restaurer le snapshot complet
     const updated = await prisma.design.update({
@@ -618,7 +618,7 @@ export const restoreVersion = async (req, res, next) => {
       include: DESIGN_PAYMENT_INCLUDE,
     });
 
-    res.json({ success: true, message: "Version restaurée", data: await formatDesignWithPayment(updated) });
+    res.json({ success: true, message: req.t("design.version_restored"), data: await formatDesignWithPayment(updated) });
   } catch (e) { next(e); }
 };
 

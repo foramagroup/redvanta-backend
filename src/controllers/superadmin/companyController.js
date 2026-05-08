@@ -132,7 +132,7 @@ export const getCompany = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     const c  = await prisma.company.findUnique({ where: { id }, include: COMPANY_INCLUDE });
-    if (!c) return res.status(404).json({ success: false, message: "Entreprise introuvable" });
+    if (!c) return res.status(404).json({ success: false, message: req.t("superadmin.company.not_found") });
     res.json({ success: true, data: formatCompany(c) });
   } catch (e) { next(e); }
 };
@@ -147,8 +147,8 @@ export const createCompany = async (req, res, next) => {
     const adminEmail = body.adminEmail || body.email;
 
     // 1. Vérifier unicité email company
-    const emailExists = await prisma.company.findUnique({ where: { email: body.email } });
-    if (emailExists) return res.status(409).json({ success: false, message: `L'email "${body.email}" est déjà utilisé par une autre entreprise` });
+    const emailExists = await prisma.company.findFirst({ where: { email: body.email } });
+    if (emailExists) return res.status(409).json({ success: false, message: req.t("superadmin.company.email_taken", { email: body.email }) });
 
     // 2. Chercher si l'admin existe déjà
     const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
@@ -312,12 +312,12 @@ export const createCompany = async (req, res, next) => {
     const fullCompany = await prisma.company.findUnique({ where: { id: result.company.id }, include: COMPANY_INCLUDE });
 
     const msg = result.isNewUser
-      ? `Entreprise "${result.company.name}" créée. Email de bienvenue envoyé à ${adminEmail}.`
-      : `Entreprise "${result.company.name}" créée et rattachée au compte existant ${adminEmail}.`;
+      ? req.t("superadmin.company.created_new_admin", { name: result.company.name, email: adminEmail })
+      : req.t("superadmin.company.created_existing", { name: result.company.name, email: adminEmail });
 
     res.status(201).json({ success: true, message: msg, data: formatCompany(fullCompany) });
   } catch (e) {
-    if (e.code === "P2002") return res.status(409).json({ success: false, message: "Email déjà utilisé" });
+    if (e.code === "P2002") return res.status(409).json({ success: false, message: req.t("superadmin.company.email_duplicate") });
     next(e);
   }
 };
@@ -327,12 +327,12 @@ export const updateCompany = async (req, res, next) => {
   try {
     const id      = parseInt(req.params.id);
     const body    = req.validatedBody;
-    const existing = await prisma.company.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ success: false, message: "Entreprise introuvable" });
+    const existing = await prisma.company.findFirst({ where: { id } });
+    if (!existing) return res.status(404).json({ success: false, message: req.t("superadmin.company.not_found") });
 
     if (body.email && body.email !== existing.email) {
       const emailExists = await prisma.company.findUnique({ where: { email: body.email } });
-      if (emailExists) return res.status(409).json({ success: false, message: `L'email "${body.email}" est déjà utilisé` });
+      if (emailExists) return res.status(409).json({ success: false, message: req.t("superadmin.company.email_taken", { email: body.email }) });
     }
 
     let logoUrl = undefined;
@@ -385,9 +385,9 @@ export const updateCompany = async (req, res, next) => {
       include: COMPANY_INCLUDE,
     });
 
-    res.json({ success: true, message: "Entreprise mise à jour", data: formatCompany(updated) });
+    res.json({ success: true, message: req.t("superadmin.company.updated"), data: formatCompany(updated) });
   } catch (e) {
-    if (e.code === "P2002") return res.status(409).json({ success: false, message: "Email déjà utilisé" });
+    if (e.code === "P2002") return res.status(409).json({ success: false, message: req.t("superadmin.company.email_duplicate") });
     next(e);
   }
 };
@@ -398,10 +398,10 @@ export const changeStatus = async (req, res, next) => {
     const id     = parseInt(req.params.id);
     const { status } = req.validatedBody;
     const existing = await prisma.company.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ success: false, message: "Entreprise introuvable" });
+    if (!existing) return res.status(404).json({ success: false, message: req.t("superadmin.company.not_found") });
     const updated = await prisma.company.update({ where: { id }, data: { status }, include: COMPANY_INCLUDE });
-    const labels  = { active: "réactivée", suspended: "suspendue", cancelled: "annulée", trial: "en essai" };
-    res.json({ success: true, message: `Entreprise ${labels[status] || status}`, data: formatCompany(updated) });
+    const statusKey = { active: "status_active", suspended: "status_suspended", cancelled: "status_cancelled", trial: "status_trial" }[status] || "updated";
+    res.json({ success: true, message: req.t(`superadmin.company.${statusKey}`), data: formatCompany(updated) });
   } catch (e) { next(e); }
 };
 
@@ -410,11 +410,11 @@ export const deleteCompany = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     const existing = await prisma.company.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ success: false, message: "Entreprise introuvable" });
+    if (!existing) return res.status(404).json({ success: false, message: req.t("superadmin.company.not_found") });
     deleteLogo(existing.logo);
     // La cascade DB supprime user_companies, company_settings, etc.
     await prisma.company.delete({ where: { id } });
-    res.json({ success: true, message: "Entreprise supprimée" });
+    res.json({ success: true, message: req.t("superadmin.company.deleted") });
   } catch (e) { next(e); }
 };
 
@@ -428,7 +428,7 @@ export const impersonateCompany = async (req, res, next) => {
       include: { user: true, company: true },
     });
 
-    if (!ownerLink) return res.status(422).json({ success: false, message: "Aucun admin propriétaire trouvé pour cette entreprise" });
+    if (!ownerLink) return res.status(422).json({ success: false, message: req.t("superadmin.company.no_owner") });
 
     const jwt   = await import("jsonwebtoken");
     const token = jwt.default.sign(
@@ -439,7 +439,7 @@ export const impersonateCompany = async (req, res, next) => {
 
     res.json({
       success:     true,
-      message:     `Impersonnification active pour "${ownerLink.company.name}"`,
+      message:     req.t("superadmin.company.impersonate_success", { name: ownerLink.company.name }),
       token,
       redirectUrl: `${process.env.FRONTEND_URL}/dashboard?impersonate=1`,
       company:     { id: ownerLink.company.id, name: ownerLink.company.name },
@@ -453,14 +453,14 @@ export const resendWelcomeEmail = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
     const company = await prisma.company.findUnique({ where: { id } });
-    if (!company) return res.status(404).json({ success: false, message: "Entreprise introuvable" });
+    if (!company) return res.status(404).json({ success: false, message: req.t("superadmin.company.not_found") });
 
     // Chercher l'admin principal via UserCompany
     const ownerLink = await prisma.userCompany.findFirst({
       where:   { companyId: id, isOwner: true },
       include: { user: true },
     });
-    if (!ownerLink) return res.status(404).json({ success: false, message: "Admin principal introuvable" });
+    if (!ownerLink) return res.status(404).json({ success: false, message: req.t("superadmin.company.main_admin_not_found") });
 
     const adminUser     = ownerLink.user;
     const plainPassword = generatePassword();
@@ -502,7 +502,7 @@ export const resendWelcomeEmail = async (req, res, next) => {
     );
 
     await sendMail({ to: adminUser.email, ...emailPayload });
-    res.json({ success: true, message: `Email de bienvenue renvoyé à ${adminUser.email}` });
+    res.json({ success: true, message: req.t("superadmin.company.welcome_email_sent", { email: adminUser.email }) });
   } catch (e) { next(e); }
 };
 
@@ -515,7 +515,7 @@ export const addMember = async (req, res, next) => {
     const { adminEmail, adminName, isOwner = false } = req.body;
 
     const company = await prisma.company.findUnique({ where: { id: companyId } });
-    if (!company) return res.status(404).json({ success: false, message: "Entreprise introuvable" });
+    if (!company) return res.status(404).json({ success: false, message: req.t("superadmin.company.not_found") });
 
     const adminRole = await findAdminRole();
     let adminUser   = await prisma.user.findUnique({ where: { email: adminEmail } });
@@ -546,7 +546,7 @@ export const addMember = async (req, res, next) => {
     const alreadyLinked = await prisma.userCompany.findUnique({
       where: { userId_companyId: { userId: adminUser.id, companyId } },
     });
-    if (alreadyLinked) return res.status(409).json({ success: false, message: "Cet admin est déjà rattaché à cette entreprise" });
+    if (alreadyLinked) return res.status(409).json({ success: false, message: req.t("superadmin.company.admin_already_linked") });
 
     await prisma.userCompany.create({
       data: { userId: adminUser.id, companyId, roleId: adminRole?.id ?? null, isOwner },
@@ -564,12 +564,12 @@ export const addMember = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: isNewUser
-        ? `Nouvel admin créé et rattaché à "${company.name}". Email envoyé.`
-        : `Admin "${adminEmail}" rattaché à "${company.name}".`,
+        ? req.t("superadmin.company.admin_created_linked", { company: company.name })
+        : req.t("superadmin.company.admin_linked", { email: adminEmail, company: company.name }),
       data: { userId: adminUser.id, email: adminUser.email, companyId, isOwner },
     });
   } catch (e) {
-    if (e.code === "P2002") return res.status(409).json({ success: false, message: "Admin déjà rattaché à cette entreprise" });
+    if (e.code === "P2002") return res.status(409).json({ success: false, message: req.t("superadmin.company.admin_duplicate") });
     next(e);
   }
 };
@@ -585,8 +585,8 @@ export const removeMember = async (req, res, next) => {
     const link = await prisma.userCompany.findUnique({
       where: { userId_companyId: { userId, companyId } },
     });
-    if (!link) return res.status(404).json({ success: false, message: "Ce lien admin-company n'existe pas" });
-    if (link.isOwner) return res.status(409).json({ success: false, message: "Impossible de retirer le propriétaire principal. Transférez d'abord la propriété." });
+    if (!link) return res.status(404).json({ success: false, message: req.t("superadmin.company.link_not_found") });
+    if (link.isOwner) return res.status(409).json({ success: false, message: req.t("superadmin.company.cannot_remove_owner") });
 
     await prisma.userCompany.delete({ where: { userId_companyId: { userId, companyId } } });
 
@@ -596,7 +596,7 @@ export const removeMember = async (req, res, next) => {
       await prisma.user.update({ where: { id: userId }, data: { isAdmin: false } });
     }
 
-    res.json({ success: true, message: "Admin retiré de l'entreprise" });
+    res.json({ success: true, message: req.t("superadmin.company.admin_removed") });
   } catch (e) { next(e); }
 };
 
@@ -616,7 +616,7 @@ export const getCompaniesByUser = async (req, res, next) => {
         },
       },
     });
-    if (!user) return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
+    if (!user) return res.status(404).json({ success: false, message: req.t("auth.user_not_found") });
 
     res.json({
       success: true,

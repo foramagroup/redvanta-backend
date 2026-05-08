@@ -134,14 +134,14 @@ export const handleScan = async (req, res, next) => {
     });
 
     if (!card) {
-      return res.status(404).json({ success: false, error: "Carte introuvable", uid });
+      return res.status(404).json({ success: false, error: req.t("nfc.card_not_found"), uid });
     }
 
     if (!card.active) {
-      return res.status(403).json({ 
-        success: false, 
-        error: "Cette carte n'est pas encore active.", 
-        status: card.status 
+      return res.status(403).json({
+        success: false,
+        error: req.t("nfc.card_not_active"),
+        status: card.status
       });
     }
 
@@ -247,8 +247,8 @@ export const getReviewPage = async (req, res, next) => {
       },
     });
 
-    if (!card)        return res.status(404).json({ success: false, error: "Carte introuvable" });
-    if (!card.active) return res.status(403).json({ success: false, error: "Carte inactive" });
+    if (!card)        return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
+    if (!card.active) return res.status(403).json({ success: false, error: req.t("nfc.card_not_active") });
 
     const company = await prisma.company.findUnique({
       where:  { id: card.companyId },
@@ -279,7 +279,7 @@ export const submitRating = async (req, res, next) => {
 
     const starsNum = parseInt(stars);
     if (!starsNum || starsNum < 1 || starsNum > 5) {
-      return res.status(422).json({ success: false, error: "stars doit être un entier entre 1 et 5" });
+      return res.status(422).json({ success: false, error: req.t("nfc.invalid_stars") });
     }
 
     const card = await prisma.nFCCard.findUnique({
@@ -291,7 +291,7 @@ export const submitRating = async (req, res, next) => {
     });
 
     if (!card || !card.active) {
-      return res.status(404).json({ success: false, error: "Carte introuvable ou inactive" });
+      return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
     }
 
     const platform     = card.design?.platform    ?? "google";
@@ -311,7 +311,7 @@ export const submitRating = async (req, res, next) => {
     if (shouldRedirect) {
       if (!redirectUrl) {
         console.warn(`[nfc] No redirectUrl for uid=${uid} platform=${platform}`);
-        return res.json({ success: true, action: "INTERNAL_FEEDBACK", message: "Merci pour votre avis !", stars: starsNum, uid });
+        return res.json({ success: true, action: "INTERNAL_FEEDBACK", message: req.t("nfc.thank_you"), stars: starsNum, uid });
       }
 
       try {
@@ -353,7 +353,7 @@ export const submitRating = async (req, res, next) => {
           googleReviewUrl: redirectUrl,
           googlePlaceId:   card.design?.googlePlaceId || card.company?.googlePlaceId || null,
         }),
-        message: `Merci ! Vous allez être redirigé vers ${platformLabel(platform)}.`,
+        message: req.t("nfc.redirect_message", { platform: platformLabel(platform) }),
         stars:   starsNum,
       });
 
@@ -364,7 +364,7 @@ export const submitRating = async (req, res, next) => {
         action:           "INTERNAL_FEEDBACK",
         platform,
         platformBehavior: behavior,
-        message:          "Votre avis compte beaucoup pour nous.",
+        message:          req.t("nfc.feedback_appreciated"),
         stars:            starsNum,
         uid,
       });
@@ -384,15 +384,15 @@ export const submitFeedback = async (req, res, next) => {
 
     const starsNum = parseInt(stars);
     if (!starsNum || starsNum < 1 || starsNum > 5) {
-      return res.status(422).json({ success: false, error: "stars doit être entre 1 et 5" });
+      return res.status(422).json({ success: false, error: req.t("nfc.invalid_stars") });
     }
     if (!message?.trim()) {
-      return res.status(422).json({ success: false, error: "message requis" });
+      return res.status(422).json({ success: false, error: req.t("nfc.message_required") });
     }
 
     const card = await prisma.nFCCard.findUnique({ where: { uid } });
     if (!card || !card.active) {
-      return res.status(404).json({ success: false, error: "Carte introuvable" });
+      return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
     }
 
     const lastScan = await prisma.nfcScan.findFirst({
@@ -430,7 +430,7 @@ export const submitFeedback = async (req, res, next) => {
     logEvent(uid, card.companyId, "FEEDBACK_SUBMITTED", { stars: starsNum }).catch(console.error);
     sendFeedbackNotification(feedback, card).catch((e) => console.error("[nfc] feedback email:", e.message));
 
-    res.json({ success: true, message: "Merci pour votre retour. Nous allons l'examiner et améliorer notre service." });
+    res.json({ success: true, message: req.t("nfc.feedback_submitted") });
   } catch (e) { next(e); }
 };
 

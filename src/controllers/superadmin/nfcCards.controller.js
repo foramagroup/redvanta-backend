@@ -176,7 +176,7 @@ export const getSuperCard = async (req, res, next) => {
   try {
     const { uid } = req.params;
     const card    = await prisma.nFCCard.findUnique({ where: { uid }, include: CARD_INCLUDE });
-    if (!card) return res.status(404).json({ success: false, error: "Carte introuvable" });
+    if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
     res.json({ success: true, data: formatCardFull(card) });
   } catch (e) { next(e); }
 };
@@ -192,12 +192,12 @@ export const downloadSuperCardExport = async (req, res, next) => {
     const format  = (req.query.format ?? "pdf").toLowerCase();
 
     if (!["svg", "png", "pdf"].includes(format)) {
-      return res.status(422).json({ success: false, error: "format doit être svg | png | pdf" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.nfc.invalid_format") });
     }
 
     const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true } });
-    if (!card)         return res.status(404).json({ success: false, error: "Carte introuvable" });
-    if (!card.payload) return res.status(422).json({ success: false, error: "Carte sans payload" });
+    if (!card)         return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
+    if (!card.payload) return res.status(422).json({ success: false, error: req.t("superadmin.nfc.no_payload") });
 
     // process.cwd() = racine du backend (compatible Windows/XAMPP)
     const EXPORT_DIR = path.join(process.cwd(), "public", "uploads", "cards");
@@ -211,7 +211,7 @@ export const downloadSuperCardExport = async (req, res, next) => {
         console.error("[export] ❌ generateCardExport a échoué :", genErr);
         return res.status(500).json({
           success: false,
-          error:   "Échec de génération",
+          error:   req.t("superadmin.nfc.generation_failed"),
           detail:  genErr.message,
         });
       }
@@ -219,7 +219,7 @@ export const downloadSuperCardExport = async (req, res, next) => {
     console.log(`[export] Vérification fichier : ${filePath}`);
 
     if (!fs.existsSync(filePath)) {
-      return res.status(500).json({ success: false, error: "Échec de génération" });
+      return res.status(500).json({ success: false, error: req.t("superadmin.nfc.generation_failed") });
     }
 
     const mimeTypes   = { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf" };
@@ -251,10 +251,10 @@ export const updateCardStatus = async (req, res, next) => {
     const { uid }    = req.params;
     const { status } = req.body;
 
-    if (!status) return res.status(422).json({ success: false, error: "status requis" });
+    if (!status) return res.status(422).json({ success: false, error: req.t("superadmin.nfc.status_required") });
 
     const card = await prisma.nFCCard.findUnique({ where: { uid } });
-    if (!card) return res.status(404).json({ success: false, error: "Carte introuvable" });
+    if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
 
     // Normaliser le statut reçu (minuscules → majuscules DB)
     // ex: "delivered" → "ACTIVE", "printed" → "PRINTED"
@@ -307,7 +307,7 @@ export const updateCardStatus = async (req, res, next) => {
     }
     res.json({ 
       success: true, 
-      message: `Carte → ${normalizedStatus}`, 
+      message: req.t("superadmin.nfc.status_updated", { status: normalizedStatus }),
       data: formatCardFull(updated) 
     });
   } catch (e) { next(e); }
@@ -323,14 +323,14 @@ export const activateCard = async (req, res, next) => {
   try {
     const { uid } = req.params;
     const card    = await prisma.nFCCard.findUnique({ where: { uid } });
-    if (!card) return res.status(404).json({ success: false, error: "Carte introuvable" });
+    if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
 
     await prisma.nFCCard.update({
       where: { uid },
       data:  { status: "ACTIVE", active: true, activatedAt: new Date() },
     });
 
-    res.json({ success: true, message: "Carte activée manuellement" });
+    res.json({ success: true, message: req.t("superadmin.nfc.card_activated") });
   } catch (e) { next(e); }
 };
 
@@ -348,7 +348,7 @@ export const regenerateSuperCardExport = async (req, res, next) => {
 
     res.json({ 
       success: true, 
-      message: `Exports régénérés pour carte uid=${uid}`,
+      message: req.t("superadmin.nfc.exports_regenerated", { uid }),
       data: exports  // { svgUrl, pngUrl, pdfUrl }
     });
 
@@ -373,13 +373,13 @@ export const deleteSuperCard = async (req, res, next) => {
   try {
     const { uid } = req.params;
     const card    = await prisma.nFCCard.findUnique({ where: { uid } });
-    if (!card) return res.status(404).json({ success: false, error: "Carte introuvable" });
+    if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
 
     // Supprimer les fichiers d'export en premier
     await deleteCardExportFiles(uid);
 
     await prisma.nFCCard.delete({ where: { uid } });
-    res.json({ success: true, message: "Carte supprimée" });
+    res.json({ success: true, message: req.t("superadmin.nfc.card_deleted") });
   } catch (e) { next(e); }
 };
 
@@ -396,11 +396,11 @@ export const downloadQrOnly = async (req, res, next) => {
     const format  = (req.query.format ?? "svg").toLowerCase();
 
     if (!["svg", "png", "pdf"].includes(format)) {
-      return res.status(422).json({ success: false, error: "format doit être svg | png | pdf" });
+      return res.status(422).json({ success: false, error: req.t("superadmin.nfc.invalid_format") });
     }
 
     const card = await prisma.nFCCard.findUnique({ where: { uid } });
-    if (!card) return res.status(404).json({ success: false, error: "Carte introuvable" });
+    if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
 
     // Les QR Codes seuls sont dans /uploads/qrcodes/ (générés par qrcode.service.js)
     // Les fiches d'impression (recto+verso) sont dans /uploads/cards/
@@ -410,7 +410,7 @@ export const downloadQrOnly = async (req, res, next) => {
     // Si le fichier QR n'existe pas, essayer de le regénérer depuis qrcode.service.js
     if (!fs.existsSync(filePath)) {
       if (!card.payload) {
-        return res.status(422).json({ success: false, error: "Carte sans payload — impossible de générer le QR" });
+        return res.status(422).json({ success: false, error: req.t("superadmin.nfc.no_payload") });
       }
       try {
         const { generateAllQrCodes } = await import("../services/qrcode.service.js");
@@ -424,12 +424,12 @@ export const downloadQrOnly = async (req, res, next) => {
           res.setHeader("Content-Disposition", `attachment; filename="qr-${uid.slice(0, 8)}.${format}"`);
           return fs.createReadStream(cardFilePath).pipe(res);
         }
-        return res.status(500).json({ success: false, error: "Fichier QR introuvable" });
+        return res.status(500).json({ success: false, error: req.t("superadmin.nfc.qr_not_found") });
       }
     }
 
     if (!fs.existsSync(filePath)) {
-      return res.status(500).json({ success: false, error: "Échec de génération du QR Code" });
+      return res.status(500).json({ success: false, error: req.t("superadmin.nfc.qr_failed") });
     }
 
     const mimeTypes = { svg: "image/svg+xml", png: "image/png", pdf: "application/pdf" };
@@ -451,14 +451,14 @@ export const regenerateQrOnly = async (req, res, next) => {
   try {
     const { uid } = req.params;
     const card    = await prisma.nFCCard.findUnique({ where: { uid } });
-    if (!card)         return res.status(404).json({ success: false, error: "Carte introuvable" });
-    if (!card.payload) return res.status(422).json({ success: false, error: "Carte sans payload" });
+    if (!card)         return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
+    if (!card.payload) return res.status(422).json({ success: false, error: req.t("superadmin.nfc.no_payload") });
 
     const { generateAllQrCodes } = await import("../services/qrcode.service.js");
     const { svgUrl } = await generateAllQrCodes(uid, card.payload);
 
     if (!svgUrl) {
-      return res.status(500).json({ success: false, error: "Échec de génération du QR Code" });
+      return res.status(500).json({ success: false, error: req.t("superadmin.nfc.qr_failed") });
     }
 
     // Mettre à jour l'URL en DB si elle a changé
@@ -468,7 +468,7 @@ export const regenerateQrOnly = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: `QR Code regénéré pour uid=${uid}`,
+      message: req.t("superadmin.nfc.qr_regenerated", { uid }),
       qrCodeUrl: svgUrl,
     });
   } catch (e) { next(e); }
@@ -488,10 +488,10 @@ export const assignTag = async (req, res, next) => {
     const tagId   = parseInt(req.params.id);
     const { cardUid } = req.body;
 
-    if (!cardUid) return res.status(422).json({ success: false, error: "cardUid requis" });
+    if (!cardUid) return res.status(422).json({ success: false, error: req.t("superadmin.nfc.uid_required") });
 
     await assignTagToCard(cardUid, tagId);
-    res.json({ success: true, message: `Puce #${tagId} assignée à la carte uid=${cardUid}` });
+    res.json({ success: true, message: req.t("superadmin.nfc.tag_assigned", { tagId, uid: cardUid }) });
   } catch (e) {
     if (e.message?.includes("déjà")) return res.status(409).json({ success: false, error: e.message });
     if (e.message?.includes("introuvable")) return res.status(404).json({ success: false, error: e.message });

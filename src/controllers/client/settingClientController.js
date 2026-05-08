@@ -12,6 +12,6 @@ export const getGlobalSettings = async (req, res) => {
 
     res.json({ languages, currencies });
   } catch (error) {
-    res.status(500).json({ error: "Erreur lors de la récupération des réglages" });
+    res.status(500).json({ error: req.t("settings.fetch_error") });
   }
 };

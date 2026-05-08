@@ -97,16 +97,16 @@ export const createOrder = async (req, res, next) => {
     const isManual = paymentMethod === "manual";
  
     if (!isStripe && !isManual) {
-      return res.status(422).json({ success: false, error: "paymentMethod invalide : 'stripe' | 'manual'" });
+      return res.status(422).json({ success: false, error: req.t("order.invalid_payment_method") });
     }
  
     let manualMethod = null;
     if (isManual) {
-      if (!paymentMethodId) return res.status(422).json({ success: false, error: "paymentMethodId requis" });
+      if (!paymentMethodId) return res.status(422).json({ success: false, error: req.t("order.payment_method_id_required") });
       manualMethod = await prisma.manualPaymentMethod.findFirst({
         where: { id: parseInt(paymentMethodId), status: "Active" },
       });
-      if (!manualMethod) return res.status(422).json({ success: false, error: "Méthode manuelle introuvable ou inactive" });
+      if (!manualMethod) return res.status(422).json({ success: false, error: req.t("order.manual_method_not_found") });
     }
  
     // ── Charger le panier — include locations v2 ──────────────
@@ -125,7 +125,7 @@ export const createOrder = async (req, res, next) => {
       },
     });
  
-    if (!cartItems.length) return res.status(422).json({ success: false, error: "Votre panier est vide" });
+    if (!cartItems.length) return res.status(422).json({ success: false, error: req.t("order.cart_empty") });
  
     // Vérifier qu'aucun design n'est déjà verrouillé
     // (legacy items uniquement — les locations ont chacune leur design)
@@ -133,7 +133,7 @@ export const createOrder = async (req, res, next) => {
     if (legacyDesigns.length) {
       return res.status(422).json({
         success: false,
-        error:   `${legacyDesigns.length} design(s) déjà verrouillé(s) par une commande existante.`,
+        error:   req.t("order.designs_locked", { count: legacyDesigns.length }),
         code:    "DESIGNS_ALREADY_LOCKED",
       });
     }
@@ -256,7 +256,7 @@ export const createOrder = async (req, res, next) => {
       invoiceNumber,
       ...(isManual && {
         manualInstructions: manualMethod.instructions ?? null,
-        message: `Commande ${order.orderNumber} créée. Votre facture ${invoiceNumber} est en attente de paiement.`,
+        message: req.t("order.order_created", { orderNumber: order.orderNumber, invoiceNumber }),
       }),
       amounts: { subtotalEUR, shippingCostEUR, totalEUR, displayTotal, currency, exchangeRate: rate },
     });
@@ -355,11 +355,11 @@ export const refundOrder = async (req, res, next) => {
     const amount = req.body.amount ? Math.round(parseFloat(req.body.amount) * 100) : undefined;
     const reason = req.body.reason || null;
     const order  = await prisma.order.findUnique({ where: { id }, include: { invoice: true } });
-    if (!order) return res.status(404).json({ success: false, error: "Commande introuvable" });
-    if (!order.stripePaymentIntentId) return res.status(422).json({ success: false, error: "Aucun paiement Stripe associé" });
+    if (!order) return res.status(404).json({ success: false, error: req.t("order.not_found") });
+    if (!order.stripePaymentIntentId) return res.status(422).json({ success: false, error: req.t("order.no_stripe_payment") });
     const stripe  = await getStripe();
     const charges = await stripe.charges.list({ payment_intent: order.stripePaymentIntentId, limit: 1 });
-    if (!charges.data.length) return res.status(422).json({ success: false, error: "Aucune charge Stripe trouvée" });
+    if (!charges.data.length) return res.status(422).json({ success: false, error: req.t("order.no_stripe_charge") });
     const refund  = await stripe.refunds.create({ charge: charges.data[0].id, ...(amount && { amount }) });
     await prisma.$transaction([
       prisma.order.update({ where: { id }, data: { status: "refunded" } }),
@@ -368,7 +368,7 @@ export const refundOrder = async (req, res, next) => {
         prisma.refund.create({ data: { invoiceId: order.invoice.id, amount: amount ? amount / 100 : Number(order.total), reason, stripeRefundId: refund.id } }),
       ] : []),
     ]);
-    res.json({ success: true, message: "Remboursement effectué", refundId: refund.id });
+    res.json({ success: true, message: req.t("superadmin.billing.refund_done"), refundId: refund.id });
   } catch (e) { next(e); }
 };
 
@@ -393,7 +393,7 @@ export const getOrder = async (req, res, next) => {
       where:   { id, userId, companyId },
       include: { items: { include: { product: { include: { translations: { take: 1 } } }, design: true, cardType: true } } },
     });
-    if (!order) return res.status(404).json({ success: false, error: "Commande introuvable" });
+    if (!order) return res.status(404).json({ success: false, error: req.t("order.not_found") });
     res.json({ success: true, data: formatOrder(order) });
   } catch (e) { next(e); }
 };

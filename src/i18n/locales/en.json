@@ -1,36 +1,42 @@
 {
   "auth": {
-"login_success": "Connexion réussie",
-"login_failed": "Identifiants invalides",
-"logout_success": "Déconnexion réussie",
-"token_invalid": "Jeton invalide ou expiré",
-"unauthorized": "Accès non autorisé",
-"email_required": "Adresse e-mail requise",
-"password_required": "Mot de passe requis",
-"user_not_found": "Utilisateur introuvable",
-"account_disabled": "Votre compte a été désactivé",
-"create_account_success": "Compte créé avec succès. Un code de vérification a été envoyé à votre adresse e-mail.",
-"email_exists": "Adresse e-mail déjà utilisée.",
-"login_account": "Connectez-vous, puis ajoutez votre nouvelle entreprise.",
-"account_exists": "Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.",
-"signup_success": "Compte créé avec succès. Veuillez vérifier votre adresse e-mail.",
-"invalid_credentials": "Adresse e-mail ou mot de passe invalide",
-"account_suspended": "Votre compte a été suspendu. Veuillez contacter l'assistance.",
-"verification_code_expired": "Votre code de vérification a expiré. Votre compte a été suspendu.",
-"email_not_verified": "Veuillez vérifier votre adresse e-mail avant de vous connecter.",
-"no_company": "Aucune entreprise n'est associée à ce compte.",
-"already_verified": "Votre adresse e-mail est déjà vérifiée. Vous pouvez vous connecter.",
-"too_many_attempts": "Trop de tentatives infructueuses. Votre compte a été suspendu pour des raisons de sécurité.",
-"invalid_verification_code": "Code incorrect. Veuillez réessayer.",
-"verification_success": "Adresse e-mail vérifiée avec succès. Vous êtes maintenant connecté.",
-"verification_code_sent": "Si un compte existe avec cette adresse e-mail, un nouveau code a été envoyé.",
-"token_missing": "Jeton manquant.",
-"token_expired": "Ce lien Le lien a expiré. Veuillez demander un nouveau lien de confirmation.",
-"email_verified_success" : "Courriel confirmé. Vous êtes maintenant connecté.",
-"invalid_code_format" : "Code invalide. Le code doit contenir 6 chiffres.",
-"verification_email_sent" : "Si un compte correspondant existe, un courriel de confirmation vous sera envoyé."
+    "login_success": "Login successful",
+    "login_failed": "Invalid credentials",
+    "logout_success": "Logout successful",
+    "token_invalid": "Invalid or expired token",
+    "unauthorized": "Unauthorized access",
+    "email_required": "Email address is required",
+    "password_required": "Password is required",
+    "user_not_found": "User not found",
+    "account_disabled": "Your account has been disabled",
+    "create_account_success": "Account created successfully. A verification code has been sent to your email address.",
+    "email_exists": "Email address already in use.",
+    "login_account": "Log in, then add your new company.",
+    "account_exists": "An account already exists with this email address. Please log in.",
+    "signup_success": "Account created successfully. Please verify your email address.",
+    "invalid_credentials": "Invalid email address or password",
+    "account_suspended": "Your account has been suspended. Please contact support.",
+    "verification_code_expired": "Your verification code has expired. Your account has been suspended.",
+    "email_not_verified": "Please verify your email address before logging in.",
+    "no_company": "No company is associated with this account.",
+    "already_verified": "Your email address is already verified. You can log in.",
+    "too_many_attempts": "Too many failed attempts. Your account has been suspended for security reasons.",
+    "invalid_verification_code": "Incorrect code. Please try again.",
+    "verification_success": "Email address verified successfully. You are now logged in.",
+    "verification_code_sent": "If an account exists with this email address, a new code has been sent.",
+    "token_missing": "Token missing.",
+    "token_expired": "This link has expired. Please request a new confirmation link.",
+    "email_verified_success": "Email confirmed. You are now logged in.",
+    "invalid_code_format": "Invalid code. The code must contain 6 digits.",
+    "verification_email_sent": "If a matching account exists, a confirmation email will be sent.",
+    "resend_code_sent": "A new verification code has been sent to your email.",
+    "company_id_required": "Company ID is required.",
+    "company_name_required": "Company name is required.",
+    "invalid_id": "Invalid ID.",
+    "invalid_token": "Invalid or already used link.",
+    "password_updated": "Password updated."
   },
-   "company": {
+  "company": {
     "created": "Company \"{{name}}\" created successfully",
     "deleted": "Company deleted successfully",
     "not_found": "Company not found",
@@ -38,7 +44,10 @@
     "suspended": "This company is suspended",
     "switched_success": "Switched to \"{{name}}\"",
     "cannot_delete_last": "You cannot delete your only company",
-    "name": "Company name"
+    "name": "Company name",
+    "updated": "Company settings updated successfully",
+    "plan_upgraded": "Plan upgraded successfully",
+    "limit_reached": "Company limit reached for the current plan"
   },
   "validation": {
     "required": "{{field}} is required",
@@ -61,21 +70,100 @@
     "assign_success": "Card assigned to location successfully",
     "unassign_success": "Card unassigned successfully",
     "already_assigned": "Card is already assigned to a location",
-    "invalid_status": "Invalid card status"
+    "invalid_status": "Invalid card status",
+    "card_not_active": "This card is not yet active.",
+    "invalid_stars": "Stars must be an integer between 1 and 5.",
+    "message_required": "Message is required.",
+    "redirect_message": "Thank you! You will be redirected to {{platform}}.",
+    "feedback_appreciated": "Your feedback means a lot to us.",
+    "feedback_submitted": "Thank you for your feedback. We will review it and improve our service.",
+    "thank_you": "Thank you for your review!"
   },
   "design": {
     "created": "Design created successfully",
     "updated": "Design updated successfully",
     "deleted": "Design deleted successfully",
     "not_found": "Design not found",
-    "duplicate_failed": "Failed to duplicate design"
+    "duplicate_failed": "Failed to duplicate design",
+    "locked": "Design is locked and cannot be modified.",
+    "locked_order": "Design is locked (order already placed).",
+    "business_name_required": "Business name is required to validate.",
+    "step1_saved": "Step 1 draft saved.",
+    "step2_saved": "Step 2 draft saved.",
+    "validated": "Design validated!",
+    "version_restored": "Version restored.",
+    "version_not_found": "Version not found.",
+    "cart_item_required": "cartItemId and productId are required."
   },
   "location": {
     "created": "Location created successfully",
     "updated": "Location updated successfully",
     "deleted": "Location deleted successfully",
     "not_found": "Location not found",
-    "invalid_google_place": "Invalid Google Place ID"
+    "invalid_google_place": "Invalid Google Place ID",
+    "activated": "Location activated.",
+    "deactivated": "Location deactivated."
+  },
+  "cart": {
+    "synced": "Cart synced successfully.",
+    "item_deleted": "Item removed from cart.",
+    "cleared": "Cart cleared.",
+    "item_not_found": "Item not found.",
+    "product_required": "productId is required.",
+    "product_not_found": "Product not found or inactive.",
+    "tier_required": "This product requires a packageTierId.",
+    "no_price": "This product has no configured price.",
+    "tier_not_found": "Price tier not found for this product.",
+    "invalid_format": "Invalid cart format.",
+    "tier_invalid": "Tier not found.",
+    "no_fields": "No fields to update.",
+    "locations_required": "locations[] is required and must not be empty.",
+    "locations_invalid": "The locations[] array is empty or invalid."
+  },
+  "google": {
+    "place_id_required": "placeId is required.",
+    "design_and_place_id_required": "placeId and designId are required.",
+    "cache_invalidated": "Cache invalidated for placeId: {{placeId}}."
+  },
+  "order": {
+    "invalid_payment_method": "Invalid payment method: 'stripe' | 'manual'",
+    "payment_method_id_required": "paymentMethodId is required.",
+    "manual_method_not_found": "Manual payment method not found or inactive.",
+    "cart_empty": "Your cart is empty.",
+    "not_found": "Order not found.",
+    "no_stripe_payment": "No Stripe payment associated with this order.",
+    "no_stripe_charge": "No Stripe charge found.",
+    "designs_locked": "{{count}} design(s) already locked by an existing order.",
+    "order_created": "Order {{orderNumber}} created. Invoice {{invoiceNumber}} is awaiting payment.",
+    "cart_locations_empty": "The locations[] array is empty or invalid.",
+    "cart_quantity_mismatch": "The sum of location quantities ({{actual}}) must equal the total ({{expected}})).",
+    "cart_missing_platform": "Location #{{index}}: missing platform.",
+    "cart_missing_platform_data": "Location #{{index}}: missing platform data.",
+    "cart_invalid_quantity": "Location #{{index}}: invalid quantity."
+  },
+  "page": {
+    "not_found": "Page not found.",
+    "language_not_found": "Language not found."
+  },
+  "subscription": {
+    "plan_id_required": "planId is required.",
+    "invalid_interval": "Invalid interval. Use 'monthly' or 'yearly'.",
+    "invalid_manual_method": "Invalid or inactive manual payment method.",
+    "plan_not_found": "Plan not found or inactive.",
+    "already_exists": "A subscription already exists for this company.",
+    "requires_card": "Please register a payment card.",
+    "confirm_payment": "Please confirm the payment.",
+    "order_created": "Order {{orderNumber}} created. Invoice {{invoiceNumber}} is awaiting payment."
+  },
+  "settings": {
+    "fetch_error": "Error fetching settings."
+  },
+  "faq": {
+    "language_not_found": "Language not found.",
+    "not_found": "FAQ not found.",
+    "helpful_required": "helpful is required (boolean).",
+    "feedback_thanks": "Thank you for your feedback.",
+    "search_too_short": "Search query too short (min 2 characters)."
   },
   "errors": {
     "server_error": "Internal server error",
@@ -83,5 +171,238 @@
     "forbidden": "Access forbidden",
     "validation_failed": "Validation failed",
     "database_error": "Database error occurred"
+  },
+  "superadmin": {
+    "auth": {
+      "credentials_required": "Email and password are required.",
+      "forbidden": "Access forbidden: superadmin only."
+    },
+    "company": {
+      "not_found": "Company not found.",
+      "email_taken": "The email \"{{email}}\" is already in use by another company.",
+      "email_duplicate": "Email already in use.",
+      "updated": "Company updated.",
+      "status_active": "Company reactivated.",
+      "status_suspended": "Company suspended.",
+      "status_cancelled": "Company cancelled.",
+      "status_trial": "Company set to trial.",
+      "deleted": "Company deleted.",
+      "no_owner": "No owner admin found for this company.",
+      "impersonate_success": "Impersonation active for \"{{name}}\".",
+      "main_admin_not_found": "Main admin not found.",
+      "welcome_email_sent": "Welcome email resent to {{email}}.",
+      "admin_already_linked": "This admin is already linked to this company.",
+      "admin_duplicate": "Admin already linked to this company.",
+      "link_not_found": "This admin-company link does not exist.",
+      "cannot_remove_owner": "Cannot remove the main owner. Transfer ownership first.",
+      "admin_removed": "Admin removed from company.",
+      "admin_created_linked": "New admin created and linked to \"{{company}}\". Email sent.",
+      "admin_linked": "Admin \"{{email}}\" linked to \"{{company}}\".",
+      "created_new_admin": "Company \"{{name}}\" created. Welcome email sent to {{email}}.",
+      "created_existing": "Company \"{{name}}\" created and linked to existing account {{email}}."
+    },
+    "nfc": {
+      "invalid_format": "Format must be svg | png | pdf.",
+      "no_payload": "Card has no payload.",
+      "generation_failed": "Generation failed.",
+      "status_required": "status is required.",
+      "card_activated": "Card manually activated.",
+      "card_deleted": "Card deleted.",
+      "status_updated": "Card → {{status}}.",
+      "qr_not_found": "QR file not found.",
+      "qr_failed": "QR Code generation failed.",
+      "uid_required": "cardUid is required.",
+      "tag_assigned": "Tag #{{tagId}} assigned to card uid={{uid}}.",
+      "ids_required": "IDs are required.",
+      "assign_success": "Assignment successful.",
+      "no_tag_linked": "No linked tag found.",
+      "unassign_success": "Tag unassigned and returned to stock.",
+      "tags_added": "{{count}} tags added to inventory.",
+      "tag_not_found": "Tag not found.",
+      "exports_regenerated": "Exports regenerated for card uid={{uid}}.",
+      "qr_regenerated": "QR Code regenerated for uid={{uid}}."
+    },
+    "design": {
+      "already_flagged": "Design already flagged.",
+      "cannot_flag_archived": "Cannot flag an archived design.",
+      "flagged": "Design flagged for review.",
+      "not_flagged": "Flag removed — design restored to draft.",
+      "cannot_archive_locked": "Cannot archive a locked design (order in progress).",
+      "already_archived": "Design already archived.",
+      "archived": "Design archived.",
+      "cannot_delete_locked": "Cannot delete a design linked to an active order.",
+      "permanently_deleted": "Design permanently deleted.",
+      "referenced_by_orders": "This design is referenced by {{count}} order line(s). Archive it instead.",
+      "used_by_nfc_cards": "This design is used by {{count}} active NFC card(s)."
+    },
+    "billing": {
+      "invoice_not_found": "Invoice not found.",
+      "required_fields": "companyId and userId are required.",
+      "refund_done": "Refund processed.",
+      "id_amount_required": "invoiceId and amount are required.",
+      "invalid_amount": "Invalid amount.",
+      "already_paid": "This invoice is already paid.",
+      "already_refunded": "This invoice has been refunded.",
+      "only_paid_refundable": "Only paid invoices can be refunded.",
+      "payment_recorded": "Payment recorded — invoice marked as paid.",
+      "order_paid": "Order #{{orderNumber}} marked as paid — NFC generation in progress.",
+      "partial_payment": "Partial payment recorded — {{remaining}} {{currency}} remaining.",
+      "no_stripe_intent": "No Stripe PaymentIntent associated.",
+      "order_already_status": "The order is already at status \"{{status}}\"."
+    },
+    "subscription": {
+      "not_found": "Subscription not found.",
+      "not_subscription_invoice": "This invoice is not linked to a subscription.",
+      "billing_not_found": "BillingHistory not found.",
+      "order_not_found": "Order not found for this invoice.",
+      "invoice_paid": "Invoice {{invoiceNumber}} marked as paid. Subscription activated.",
+      "status_updated": "Subscription {{id}} updated: {{status}}."
+    },
+    "order": {
+      "status_required": "status is required.",
+      "status_updated": "Status updated: {{status}}."
+    },
+    "faq": {
+      "category_id_required": "categoryId and translations are required.",
+      "invalid_category": "Invalid category.",
+      "invalid_languages": "One or more languages are invalid.",
+      "created": "FAQ created.",
+      "updated": "FAQ updated.",
+      "deleted": "FAQ deleted.",
+      "ids_required": "ids is required (array).",
+      "action_required": "action is required.",
+      "invalid_action": "Invalid action.",
+      "bulk_updated": "{{count}} FAQ(s) updated.",
+      "orders_required": "orders is required (array).",
+      "order_updated": "Order updated."
+    },
+    "faq_category": {
+      "not_found": "Category not found.",
+      "fields_required": "slug and at least one translation are required.",
+      "invalid_slug": "Slug must contain only lowercase letters, digits, and hyphens.",
+      "invalid_languages": "One or more languages are invalid.",
+      "created": "Category created.",
+      "updated": "Category updated.",
+      "deleted": "Category deleted.",
+      "orders_required": "orders is required (array).",
+      "order_updated": "Order updated.",
+      "cannot_delete_has_faqs": "Cannot delete. {{count}} FAQ(s) use this category."
+    },
+    "page": {
+      "fields_required": "slug and at least one translation are required.",
+      "invalid_slug": "Slug must contain only lowercase letters, digits, and hyphens.",
+      "invalid_languages": "One or more languages are invalid.",
+      "created": "Page created successfully.",
+      "updated": "Page updated.",
+      "cannot_delete_system": "Cannot delete a system page.",
+      "deleted": "Page deleted.",
+      "invalid_status": "Invalid status (draft | published).",
+      "published": "Page published.",
+      "unpublished": "Page set to draft.",
+      "duplicated": "Page duplicated."
+    },
+    "product": {
+      "not_found": "Product not found.",
+      "deleted": "Product deleted."
+    },
+    "card_type": {
+      "not_found": "Card type not found.",
+      "id_taken": "The id \"{{id}}\" already exists.",
+      "deleted": "Card type deleted."
+    },
+    "platform": {
+      "updated": "Platform settings updated successfully."
+    }
+  },
+  "admin": {
+    "auth": {
+      "use_superadmin_portal": "Please use the SuperAdmin portal.",
+      "company_id_required": "companyId is required."
+    },
+    "billing": {
+      "no_subscription": "No subscription found.",
+      "addon_already_active": "Add-on already activated.",
+      "addon_activated": "Add-on \"{{name}}\" activated successfully.",
+      "addon_deactivated": "Add-on deactivated successfully.",
+      "invalid_usage_type": "Invalid type. Accepted values: api, sms, webhook."
+    },
+    "location": {
+      "name_required": "Location name is required.",
+      "no_google_place_id": "No Google Place ID associated with this location.",
+      "google_data_updated": "Google data updated.",
+      "card_id_required": "cardId is required.",
+      "limit_reached": "Limit reached: your plan allows {{max}} location(s). Please upgrade your plan."
+    },
+    "design": {
+      "name_required": "Name cannot be empty.",
+      "rename_locked": "Cannot rename a locked design.",
+      "renamed": "Design renamed.",
+      "duplicated": "Design duplicated.",
+      "only_archived_restorable": "Only archived designs can be restored.",
+      "restored": "Design restored to draft.",
+      "used_by_nfc_cards": "This design is used by {{count}} active NFC card(s)."
+    },
+    "team": {
+      "email_required": "Email is required.",
+      "name_required": "Name is required.",
+      "already_member": "This user is already a member of this company.",
+      "invite_sent_new": "Invitation sent to {{email}}. An account creation link has been generated.",
+      "invite_sent_existing": "{{email}} added to the company.",
+      "member_not_found": "Member not found.",
+      "cannot_change_owner_role": "Cannot change the owner's role.",
+      "role_not_found": "Role \"{{role}}\" not found.",
+      "role_updated": "Role updated: {{role}}.",
+      "cannot_disable_owner": "Cannot disable the owner.",
+      "member_activated": "Member activated.",
+      "member_deactivated": "Member deactivated.",
+      "cannot_remove_owner": "Cannot remove the owner.",
+      "member_removed": "Member removed from the company."
+    },
+    "review_request": {
+      "customer_name_required": "Customer name is required.",
+      "email_required": "Email is required for email method.",
+      "phone_required": "Phone is required for SMS method.",
+      "contacts_required": "contacts[] array is required.",
+      "max_contacts": "Maximum 500 contacts per import.",
+      "not_found": "Request not found.",
+      "already_completed": "This request is already completed.",
+      "already_cancelled": "This request is already cancelled.",
+      "deleted": "Request deleted.",
+      "bulk_result": "{{created}} request(s) created, {{failed}} ignored."
+    },
+    "nfc": {
+      "not_assigned": "This card is not assigned to any location.",
+      "card_disabled": "Card disabled successfully."
+    },
+    "review": {
+      "not_found": "Review not found.",
+      "invalid_status": "Invalid status.",
+      "status_updated": "Status updated: {{status}}.",
+      "notes_required": "notes is required.",
+      "notes_saved": "Notes saved.",
+      "reply_required": "reply is required.",
+      "reply_sent": "Reply sent.",
+      "reply_sent_email": "Reply sent and customer notified by email.",
+      "ids_required": "ids[] is required (non-empty array).",
+      "bulk_updated": "{{count}} review(s) updated → {{status}}."
+    },
+    "filtering": {
+      "invalid_threshold": "threshold must be an integer between 1 and 5.",
+      "invalid_platform": "Invalid redirectPlatform.",
+      "custom_url_required": "customUrl is required when redirectPlatform = custom.",
+      "assigned_user_not_member": "Assigned user is not a member of this company.",
+      "invalid_rating": "rating must be an integer between 1 and 5.",
+      "test_public_message": "Rating {{rating}} ≥ {{threshold}} → redirect to {{platform}}",
+      "test_private_message": "Rating {{rating}} < {{threshold}} → private form"
+    },
+    "plan_builder": {
+      "subscription_updated": "Subscription updated.",
+      "subscription_created": "Subscription created.",
+      "addons_invalid": "Invalid add-ons.",
+      "subscription_cancelled": "Subscription cancelled.",
+      "addons_updated": "Add-ons updated.",
+      "billing_yearly": "Yearly billing.",
+      "billing_monthly": "Monthly billing."
+    }
   }
 }

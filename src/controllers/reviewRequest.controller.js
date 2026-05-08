@@ -198,13 +198,13 @@ export const createRequest = async (req, res, next) => {
 
     // ── Validation ────────────────────────────────────────────
     if (!customerName?.trim()) {
-      return res.status(422).json({ success: false, error: "Le nom du client est requis" });
+      return res.status(422).json({ success: false, error: req.t("admin.review_request.customer_name_required") });
     }
     if (method === "email" && !email?.trim()) {
-      return res.status(422).json({ success: false, error: "L'email est requis pour la méthode email" });
+      return res.status(422).json({ success: false, error: req.t("admin.review_request.email_required") });
     }
     if (method === "sms" && !phone?.trim()) {
-      return res.status(422).json({ success: false, error: "Le téléphone est requis pour la méthode SMS" });
+      return res.status(422).json({ success: false, error: req.t("admin.review_request.phone_required") });
     }
 
     const company = await prisma.company.findUnique({
@@ -264,12 +264,12 @@ export const bulkCreateRequests = async (req, res, next) => {
     const { contacts, locationId, customMessage } = req.body;
 
     if (!Array.isArray(contacts) || contacts.length === 0) {
-      return res.status(422).json({ success: false, error: "Le tableau contacts[] est requis" });
+      return res.status(422).json({ success: false, error: req.t("admin.review_request.contacts_required") });
     }
 
     // Limiter à 500 par import (protection)
     if (contacts.length > 500) {
-      return res.status(422).json({ success: false, error: "Maximum 500 contacts par import" });
+      return res.status(422).json({ success: false, error: req.t("admin.review_request.max_contacts") });
     }
 
     const company = await prisma.company.findUnique({
@@ -321,7 +321,7 @@ export const bulkCreateRequests = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: `${results.created} demandes créées, ${results.failed} ignorées`,
+      message: req.t("admin.review_request.bulk_result", { created: results.created, failed: results.failed }),
       data:    results,
     });
   } catch (e) {
@@ -344,11 +344,11 @@ export const resendRequest = async (req, res, next) => {
     });
 
     if (!existing) {
-      return res.status(404).json({ success: false, error: "Demande introuvable" });
+      return res.status(404).json({ success: false, error: req.t("admin.review_request.not_found") });
     }
 
     if (existing.status === "completed") {
-      return res.status(422).json({ success: false, error: "Cette demande est déjà complétée" });
+      return res.status(422).json({ success: false, error: req.t("admin.review_request.already_completed") });
     }
 
     const company = await prisma.company.findUnique({
@@ -398,11 +398,16 @@ export const cancelRequest = async (req, res, next) => {
     });
 
     if (!existing) {
-      return res.status(404).json({ success: false, error: "Demande introuvable" });
+      return res.status(404).json({ success: false, error: req.t("admin.review_request.not_found") });
     }
 
     if (["completed", "cancelled"].includes(existing.status)) {
-      return res.status(422).json({ success: false, error: `La demande est déjà ${existing.status}` });
+      return res.status(422).json({
+        success: false,
+        error: existing.status === "completed"
+          ? req.t("admin.review_request.already_completed")
+          : req.t("admin.review_request.already_cancelled"),
+      });
     }
 
     const updated = await prisma.reviewRequest.update({
@@ -432,12 +437,12 @@ export const deleteRequest = async (req, res, next) => {
     });
 
     if (!existing) {
-      return res.status(404).json({ success: false, error: "Demande introuvable" });
+      return res.status(404).json({ success: false, error: req.t("admin.review_request.not_found") });
     }
 
     await prisma.reviewRequest.delete({ where: { id } });
 
-    res.json({ success: true, message: "Demande supprimée" });
+    res.json({ success: true, message: req.t("admin.review_request.deleted") });
   } catch (e) {
     next(e);
   }
@@ -465,7 +470,7 @@ export const updateRequestStatus = async (req, res, next) => {
     });
 
     if (!existing) {
-      return res.status(404).json({ success: false, error: "Demande introuvable" });
+      return res.status(404).json({ success: false, error: req.t("admin.review_request.not_found") });
     }
 
     // Construire les champs de date selon le nouveau statut

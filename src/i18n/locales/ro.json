@@ -28,7 +28,13 @@
     "token_expired": "Acest link a expirat. Vă rugăm să solicitați un nou link de confirmare.",
     "email_verified_success": "E-mail confirmat. Sunteți acum conectat.",
     "invalid_code_format": "Cod nevalid. Codul trebuie să conțină 6 cifre.",
-    "verification_email_sent": "Dacă există un cont corespunzător, un e-mail de confirmare vă va fi trimis."
+    "verification_email_sent": "Dacă există un cont corespunzător, un e-mail de confirmare vă va fi trimis.",
+    "resend_code_sent": "Un nou cod de verificare a fost trimis la adresa dvs. de e-mail.",
+    "company_id_required": "ID-ul companiei este obligatoriu.",
+    "company_name_required": "Numele companiei este obligatoriu.",
+    "invalid_id": "ID nevalid.",
+    "invalid_token": "Link nevalid sau deja utilizat.",
+    "password_updated": "Parolă actualizată."
   },
   "company": {
     "created": "Compania \"{{name}}\" a fost creată cu succes",
@@ -38,7 +44,10 @@
     "suspended": "Această companie este suspendată",
     "switched_success": "S-a trecut la \"{{name}}\"",
     "cannot_delete_last": "Nu puteți șterge singura companie deținută",
-    "name": "Numele companiei"
+    "name": "Numele companiei",
+    "updated": "Setările companiei au fost actualizate cu succes",
+    "plan_upgraded": "Plan actualizat cu succes",
+    "limit_reached": "Limita companiei atinsă pentru planul actual"
   },
   "validation": {
     "required": "{{field}} este obligatoriu",
@@ -61,21 +70,100 @@
     "assign_success": "Card atribuit locației cu succes",
     "unassign_success": "Card neatribuit cu succes",
     "already_assigned": "Cardul este deja atribuit unei locații",
-    "invalid_status": "Stare card nevalidă"
+    "invalid_status": "Stare card nevalidă",
+    "card_not_active": "Acest card nu este încă activ.",
+    "invalid_stars": "Stelele trebuie să fie un număr întreg între 1 și 5.",
+    "message_required": "Mesajul este obligatoriu.",
+    "redirect_message": "Vă mulțumim! Veți fi redirecționat către {{platform}}.",
+    "feedback_appreciated": "Feedback-ul dumneavoastră contează mult pentru noi.",
+    "feedback_submitted": "Vă mulțumim pentru feedback. Îl vom analiza și vom îmbunătăți serviciul nostru.",
+    "thank_you": "Vă mulțumim pentru recenzie!"
   },
   "design": {
     "created": "Design creat cu succes",
     "updated": "Design actualizat cu succes",
     "deleted": "Design șters cu succes",
     "not_found": "Designul nu a fost găsit",
-    "duplicate_failed": "Duplicarea designului a eșuat"
+    "duplicate_failed": "Duplicarea designului a eșuat",
+    "locked": "Design-ul este blocat și nu poate fi modificat.",
+    "locked_order": "Design blocat (comandă deja plasată).",
+    "business_name_required": "Numele afacerii este necesar pentru validare.",
+    "step1_saved": "Ciornă pasul 1 salvată.",
+    "step2_saved": "Ciornă pasul 2 salvată.",
+    "validated": "Design validat!",
+    "version_restored": "Versiune restaurată.",
+    "version_not_found": "Versiune negăsită.",
+    "cart_item_required": "cartItemId și productId sunt necesare."
   },
   "location": {
     "created": "Locație creată cu succes",
     "updated": "Locație actualizată cu succes",
     "deleted": "Locație ștearsă cu succes",
     "not_found": "Locația nu a fost găsită",
-    "invalid_google_place": "ID Google Place nevalid"
+    "invalid_google_place": "ID Google Place nevalid",
+    "activated": "Locație activată.",
+    "deactivated": "Locație dezactivată."
+  },
+  "cart": {
+    "synced": "Coș sincronizat cu succes.",
+    "item_deleted": "Articol eliminat din coș.",
+    "cleared": "Coș golit.",
+    "item_not_found": "Articol negăsit.",
+    "product_required": "productId este obligatoriu.",
+    "product_not_found": "Produs negăsit sau inactiv.",
+    "tier_required": "Acest produs necesită un packageTierId.",
+    "no_price": "Acest produs nu are un preț configurat.",
+    "tier_not_found": "Nivelul de preț nu a fost găsit pentru acest produs.",
+    "invalid_format": "Format de coș nevalid.",
+    "tier_invalid": "Nivel negăsit.",
+    "no_fields": "Niciun câmp de actualizat.",
+    "locations_required": "locations[] este obligatoriu și nu trebuie să fie gol.",
+    "locations_invalid": "Matricea locations[] este goală sau nevalidă."
+  },
+  "google": {
+    "place_id_required": "placeId este obligatoriu.",
+    "design_and_place_id_required": "placeId și designId sunt necesare.",
+    "cache_invalidated": "Cache invalidat pentru placeId: {{placeId}}."
+  },
+  "order": {
+    "invalid_payment_method": "Metodă de plată nevalidă: 'stripe' | 'manual'",
+    "payment_method_id_required": "paymentMethodId este obligatoriu.",
+    "manual_method_not_found": "Metoda de plată manuală nu a fost găsită sau este inactivă.",
+    "cart_empty": "Coșul dumneavoastră este gol.",
+    "not_found": "Comanda nu a fost găsită.",
+    "no_stripe_payment": "Nicio plată Stripe asociată acestei comenzi.",
+    "no_stripe_charge": "Nicio taxă Stripe găsită.",
+    "designs_locked": "{{count}} design(uri) deja blocate de o comandă existentă.",
+    "order_created": "Comanda {{orderNumber}} creată. Factura {{invoiceNumber}} așteaptă plata.",
+    "cart_locations_empty": "Matricea locations[] este goală sau nevalidă.",
+    "cart_quantity_mismatch": "Suma cantităților locațiilor ({{actual}}) trebuie să fie egală cu totalul ({{expected}})).",
+    "cart_missing_platform": "Locația #{{index}}: platformă lipsă.",
+    "cart_missing_platform_data": "Locația #{{index}}: date de platformă lipsă.",
+    "cart_invalid_quantity": "Locația #{{index}}: cantitate nevalidă."
+  },
+  "page": {
+    "not_found": "Pagina nu a fost găsită.",
+    "language_not_found": "Limba nu a fost găsită."
+  },
+  "subscription": {
+    "plan_id_required": "planId este obligatoriu.",
+    "invalid_interval": "Interval nevalid. Utilizați 'monthly' sau 'yearly'.",
+    "invalid_manual_method": "Metodă de plată manuală nevalidă sau inactivă.",
+    "plan_not_found": "Planul nu a fost găsit sau este inactiv.",
+    "already_exists": "Un abonament există deja pentru această companie.",
+    "requires_card": "Vă rugăm să înregistrați un card de plată.",
+    "confirm_payment": "Vă rugăm să confirmați plata.",
+    "order_created": "Comanda {{orderNumber}} a fost creată. Factura {{invoiceNumber}} este în așteptarea plății."
+  },
+  "settings": {
+    "fetch_error": "Eroare la obținerea setărilor."
+  },
+  "faq": {
+    "language_not_found": "Limba nu a fost găsită.",
+    "not_found": "Întrebarea frecventă nu a fost găsită.",
+    "helpful_required": "helpful este obligatoriu (boolean).",
+    "feedback_thanks": "Vă mulțumim pentru feedback.",
+    "search_too_short": "Căutare prea scurtă (min 2 caractere)."
   },
   "errors": {
     "server_error": "Eroare internă de server",
@@ -83,5 +171,238 @@
     "forbidden": "Acces interzis",
     "validation_failed": "Validarea a eșuat",
     "database_error": "A apărut o eroare de bază de date"
+  },
+  "superadmin": {
+    "auth": {
+      "credentials_required": "Email și parolă obligatorii.",
+      "forbidden": "Acces interzis: numai superadmin."
+    },
+    "company": {
+      "not_found": "Compania nu a fost găsită.",
+      "email_taken": "Email-ul \"{{email}}\" este deja folosit de altă companie.",
+      "email_duplicate": "Email deja utilizat.",
+      "updated": "Companie actualizată.",
+      "status_active": "Companie reactivată.",
+      "status_suspended": "Companie suspendată.",
+      "status_cancelled": "Companie anulată.",
+      "status_trial": "Companie în perioadă de probă.",
+      "deleted": "Companie ștearsă.",
+      "no_owner": "Niciun admin proprietar găsit pentru această companie.",
+      "impersonate_success": "Impersonare activă pentru \"{{name}}\".",
+      "main_admin_not_found": "Admin principal negăsit.",
+      "welcome_email_sent": "Email de bun venit retrimis la {{email}}.",
+      "admin_already_linked": "Acest admin este deja asociat cu această companie.",
+      "admin_duplicate": "Admin deja asociat cu această companie.",
+      "link_not_found": "Această legătură admin-companie nu există.",
+      "cannot_remove_owner": "Nu se poate elimina proprietarul principal. Transferați mai întâi proprietatea.",
+      "admin_removed": "Admin eliminat din companie.",
+      "admin_created_linked": "Admin nou creat și asociat cu \"{{company}}\". Email trimis.",
+      "admin_linked": "Admin \"{{email}}\" asociat cu \"{{company}}\".",
+      "created_new_admin": "Compania \"{{name}}\" creată. Email de bun venit trimis la {{email}}.",
+      "created_existing": "Compania \"{{name}}\" creată și asociată cu contul existent {{email}}."
+    },
+    "nfc": {
+      "invalid_format": "Formatul trebuie să fie svg | png | pdf.",
+      "no_payload": "Cardul nu are payload.",
+      "generation_failed": "Generare eșuată.",
+      "status_required": "status este obligatoriu.",
+      "card_activated": "Card activat manual.",
+      "card_deleted": "Card șters.",
+      "status_updated": "Card → {{status}}.",
+      "qr_not_found": "Fișierul QR nu a fost găsit.",
+      "qr_failed": "Generarea codului QR a eșuat.",
+      "uid_required": "cardUid este obligatoriu.",
+      "tag_assigned": "Eticheta #{{tagId}} atribuită cardului uid={{uid}}.",
+      "ids_required": "ID-urile sunt obligatorii.",
+      "assign_success": "Atribuire reușită.",
+      "no_tag_linked": "Nicio etichetă asociată.",
+      "unassign_success": "Etichetă desasociată și returnată în stoc.",
+      "tags_added": "{{count}} etichete adăugate în inventar.",
+      "tag_not_found": "Eticheta nu a fost găsită.",
+      "exports_regenerated": "Exporturi regenerate pentru cardul uid={{uid}}.",
+      "qr_regenerated": "Cod QR regenerat pentru uid={{uid}}."
+    },
+    "design": {
+      "already_flagged": "Design-ul este deja marcat.",
+      "cannot_flag_archived": "Nu se poate marca un design arhivat.",
+      "flagged": "Design marcat pentru revizuire.",
+      "not_flagged": "Marcare eliminată — design restaurat ca ciornă.",
+      "cannot_archive_locked": "Nu se poate arhiva un design blocat (comandă în curs).",
+      "already_archived": "Design-ul este deja arhivat.",
+      "archived": "Design arhivat.",
+      "cannot_delete_locked": "Nu se poate șterge un design legat de o comandă activă.",
+      "permanently_deleted": "Design șters definitiv.",
+      "referenced_by_orders": "Acest design este referențiat de {{count}} linie(linii) de comandă. Arhivați-l în schimb.",
+      "used_by_nfc_cards": "Acest design este folosit de {{count}} card(uri) NFC active."
+    },
+    "billing": {
+      "invoice_not_found": "Factura nu a fost găsită.",
+      "required_fields": "companyId și userId sunt obligatorii.",
+      "refund_done": "Rambursare efectuată.",
+      "id_amount_required": "invoiceId și amount sunt obligatorii.",
+      "invalid_amount": "Sumă nevalidă.",
+      "already_paid": "Această factură este deja plătită.",
+      "already_refunded": "Această factură a fost rambursată.",
+      "only_paid_refundable": "Doar facturile plătite pot fi rambursate.",
+      "payment_recorded": "Plată înregistrată — factură marcată ca plătită.",
+      "order_paid": "Comanda #{{orderNumber}} marcată ca plătită — generare NFC în curs.",
+      "partial_payment": "Plată parțială înregistrată — rămân {{remaining}} {{currency}}.",
+      "no_stripe_intent": "Niciun PaymentIntent Stripe asociat.",
+      "order_already_status": "Comanda este deja la statusul \"{{status}}\"."
+    },
+    "subscription": {
+      "not_found": "Abonamentul nu a fost găsit.",
+      "not_subscription_invoice": "Această factură nu este legată de un abonament.",
+      "billing_not_found": "BillingHistory nu a fost găsit.",
+      "order_not_found": "Comanda nu a fost găsită pentru această factură.",
+      "invoice_paid": "Factura {{invoiceNumber}} marcată ca plătită. Abonament activat.",
+      "status_updated": "Abonament {{id}} actualizat: {{status}}."
+    },
+    "order": {
+      "status_required": "status este obligatoriu.",
+      "status_updated": "Status actualizat: {{status}}."
+    },
+    "faq": {
+      "category_id_required": "categoryId și translations sunt obligatorii.",
+      "invalid_category": "Categorie nevalidă.",
+      "invalid_languages": "Una sau mai multe limbi sunt nevalide.",
+      "created": "Întrebare frecventă creată.",
+      "updated": "Întrebare frecventă actualizată.",
+      "deleted": "Întrebare frecventă ștearsă.",
+      "ids_required": "ids este obligatoriu (array).",
+      "action_required": "action este obligatorie.",
+      "invalid_action": "Acțiune nevalidă.",
+      "bulk_updated": "{{count}} întrebare(i) frecventă(e) actualizată(e).",
+      "orders_required": "orders este obligatoriu (array).",
+      "order_updated": "Ordine actualizată."
+    },
+    "faq_category": {
+      "not_found": "Categoria nu a fost găsită.",
+      "fields_required": "slug și cel puțin o traducere sunt necesare.",
+      "invalid_slug": "Slug-ul trebuie să conțină numai litere mici, cifre și cratime.",
+      "invalid_languages": "Una sau mai multe limbi sunt nevalide.",
+      "created": "Categorie creată.",
+      "updated": "Categorie actualizată.",
+      "deleted": "Categorie ștearsă.",
+      "orders_required": "orders este obligatoriu (array).",
+      "order_updated": "Ordine actualizată.",
+      "cannot_delete_has_faqs": "Imposibil de șters. {{count}} FAQ(uri) folosesc această categorie."
+    },
+    "page": {
+      "fields_required": "slug și cel puțin o traducere sunt necesare.",
+      "invalid_slug": "Slug-ul trebuie să conțină numai litere mici, cifre și cratime.",
+      "invalid_languages": "Una sau mai multe limbi sunt nevalide.",
+      "created": "Pagină creată cu succes.",
+      "updated": "Pagină actualizată.",
+      "cannot_delete_system": "Nu se poate șterge o pagină de sistem.",
+      "deleted": "Pagină ștearsă.",
+      "invalid_status": "Status nevalid (draft | published).",
+      "published": "Pagină publicată.",
+      "unpublished": "Pagina setată ca ciornă.",
+      "duplicated": "Pagină duplicată."
+    },
+    "product": {
+      "not_found": "Produsul nu a fost găsit.",
+      "deleted": "Produs șters."
+    },
+    "card_type": {
+      "not_found": "Tip de card negăsit.",
+      "id_taken": "Id-ul \"{{id}}\" există deja.",
+      "deleted": "Tip de card șters."
+    },
+    "platform": {
+      "updated": "Setările platformei actualizate cu succes."
+    }
+  },
+  "admin": {
+    "auth": {
+      "use_superadmin_portal": "Vă rugăm să utilizați portalul SuperAdmin.",
+      "company_id_required": "companyId este obligatoriu."
+    },
+    "billing": {
+      "no_subscription": "Niciun abonament găsit.",
+      "addon_already_active": "Add-on deja activat.",
+      "addon_activated": "Add-on \"{{name}}\" activat cu succes.",
+      "addon_deactivated": "Add-on dezactivat cu succes.",
+      "invalid_usage_type": "Tip nevalid. Valori acceptate: api, sms, webhook."
+    },
+    "location": {
+      "name_required": "Numele locației este obligatoriu.",
+      "no_google_place_id": "Niciun Google Place ID asociat acestei locații.",
+      "google_data_updated": "Date Google actualizate.",
+      "card_id_required": "cardId este obligatoriu.",
+      "limit_reached": "Limită atinsă: planul dvs. permite {{max}} locație(locații). Vă rugăm să faceți upgrade."
+    },
+    "design": {
+      "name_required": "Numele nu poate fi gol.",
+      "rename_locked": "Nu se poate redenumi un design blocat.",
+      "renamed": "Design redenumit.",
+      "duplicated": "Design duplicat.",
+      "only_archived_restorable": "Doar designurile arhivate pot fi restaurate.",
+      "used_by_nfc_cards": "Acest design este folosit de {{count}} card(uri) NFC active.",
+      "restored": "Design restaurat ca ciornă."
+    },
+    "team": {
+      "email_required": "Email-ul este obligatoriu.",
+      "name_required": "Numele este obligatoriu.",
+      "already_member": "Acest utilizator este deja membru al companiei.",
+      "invite_sent_new": "Invitație trimisă la {{email}}. A fost generat un link de creare a contului.",
+      "invite_sent_existing": "{{email}} adăugat în companie.",
+      "member_not_found": "Membrul nu a fost găsit.",
+      "cannot_change_owner_role": "Nu se poate schimba rolul proprietarului.",
+      "role_not_found": "Rolul \"{{role}}\" nu a fost găsit.",
+      "role_updated": "Rol actualizat: {{role}}.",
+      "cannot_disable_owner": "Nu se poate dezactiva proprietarul.",
+      "member_activated": "Membru activat.",
+      "member_deactivated": "Membru dezactivat.",
+      "cannot_remove_owner": "Nu se poate elimina proprietarul.",
+      "member_removed": "Membru eliminat din companie."
+    },
+    "review_request": {
+      "customer_name_required": "Numele clientului este obligatoriu.",
+      "email_required": "Email-ul este obligatoriu pentru metoda email.",
+      "phone_required": "Telefonul este obligatoriu pentru metoda SMS.",
+      "contacts_required": "Matricea contacts[] este obligatorie.",
+      "max_contacts": "Maximum 500 de contacte per import.",
+      "not_found": "Solicitarea nu a fost găsită.",
+      "already_completed": "Această solicitare este deja finalizată.",
+      "already_cancelled": "Această solicitare este deja anulată.",
+      "deleted": "Solicitare ștearsă.",
+      "bulk_result": "{{created}} solicitare(solicitări) create, {{failed}} ignorate."
+    },
+    "nfc": {
+      "not_assigned": "Acest card nu este atribuit niciunei locații.",
+      "card_disabled": "Card dezactivat cu succes."
+    },
+    "review": {
+      "not_found": "Recenzia nu a fost găsită.",
+      "invalid_status": "Status nevalid.",
+      "status_updated": "Status actualizat: {{status}}.",
+      "notes_required": "notes este obligatoriu.",
+      "notes_saved": "Note salvate.",
+      "reply_required": "reply este obligatoriu.",
+      "reply_sent": "Răspuns trimis.",
+      "reply_sent_email": "Răspuns trimis și clientul notificat prin email.",
+      "ids_required": "ids[] este obligatoriu (matrice non-goală).",
+      "bulk_updated": "{{count}} recenzie(i) actualizată(e) → {{status}}."
+    },
+    "filtering": {
+      "invalid_threshold": "threshold trebuie să fie un număr întreg între 1 și 5.",
+      "invalid_platform": "redirectPlatform invalid.",
+      "custom_url_required": "customUrl este obligatoriu când redirectPlatform = custom.",
+      "assigned_user_not_member": "Utilizatorul atribuit nu este membru al acestei companii.",
+      "invalid_rating": "rating trebuie să fie un număr întreg între 1 și 5.",
+      "test_public_message": "Rating {{rating}} ≥ {{threshold}} → redirecționare către {{platform}}",
+      "test_private_message": "Rating {{rating}} < {{threshold}} → formular privat"
+    },
+    "plan_builder": {
+      "subscription_updated": "Abonament actualizat.",
+      "subscription_created": "Abonament creat.",
+      "addons_invalid": "Add-on-uri nevalide.",
+      "subscription_cancelled": "Abonament anulat.",
+      "addons_updated": "Add-on-uri actualizate.",
+      "billing_yearly": "Facturare anuală.",
+      "billing_monthly": "Facturare lunară."
+    }
   }
 }

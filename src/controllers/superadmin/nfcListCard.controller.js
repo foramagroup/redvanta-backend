@@ -107,12 +107,12 @@ import { assignTagToCard } from "../../services/nfc.service.js";
             const { cardId, tagId } = req.body;
 
             if (!cardId || !tagId) {
-            return res.status(422).json({ success: false, error: "IDs requis" });
+            return res.status(422).json({ success: false, error: req.t("superadmin.nfc.ids_required") });
             }
             // Utilisation de ton service existant
             await assignTagToCard(parseInt(cardId), parseInt(tagId));
             
-            res.json({ success: true, message: "Assignation réussie" });
+            res.json({ success: true, message: req.t("superadmin.nfc.assign_success") });
         } catch (e) {
             res.status(400).json({ success: false, error: e.message });
         }
@@ -129,7 +129,7 @@ import { assignTagToCard } from "../../services/nfc.service.js";
             });
 
             if (!card?.tagId) {
-            return res.status(404).json({ success: false, error: "Aucun tag lié" });
+            return res.status(404).json({ success: false, error: req.t("superadmin.nfc.no_tag_linked") });
             }
 
             // Libération du tag (NEW) et retrait du lien sur la carte
@@ -144,6 +144,6 @@ import { assignTagToCard } from "../../services/nfc.service.js";
             })
             ]);
 
-            res.json({ success: true, message: "Tag désassigné et remis en stock" });
+            res.json({ success: true, message: req.t("superadmin.nfc.unassign_success") });
         } catch (e) { next(e); }
     };

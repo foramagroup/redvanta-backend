@@ -16,6 +16,6 @@ export async function getOverview(req, res) {
     });
   } catch (err) {
     console.error("superadmin dashboard error", err);
-    return res.status(500).json({ error: "Internal error" });
+    return res.status(500).json({ error: req.t("errors.server_error") });
   }
 }

@@ -20,7 +20,7 @@ export const listPublicFAQs = async (req, res, next) => {
     if (!language) {
       return res.status(404).json({
         success: false,
-        error: "Langue non trouvée",
+        error: req.t("faq.language_not_found"),
       });
     }
 
@@ -94,7 +94,7 @@ export const getFAQPublic = async (req, res, next) => {
     if (!language) {
       return res.status(404).json({
         success: false,
-        error: "Langue non trouvée",
+        error: req.t("faq.language_not_found"),
       });
     }
 
@@ -120,7 +120,7 @@ export const getFAQPublic = async (req, res, next) => {
     if (!faq || faq.translations.length === 0) {
       return res.status(404).json({
         success: false,
-        error: "FAQ introuvable",
+        error: req.t("faq.not_found"),
       });
     }
 
@@ -165,7 +165,7 @@ export const voteFAQ = async (req, res, next) => {
     if (typeof helpful !== "boolean") {
       return res.status(422).json({
         success: false,
-        error: "helpful requis (boolean)",
+        error: req.t("faq.helpful_required"),
       });
     }
 
@@ -176,7 +176,7 @@ export const voteFAQ = async (req, res, next) => {
     if (!faq) {
       return res.status(404).json({
         success: false,
-        error: "FAQ introuvable",
+        error: req.t("faq.not_found"),
       });
     }
 
@@ -191,7 +191,7 @@ export const voteFAQ = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Merci pour votre feedback",
+      message: req.t("faq.feedback_thanks"),
     });
   } catch (e) {
     next(e);
@@ -213,7 +213,7 @@ export const getFAQCategories = async (req, res, next) => {
     if (!language) {
       return res.status(404).json({
         success: false,
-        error: "Langue non trouvée",
+        error: req.t("faq.language_not_found"),
       });
     }
 
@@ -269,7 +269,7 @@ export const searchFAQs = async (req, res, next) => {
     if (!q || q.trim().length < 2) {
       return res.status(422).json({
         success: false,
-        error: "Recherche trop courte (min 2 caractères)",
+        error: req.t("faq.search_too_short"),
       });
     }
 
@@ -280,7 +280,7 @@ export const searchFAQs = async (req, res, next) => {
     if (!language) {
       return res.status(404).json({
         success: false,
-        error: "Langue non trouvée",
+        error: req.t("faq.language_not_found"),
       });
     }
 

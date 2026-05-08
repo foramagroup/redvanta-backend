@@ -7,7 +7,6 @@ import { getStripe, getWebhookSecret } from "../../services/Stripe.service.js";
 import {
   getOrCreateStripeCustomer,
   getDefaultPaymentMethod,
-  createSetupIntent,
   calculatePeriodDates,
   calculateSubscriptionAmounts,
   generateSubscriptionOrderNumber,
@@ -19,8 +18,8 @@ import {
 } from "../../services/stripeSubscription.service.js";
 
 function getCompanyId(req) {
-  const id = req.user.companyId;
-  if (!id) throw Object.assign(new Error("Aucune company active"), { status: 403 });
+  const id = req.user?.companyId;
+  if (!id) throw Object.assign(new Error(req.t("errors.forbidden")), { status: 403 });
   return parseInt(id);
 }
 
@@ -110,7 +109,7 @@ export const checkoutSubscription = async (req, res, next) => {
 
     // Validation
     if (!planId) {
-      return res.status(422).json({ success: false, error: "planId requis" });
+      return res.status(422).json({ success: false, error: req.t("subscription.plan_id_required") });
     }
 
     const isStripe = paymentMethod === "stripe";
@@ -119,19 +118,19 @@ export const checkoutSubscription = async (req, res, next) => {
     if (!isStripe && !isManual) {
       return res.status(422).json({
         success: false,
-        error: "paymentMethod invalide : 'stripe' | 'manual'"
+        error: req.t("order.invalid_payment_method")
       });
     }
 
     if (!["monthly", "yearly"].includes(interval)) {
-      return res.status(422).json({ success: false, error: "interval invalide" });
+      return res.status(422).json({ success: false, error: req.t("subscription.invalid_interval") });
     }
 
     // Méthode manuelle
     let manualMethod = null;
     if (isManual) {
       if (!paymentMethodId) {
-        return res.status(422).json({ success: false, error: "paymentMethodId requis" });
+        return res.status(422).json({ success: false, error: req.t("order.payment_method_id_required") });
       }
 
       manualMethod = await prisma.manualPaymentMethod.findFirst({
@@ -139,7 +138,7 @@ export const checkoutSubscription = async (req, res, next) => {
       });
 
       if (!manualMethod) {
-        return res.status(422).json({ success: false, error: "Méthode manuelle invalide" });
+        return res.status(422).json({ success: false, error: req.t("subscription.invalid_manual_method") });
       }
     }
 
@@ -149,7 +148,7 @@ export const checkoutSubscription = async (req, res, next) => {
     });
 
     if (!plan || plan.status !== "Active") {
-      return res.status(404).json({ success: false, error: "Plan introuvable" });
+      return res.status(404).json({ success: false, error: req.t("subscription.plan_not_found") });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -160,12 +159,12 @@ export const checkoutSubscription = async (req, res, next) => {
       where: { companyId },
     });
 
-    if (existingSub) {
-      return res.status(422).json({
-        success: false,
-        error: "Un abonnement existe déjà",
-      });
-    }
+    // if (existingSub) {
+    //   return res.status(422).json({
+    //     success: false,
+    //     error: req.t("subscription.already_exists"),
+    //   });
+    // }
 
     // Calculer montants
     const amounts = calculateSubscriptionAmounts(plan, interval, []);
@@ -180,16 +179,103 @@ export const checkoutSubscription = async (req, res, next) => {
       // Créer/récupérer customer
       const customer = await getOrCreateStripeCustomer(user, company);
 
-      // Vérifier carte
       const savedCard = await getDefaultPaymentMethod(customer.id);
 
       if (!savedCard) {
-        const setupIntent = await createSetupIntent(customer.id);
+        // Première souscription : aucune carte enregistrée.
+        // On crée un PaymentIntent avec setup_future_usage pour que le paiement
+        // et l'enregistrement de la carte se fassent en une seule étape.
+        const orderNumber = await generateSubscriptionOrderNumber();
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.round(amounts.totalAmount * 100),
+          currency: 'eur',
+          customer: customer.id,
+          automatic_payment_methods: { enabled: true },
+          setup_future_usage: 'off_session',
+          metadata: {
+            type: 'subscription',
+            companyId: String(companyId),
+            userId: String(userId),
+            planId: String(planId),
+            interval,
+            orderNumber,
+          },
+        });
+
+        await prisma.$transaction(async (tx) => {
+          await tx.order.create({
+            data: {
+              userId,
+              companyId,
+              orderNumber,
+              status: "pending",
+              subtotal: amounts.totalAmount,
+              shippingCost: 0,
+              total: amounts.totalAmount,
+              currency: "EUR",
+              exchangeRate: 1,
+              methodPayment: "Stripe",
+              stripePaymentIntentId: paymentIntent.id,
+              stripeClientSecret: paymentIntent.client_secret,
+            },
+          });
+
+          await tx.subscription.upsert({
+            where: { companyId },
+            create: {
+              companyId,
+              planId: plan.id,
+              status: "incomplete",
+              interval,
+              baseAmount: amounts.baseAmount,
+              addonsAmount: amounts.addonsAmount,
+              totalAmount: amounts.totalAmount,
+              currentPeriodStart: periods.currentPeriodStart,
+              currentPeriodEnd: periods.currentPeriodEnd,
+              nextBillingDate: periods.nextBillingDate,
+              stripeCustomerId: customer.id,
+            },
+            update: {
+              planId: plan.id,
+              status: "incomplete",
+              interval,
+              baseAmount: amounts.baseAmount,
+              addonsAmount: amounts.addonsAmount,
+              totalAmount: amounts.totalAmount,
+              currentPeriodStart: periods.currentPeriodStart,
+              currentPeriodEnd: periods.currentPeriodEnd,
+              nextBillingDate: periods.nextBillingDate,
+              stripeCustomerId: customer.id,
+            },
+          });
+
+          const subscription = await tx.subscription.findUnique({ where: { companyId } });
+
+          await tx.billingHistory.create({
+            data: {
+              subscriptionId: subscription.id,
+              baseAmount: amounts.baseAmount,
+              addonsAmount: amounts.addonsAmount,
+              totalAmount: amounts.totalAmount,
+              periodStart: periods.currentPeriodStart,
+              periodEnd: periods.currentPeriodEnd,
+              status: "pending",
+              stripePaymentIntentId: paymentIntent.id,
+              paymentMethod: "Stripe",
+            },
+          });
+        });
+
         return res.json({
           success: true,
-          requiresPaymentMethod: true,
-          clientSecret: setupIntent.client_secret,
-          message: "Veuillez enregistrer une carte",
+          clientSecret: paymentIntent.client_secret,
+          message: req.t("subscription.confirm_payment"),
+          data: {
+            orderNumber,
+            totalAmount: amounts.totalAmount,
+            status: "pending",
+          },
         });
       }
 
@@ -232,10 +318,23 @@ export const checkoutSubscription = async (req, res, next) => {
           },
         });
 
-        // 2. Subscription
-        await tx.subscription.create({
-          data: {
+        // 2. Subscription (upsert : peut déjà exister depuis la phase !savedCard)
+        await tx.subscription.upsert({
+          where: { companyId },
+          create: {
             companyId,
+            planId: plan.id,
+            status: "incomplete",
+            interval,
+            baseAmount: amounts.baseAmount,
+            addonsAmount: amounts.addonsAmount,
+            totalAmount: amounts.totalAmount,
+            currentPeriodStart: periods.currentPeriodStart,
+            currentPeriodEnd: periods.currentPeriodEnd,
+            nextBillingDate: periods.nextBillingDate,
+            stripeCustomerId: customer.id,
+          },
+          update: {
             planId: plan.id,
             status: "incomplete",
             interval,
@@ -272,7 +371,7 @@ export const checkoutSubscription = async (req, res, next) => {
       return res.json({
         success: true,
         clientSecret: paymentIntent.client_secret,
-        message: "Veuillez confirmer le paiement",
+        message: req.t("subscription.confirm_payment"),
         data: {
           orderNumber,
           totalAmount: amounts.totalAmount,
@@ -359,7 +458,7 @@ export const checkoutSubscription = async (req, res, next) => {
 
       return res.json({
         success: true,
-        message: `Commande ${result.order.orderNumber} créée. Facture ${result.invoice.invoiceNumber} en attente de paiement.`,
+        message: req.t("subscription.order_created", { orderNumber: result.order.orderNumber, invoiceNumber: result.invoice.invoiceNumber }),
         data: {
           orderNumber: result.order.orderNumber,
           invoiceNumber: result.invoice.invoiceNumber,

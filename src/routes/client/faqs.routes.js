@@ -13,9 +13,9 @@ import {
 const router = express.Router();
 
 // Public routes
-router.get("/faqs/categories", getFAQCategories);
-router.get("/faqs", listPublicFAQs);
-router.get("/faqs/:id", getFAQPublic);
-router.post("/faqs/:id/feedback", voteFAQ);
+router.get("/categories", getFAQCategories);
+router.get("/", listPublicFAQs);
+router.get("/:id", getFAQPublic);
+router.post("/:id/feedback", voteFAQ);
 
 export default router;

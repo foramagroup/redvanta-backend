@@ -12,7 +12,7 @@ export const listNfcCards = async (req, res, next) => {
     if (!companyId) {
       return res.status(403).json({
         success: false,
-        error: "Aucune company active",
+        error: req.t("errors.forbidden"),
         code: "NO_COMPANY"
       });
     }
@@ -225,7 +225,7 @@ export const getNfcCard = async (req, res, next) => {
     if (!card) {
       return res.status(404).json({
         success: false,
-        error: "Carte introuvable",
+        error: req.t("nfc.card_not_found"),
         code: "CARD_NOT_FOUND"
       });
     }
@@ -269,7 +269,7 @@ export const assignCardToLocation = async (req, res, next) => {
     if (!card) {
       return res.status(404).json({
         success: false,
-        error: "Carte introuvable",
+        error: req.t("nfc.card_not_found"),
         code: "CARD_NOT_FOUND"
       });
     }
@@ -285,7 +285,7 @@ export const assignCardToLocation = async (req, res, next) => {
     if (!location) {
       return res.status(404).json({
         success: false,
-        error: "Location introuvable",
+        error: req.t("location.not_found"),
         code: "LOCATION_NOT_FOUND"
       });
     }
@@ -315,7 +315,7 @@ export const assignCardToLocation = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: `Carte assignée à "${location.name}"`,
+      message: req.t("nfc.assign_success"),
       data: formatNfcCard(updatedCard)
     });
   } catch (error) {
@@ -343,7 +343,7 @@ export const unassignCardFromLocation = async (req, res, next) => {
     if (!card) {
       return res.status(404).json({
         success: false,
-        error: "Carte introuvable",
+        error: req.t("nfc.card_not_found"),
         code: "CARD_NOT_FOUND"
       });
     }
@@ -351,7 +351,7 @@ export const unassignCardFromLocation = async (req, res, next) => {
     if (!card.locationId) {
       return res.status(400).json({
         success: false,
-        error: "Cette carte n'est assignée à aucune location",
+        error: req.t("admin.nfc.not_assigned"),
         code: "NOT_ASSIGNED"
       });
     }
@@ -379,7 +379,7 @@ export const unassignCardFromLocation = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: "Carte désassignée avec succès",
+      message: req.t("nfc.unassign_success"),
       data: formatNfcCard(updatedCard)
     });
   } catch (error) {
@@ -410,7 +410,7 @@ export const updateCardStatus = async (req, res, next) => {
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        error: "Statut invalide",
+        error: req.t("nfc.invalid_status"),
         code: "INVALID_STATUS",
         validStatuses
       });
@@ -426,7 +426,7 @@ export const updateCardStatus = async (req, res, next) => {
     if (!card) {
       return res.status(404).json({
         success: false,
-        error: "Carte introuvable",
+        error: req.t("nfc.card_not_found"),
         code: "CARD_NOT_FOUND"
       });
     }
@@ -462,7 +462,7 @@ export const updateCardStatus = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: `Statut mis à jour: ${status}`,
+      message: req.t("superadmin.nfc.status_updated", { status }),
       data: formatNfcCard(updatedCard)
     });
   } catch (error) {
@@ -490,7 +490,7 @@ export const deleteNfcCard = async (req, res, next) => {
     if (!card) {
       return res.status(404).json({
         success: false,
-        error: "Carte introuvable",
+        error: req.t("nfc.card_not_found"),
         code: "CARD_NOT_FOUND"
       });
     }
@@ -506,7 +506,7 @@ export const deleteNfcCard = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: "Carte désactivée avec succès"
+      message: req.t("admin.nfc.card_disabled")
     });
   } catch (error) {
     console.error("Error deleting card:", error);
@@ -525,7 +525,7 @@ export const getAvailableLocations = async (req, res, next) => {
     if (!companyId) {
       return res.status(403).json({
         success: false,
-        error: "Aucune company active",
+        error: req.t("errors.forbidden"),
         code: "NO_COMPANY"
       });
     }

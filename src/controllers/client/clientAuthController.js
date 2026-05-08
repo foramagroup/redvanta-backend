@@ -114,10 +114,10 @@ export const signup = async (req, res, next) => {
     if (userExists || companyExists) {
         return res.status(409).json({
         success: false,
-        error: "An account already exists with this email. Please log in.",
+        error: req.t("auth.account_exists"),
         code: "EMAIL_EXISTS",
-        redirectTo: "/login", 
-        message: "Log in and then add your new company."
+        redirectTo: "/login",
+        message: req.t("auth.login_account"),
       });
     }
 
@@ -222,7 +222,7 @@ export const signup = async (req, res, next) => {
     //  Il doit d'abord vérifier
     return res.status(201).json({
       success: true,
-      message: "Account created successfully. A verification code has been sent to your email.",
+      message: req.t("auth.create_account_success"),
       emailVerified: false,
       codeExpiration: codeExpiration,
       email: email, // Pour redirection vers page de vérification
@@ -232,7 +232,7 @@ export const signup = async (req, res, next) => {
     if (e.code === "P2002") {
       return res.status(409).json({ 
         success: false, 
-        error: "Email already in use", 
+        error: req.t("auth.email_exists"),
         code: "EMAIL_EXISTS" 
       });
     }
@@ -252,20 +252,20 @@ export const login = async (req, res, next) => {
 
     if (!user || !user.isAdmin) {
       await logActivity(null, email, ip, userAgent, "failed");
-      return res.status(401).json({ success: false, error: "Incorrect email or password", code: "INVALID_CREDENTIALS" });
+      return res.status(401).json({ success: false, error: req.t("auth.invalid_credentials"), code: "INVALID_CREDENTIALS" });
     }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       await logActivity(user.id, user.name, ip, userAgent, "failed");
-      return res.status(401).json({ success: false, error: "Incorrect email or password", code: "INVALID_CREDENTIALS" });
+      return res.status(401).json({ success: false, error: req.t("auth.invalid_credentials"), code: "INVALID_CREDENTIALS" });
     }
 
      if (user.accountSuspendedAt) {
       await logActivity(user.id, user.name, ip, userAgent, "failed_suspended");
       return res.status(403).json({
         success: false,
-        error: "Your account has been suspended. Please contact support.",
+        error: req.t("auth.account_suspended"),
         code: "ACCOUNT_SUSPENDED",
         suspendedAt: user.accountSuspendedAt,
         reason: user.suspensionReason
@@ -286,13 +286,13 @@ export const login = async (req, res, next) => {
         });
         return res.status(403).json({
           success: false,
-          error: "Your verification code has expired. Your account has been suspended.",
+          error: req.t("auth.verification_code_expired"),
           code: "CODE_EXPIRED_SUSPENDED"
         });
       }
       return res.status(403).json({
         success: false,
-        error: "Please verify your email before logging in.",
+        error: req.t("auth.email_not_verified"),
         code: "EMAIL_NOT_VERIFIED",
         email: user.email,
         codeExpiration: user.emailVerifyCodeExp,
@@ -305,10 +305,10 @@ export const login = async (req, res, next) => {
 
     if (!defaultLink) {
       await logActivity(user.id, user.name, ip, userAgent, "failed");
-      return res.status(403).json({ success: false, error: "No company associated with this account.", code: "NO_COMPANY" });
+      return res.status(403).json({ success: false, error: req.t("auth.no_company"), code: "NO_COMPANY" });
     }
 
-    
+
 
     const token = generateToken({
       userId: user.id,
@@ -328,7 +328,7 @@ export const login = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: "Login successful",
+      message: req.t("auth.login_success"),
       emailVerified: true,
       user: formatAdmin(fullUser, defaultLink.company.id),
     });
@@ -348,7 +348,7 @@ export const verifyEmail = async (req, res, next) => {
       if (shouldRedirect) {
         return redirectVerifyResult(res, "error", "Missing token");
       }
-      return res.status(400).json({ success: false, error: "Missing token", code: "MISSING_TOKEN" });
+      return res.status(400).json({ success: false, error: req.t("auth.token_missing"), code: "MISSING_TOKEN" });
     }
 
     const tokenHash = hashVerifyToken(rawToken);
@@ -364,7 +364,7 @@ export const verifyEmail = async (req, res, next) => {
       if (shouldRedirect) {
         return redirectVerifyResult(res, "error", "Invalid or already used link");
       }
-      return res.status(400).json({ success: false, error: "Invalid or already used link", code: "INVALID_TOKEN" });
+      return res.status(400).json({ success: false, error: req.t("auth.invalid_token"), code: "INVALID_TOKEN" });
     }
 
     if (user.emailVerifyExp && user.emailVerifyExp < new Date()) {
@@ -373,7 +373,7 @@ export const verifyEmail = async (req, res, next) => {
       }
       return res.status(400).json({
         success: false,
-        error: "This link has expired. Please request a new confirmation link.",
+        error: req.t("auth.token_expired"),
         code: "TOKEN_EXPIRED",
       });
     }
@@ -400,7 +400,7 @@ export const verifyEmail = async (req, res, next) => {
       if (shouldRedirect) {
         return redirectVerifyResult(res, "error", "No active company associated with this account.");
       }
-      return res.status(403).json({ success: false, error: "No active company associated with this account.", code: "NO_COMPANY" });
+      return res.status(403).json({ success: false, error: req.t("auth.no_company"), code: "NO_COMPANY" });
     }
 
     const authToken = generateToken({
@@ -421,7 +421,7 @@ export const verifyEmail = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: "Email confirmed successfully. You are now logged in.",
+      message: req.t("auth.email_verified_success"),
     });
   } catch (e) {
     next(e);
@@ -443,7 +443,7 @@ export const verifyCode = async (req, res, next) => {
     if (!code || code.length !== 6) {
       return res.status(400).json({
         success: false,
-        error: "Invalid code. The code must contain 6 digits.",
+        error: req.t("auth.invalid_code_format"),
         code: "INVALID_CODE_FORMAT"
       });
     }
@@ -463,7 +463,7 @@ export const verifyCode = async (req, res, next) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: "User not found",
+        error: req.t("auth.user_not_found"),
         code: "USER_NOT_FOUND"
       });
     }
@@ -472,7 +472,7 @@ export const verifyCode = async (req, res, next) => {
     if (user.accountSuspendedAt) {
       return res.status(403).json({
         success: false,
-        error: "Your account has been suspended. Please contact support.",
+        error: req.t("auth.account_suspended"),
         code: "ACCOUNT_SUSPENDED",
         suspendedAt: user.accountSuspendedAt,
         reason: user.suspensionReason
@@ -483,7 +483,7 @@ export const verifyCode = async (req, res, next) => {
     if (user.emailVerifiedAt) {
       return res.status(400).json({
         success: false,
-        error: "Your email is already verified. You can log in.",
+        error: req.t("auth.already_verified"),
         code: "ALREADY_VERIFIED"
       });
     }
@@ -503,7 +503,7 @@ export const verifyCode = async (req, res, next) => {
 
       return res.status(403).json({
         success: false,
-        error: "Too many failed attempts. Your account has been suspended for security reasons.",
+        error: req.t("auth.too_many_attempts"),
         code: "TOO_MANY_ATTEMPTS"
       });
     }
@@ -523,7 +523,7 @@ export const verifyCode = async (req, res, next) => {
 
       return res.status(403).json({
         success: false,
-        error: "Your verification code has expired. Your account has been suspended.",
+        error: req.t("auth.verification_code_expired"),
         code: "CODE_EXPIRED",
         canRequestNew: true // Permettre de demander un nouveau code
       });
@@ -545,7 +545,7 @@ export const verifyCode = async (req, res, next) => {
 
       return res.status(400).json({
         success: false,
-        error: "Incorrect code. Please try again.",
+        error: req.t("auth.invalid_verification_code"),
         code: "INVALID_CODE",
         attemptsRemaining: MAX_VERIFICATION_ATTEMPTS - newAttempts,
         attemptsUsed: newAttempts
@@ -571,7 +571,7 @@ export const verifyCode = async (req, res, next) => {
     if (!companyLink) {
       return res.status(403).json({
         success: false,
-        error: "No company associated with this account",
+        error: req.t("auth.no_company"),
         code: "NO_COMPANY"
       });
     }
@@ -592,7 +592,7 @@ export const verifyCode = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: "Email verified successfully. You are now logged in.",
+      message: req.t("auth.verification_success"),
       emailVerified: true,
       user: formatAdmin(fullUser, companyLink.company.id),
       redirectTo: req.body.returnUrl || "/dashboard" // Redirection personnalisée
@@ -616,7 +616,7 @@ export const resendVerificationCode = async (req, res, next) => {
     if (!email) {
       return res.status(400).json({
         success: false,
-        error: "Email required"
+        error: req.t("auth.email_required")
       });
     }
 
@@ -632,10 +632,9 @@ export const resendVerificationCode = async (req, res, next) => {
     });
 
     if (!user) {
-      // Ne pas révéler si l'email existe ou non (sécurité)
       return res.json({
         success: true,
-        message: "If an account exists with this email, a new code has been sent."
+        message: req.t("auth.verification_code_sent")
       });
     }
 
@@ -643,7 +642,7 @@ export const resendVerificationCode = async (req, res, next) => {
     if (user.emailVerifiedAt) {
       return res.json({
         success: true,
-        message: "If an account exists with this email, a new code has been sent."
+        message: req.t("auth.verification_code_sent")
       });
     }
 
@@ -651,7 +650,7 @@ export const resendVerificationCode = async (req, res, next) => {
     if (user.accountSuspendedAt) {
       return res.status(403).json({
         success: false,
-        error: "Your account has been suspended. Please contact support.",
+        error: req.t("auth.account_suspended"),
         code: "ACCOUNT_SUSPENDED"
       });
     }
@@ -684,7 +683,7 @@ export const resendVerificationCode = async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: "A new verification code has been sent to your email.",
+      message: req.t("auth.resend_code_sent"),
       codeExpiration: newExpiration
     });
 
@@ -697,19 +696,19 @@ export const resendVerificationCode = async (req, res, next) => {
 export const resendVerification = async (req, res, next) => {
   try {
     const email = normalizeEmail(req.body?.email || req.user?.email);
-    if (!email) return res.status(422).json({ success: false, error: "Email required" });
+    if (!email) return res.status(422).json({ success: false, error: req.t("auth.email_required") });
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       return res.json({
         success: true,
-        message: "If a matching account exists, a confirmation email will be sent.",
+        message: req.t("auth.verification_email_sent"),
       });
     }
     if (user.emailVerifiedAt) {
       return res.json({
         success: true,
-        message: "If a matching account exists, a confirmation email will be sent.",
+        message: req.t("auth.verification_email_sent"),
       });
     }
 
@@ -750,7 +749,7 @@ export const resendVerification = async (req, res, next) => {
 export const me = async (req, res, next) => {
   try {
     const user = await loadUserForAuth(req.user.userId, "admin");
-    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+    if (!user) return res.status(404).json({ success: false, error: req.t("auth.user_not_found") });
     return res.json({
       success:       true,
       emailVerified: !!user.emailVerifiedAt,
@@ -763,16 +762,16 @@ export const me = async (req, res, next) => {
 export const switchCompany = async (req, res, next) => {
   try {
     const { companyId } = req.body;
-    if (!companyId) return res.status(422).json({ success: false, error: "companyId required" });
+    if (!companyId) return res.status(422).json({ success: false, error: req.t("auth.company_id_required") });
 
     const link = await prisma.userCompany.findUnique({
       where:   { userId_companyId: { userId: req.user.userId, companyId: parseInt(companyId) } },
       include: { company: true },
     });
 
-    if (!link) return res.status(403).json({ success: false, error: "Access denied to this company" });
+    if (!link) return res.status(403).json({ success: false, error: req.t("company.access_denied") });
     if (!["active", "trial"].includes(link.company.status)) {
-      return res.status(403).json({ success: false, error: "This company is suspended" });
+      return res.status(403).json({ success: false, error: req.t("company.suspended") });
     }
 
     if (req.token) await blacklistToken(req.token);
@@ -790,7 +789,7 @@ export const switchCompany = async (req, res, next) => {
 
     return res.json({
       success:       true,
-      message:       `Switched to "${link.company.name}"`,
+      message:       req.t("company.switched_success", { name: link.company.name }),
       activeCompany: { id: link.company.id, name: link.company.name, status: link.company.status },
     });
   } catch (e) { next(e); }
@@ -804,7 +803,7 @@ export const logout = async (req, res, next) => {
       await logActivity(req.user.userId, null, getIp(req), req.headers["user-agent"], "logout");
     }
     res.clearCookie("admin_token", getCookieOptions("admin_token"));
-    return res.json({ success: true, message: "Logged out successfully" });
+    return res.json({ success: true, message: req.t("auth.logout_success") });
   } catch (e) { next(e); }
 };
 
@@ -827,17 +826,17 @@ export const deleteUserCompany = async (req, res, next) => {
     const link = await prisma.userCompany.findFirst({
       where: { userId, companyId, isOwner: true },
     });
-    if (!link) return res.status(403).json({ success: false, error: "Unauthorized or company not found", code: "FORBIDDEN" });
+    if (!link) return res.status(403).json({ success: false, error: req.t("auth.unauthorized"), code: "FORBIDDEN" });
 
     // Vérifier qu'il lui reste au moins une autre company
     const total = await prisma.userCompany.count({ where: { userId } });
-    if (total <= 1) return res.status(400).json({ success: false, error: "You cannot delete your only company", code: "LAST_COMPANY" });
+    if (total <= 1) return res.status(400).json({ success: false, error: req.t("company.cannot_delete_last"), code: "LAST_COMPANY" });
 
     // Supprimer les liens UserCompany d'abord, puis la company
     await prisma.userCompany.deleteMany({ where: { companyId } });
     await prisma.company.delete({ where: { id: companyId } });
 
-    return res.json({ success: true, message: "Company deleted successfully" });
+    return res.json({ success: true, message: req.t("company.deleted") });
   } catch (e) {
     next(e);
   }
@@ -851,7 +850,7 @@ export const addCompany = async (req, res, next) => {
     if (!userId) {
       return res.status(401).json({
         success: false,
-        error: "Unauthorized",
+        error: req.t("auth.unauthorized"),
         code: "UNAUTHORIZED"
       });
     }
@@ -861,7 +860,7 @@ export const addCompany = async (req, res, next) => {
     if (!companyName || !companyName.trim()) {
       return res.status(400).json({
         success: false,
-        error: "MISSING COMPANY NAME",
+        error: req.t("auth.company_name_required"),
         code: "MISSING_COMPANY_NAME"
       });
     }
@@ -875,7 +874,7 @@ export const addCompany = async (req, res, next) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: "USER NOT FOUND",
+        error: req.t("auth.user_not_found"),
         code: "USER_NOT_FOUND"
       });
     }
@@ -968,7 +967,7 @@ export const addCompany = async (req, res, next) => {
 
     return res.status(201).json({
       success: true,
-      message: `Company "${result.company.name}" created successfully`,
+      message: req.t("company.created", { name: result.company.name }),
       company: {
         id: result.company.id,
         name: result.company.name,

@@ -94,7 +94,7 @@ export const updateTemplate = async (req, res) => {
         res.status(200).json({ success: true, data: result });
     } catch (error) {
         console.error("Update Template Error:", error);
-        res.status(400).json({ success: false, message: "Erreur lors de la mise à jour" });
+        res.status(400).json({ success: false, message: req.t("errors.server_error") });
     }
 };
 
@@ -147,7 +147,7 @@ export const deleteTemplate = async (req, res) => {
         await prisma.emailTemplate.delete({
             where: { id: parseInt(id) }
         });
-        res.json({ success: true, message: "Template supprimé" });
+        res.json({ success: true, message: req.t("success.deleted") });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

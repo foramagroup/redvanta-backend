@@ -198,9 +198,9 @@ export const updateOrderStatus = async (req, res, next) => {
     const id = parseInt(req.params.id);
     const { status, note, trackingNumber, trackingUrl, estimatedDelivery } = req.body;
     const changedBy = req.user.userId;
-    if (!status) return res.status(422).json({ success: false, error: "status requis" });
+    if (!status) return res.status(422).json({ success: false, error: req.t("superadmin.order.status_required") });
     const order = await prisma.order.findUnique({ where: { id } });
-    if (!order) return res.status(404).json({ success: false, error: "Commande introuvable" });
+    if (!order) return res.status(404).json({ success: false, error: req.t("order.not_found") });
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id },
@@ -223,7 +223,7 @@ export const updateOrderStatus = async (req, res, next) => {
       // Mettre à jour le statut sans activer
       await updateCardsStatusForOrder(id, status).catch((e) => console.error("[tracking] Erreur update NFC:", e.message));
     }
-    res.json({ success: true, message: `Statut mis à jour : ${status}` });
+    res.json({ success: true, message: req.t("superadmin.order.status_updated", { status }) });
   } catch (e) { next(e); }
 };
 
@@ -252,7 +252,7 @@ export const getOrderDetail = async (req, res, next) => {
         payments: { orderBy: { createdAt: "desc" }, take: 1 },
       },
     });
-    if (!order) return res.status(404).json({ success: false, error: "Commande introuvable" });
+    if (!order) return res.status(404).json({ success: false, error: req.t("order.not_found") });
     res.json({ success: true, data: formatOrderTracking(order) });
   } catch (e) { next(e); }
 };

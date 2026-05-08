@@ -11,7 +11,7 @@ import {
 const router = express.Router();
 
 // Public routes
-router.get("/pages", listPublicPages);
-router.get("/pages/:slug", getPageBySlug);
+router.get("/", listPublicPages);
+router.get("/:slug", getPageBySlug);
 
 export default router;

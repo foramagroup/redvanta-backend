@@ -33,7 +33,7 @@ router.get("/:slug", async (req, res) => {
       where: { slug: req.params.slug }
     });
 
-    if (!product) return fail(res, 404, "Produit introuvable");
+    if (!product) return fail(res, 404, req.t("superadmin.product.not_found"));
 
     return ok(res, { product });
   } catch (err) {
@@ -106,7 +106,7 @@ router.delete("/:id", async (req, res) => {
 
     await prisma.product.delete({ where: { id } });
 
-    return ok(res, { message: "Produit supprimé" });
+    return ok(res, { message: req.t("superadmin.product.deleted") });
   } catch (err) {
     return fail(res, 500, err.message);
   }

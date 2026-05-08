@@ -48,7 +48,7 @@ export const userController = {
         data: { password: hashed }
       });
 
-      return ok(res, { message: 'Mot de passe mis à jour' });
+      return ok(res, { message: req.t("auth.password_updated") });
     } catch (err) {
       return fail(res, 500, err.message);
     }

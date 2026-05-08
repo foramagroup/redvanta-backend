@@ -16,7 +16,8 @@ export async function languageMiddleware(req, res, next) {
     // 1. Langue depuis le header (priorité max)
     const headerLang = req.headers["accept-language"]?.split(",")[0]?.split("-")[0];
     if (headerLang && i18n.hasLocale(headerLang)) {
-      locale = headerLang;
+      // locale = headerLang;
+      locale = "en";
     }
 
     // 2. Langue de la company (si user connecté)

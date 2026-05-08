@@ -155,10 +155,10 @@ export const inviteTeamMember = async (req, res, next) => {
     const { email, name, roleName = "Viewer", locationIds = [] } = req.body;
 
     if (!email?.trim()) {
-      return res.status(422).json({ success: false, error: "L'email est requis" });
+      return res.status(422).json({ success: false, error: req.t("admin.team.email_required") });
     }
     if (!name?.trim()) {
-      return res.status(422).json({ success: false, error: "Le nom est requis" });
+      return res.status(422).json({ success: false, error: req.t("admin.team.name_required") });
     }
 
     // Récupérer l'id du rôle depuis la DB (Role.name = roleName)
@@ -166,7 +166,7 @@ export const inviteTeamMember = async (req, res, next) => {
     if (!role) {
       return res.status(422).json({
         success: false,
-        error: `Rôle "${roleName}" introuvable en base. Vérifiez la table roles.`,
+        error: req.t("admin.team.role_not_found", { role: roleName }),
       });
     }
 
@@ -204,7 +204,7 @@ export const inviteTeamMember = async (req, res, next) => {
       });
       if (existing) {
         throw Object.assign(
-          new Error("Cet utilisateur est déjà membre de la company"),
+          new Error(req.t("admin.team.already_member")),
           { status: 409 }
         );
       }
@@ -283,8 +283,8 @@ export const inviteTeamMember = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: result.isNew
-        ? `Invitation envoyée à ${email}. Un lien de création de compte a été généré.`
-        : `${email} ajouté à la company.`,
+        ? req.t("admin.team.invite_sent_new", { email })
+        : req.t("admin.team.invite_sent_existing", { email }),
       data: {
         userId:  result.user.id,
         isNew:   result.isNew,
@@ -313,7 +313,7 @@ export const getMemberActivity = async (req, res, next) => {
       where: { userId, companyId },
     });
     if (!membership) {
-      return res.status(404).json({ success: false, error: "Membre introuvable" });
+      return res.status(404).json({ success: false, error: req.t("admin.team.member_not_found") });
     }
 
     const [activityLogs, loginLogs] = await Promise.all([
@@ -376,7 +376,7 @@ export const changeMemberRole = async (req, res, next) => {
     // Récupérer le rôle
     const role = await prisma.role.findFirst({ where: { name: roleName } });
     if (!role) {
-      return res.status(422).json({ success: false, error: `Rôle "${roleName}" introuvable` });
+      return res.status(422).json({ success: false, error: req.t("admin.team.role_not_found", { role: roleName }) });
     }
 
     // Vérifier la liaison
@@ -384,10 +384,10 @@ export const changeMemberRole = async (req, res, next) => {
       where: { userId: targetId, companyId },
     });
     if (!membership) {
-      return res.status(404).json({ success: false, error: "Membre introuvable" });
+      return res.status(404).json({ success: false, error: req.t("admin.team.member_not_found") });
     }
     if (membership.isOwner) {
-      return res.status(403).json({ success: false, error: "Impossible de modifier le rôle du propriétaire" });
+      return res.status(403).json({ success: false, error: req.t("admin.team.cannot_change_owner_role") });
     }
 
     await prisma.$transaction([
@@ -406,7 +406,7 @@ export const changeMemberRole = async (req, res, next) => {
       }),
     ]);
 
-    res.json({ success: true, message: `Rôle mis à jour : ${roleName}` });
+    res.json({ success: true, message: req.t("admin.team.role_updated", { role: roleName }) });
   } catch (e) {
     next(e);
   }
@@ -428,10 +428,10 @@ export const toggleMemberStatus = async (req, res, next) => {
       where: { userId: targetId, companyId },
     });
     if (!membership) {
-      return res.status(404).json({ success: false, error: "Membre introuvable" });
+      return res.status(404).json({ success: false, error: req.t("admin.team.member_not_found") });
     }
     if (membership.isOwner) {
-      return res.status(403).json({ success: false, error: "Impossible de désactiver le propriétaire" });
+      return res.status(403).json({ success: false, error: req.t("admin.team.cannot_disable_owner") });
     }
 
     await prisma.$transaction([
@@ -455,7 +455,7 @@ export const toggleMemberStatus = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: activate ? "Membre activé" : "Membre désactivé",
+      message: activate ? req.t("admin.team.member_activated") : req.t("admin.team.member_deactivated"),
       status:  activate ? "Active" : "Inactive",
     });
   } catch (e) {
@@ -476,10 +476,10 @@ export const removeMember = async (req, res, next) => {
       where: { userId: targetId, companyId },
     });
     if (!membership) {
-      return res.status(404).json({ success: false, error: "Membre introuvable" });
+      return res.status(404).json({ success: false, error: req.t("admin.team.member_not_found") });
     }
     if (membership.isOwner) {
-      return res.status(403).json({ success: false, error: "Impossible de retirer le propriétaire" });
+      return res.status(403).json({ success: false, error: req.t("admin.team.cannot_remove_owner") });
     }
 
     await prisma.$transaction([
@@ -499,7 +499,7 @@ export const removeMember = async (req, res, next) => {
       }),
     ]);
 
-    res.json({ success: true, message: "Membre retiré de la company" });
+    res.json({ success: true, message: req.t("admin.team.member_removed") });
   } catch (e) {
     next(e);
   }

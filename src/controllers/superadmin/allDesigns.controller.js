@@ -248,14 +248,14 @@ export const listAllDesigns = async (req, res, next) => {
 export const getSuperadminDesign = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ success: false, error: "ID invalide" });
+    if (isNaN(id)) return res.status(400).json({ success: false, error: req.t("auth.invalid_id") });
 
     const design = await prisma.design.findUnique({
       where:   { id },
       include: DESIGN_INCLUDE,
     });
 
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     res.json({ success: true, data: formatDesign(design) });
   } catch (e) { next(e); }
@@ -270,16 +270,16 @@ export const flagDesign = async (req, res, next) => {
   try {
     const id    = parseInt(req.params.id);
     const { reason } = req.body ?? {};
-    if (isNaN(id)) return res.status(400).json({ success: false, error: "ID invalide" });
+    if (isNaN(id)) return res.status(400).json({ success: false, error: req.t("auth.invalid_id") });
 
     const design = await prisma.design.findUnique({ where: { id } });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     if (design.status === "flagged") {
-      return res.status(409).json({ success: false, error: "Design déjà flaggé" });
+      return res.status(409).json({ success: false, error: req.t("superadmin.design.already_flagged") });
     }
     if (design.status === "archived") {
-      return res.status(409).json({ success: false, error: "Impossible de flagguer un design archivé" });
+      return res.status(409).json({ success: false, error: req.t("superadmin.design.cannot_flag_archived") });
     }
 
     const [updated] = await prisma.$transaction([
@@ -301,7 +301,7 @@ export const flagDesign = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Design flaggé pour révision",
+      message: req.t("superadmin.design.flagged"),
       data:    formatDesign(updated),
     });
   } catch (e) { next(e); }
@@ -314,13 +314,13 @@ export const flagDesign = async (req, res, next) => {
 export const unflagDesign = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ success: false, error: "ID invalide" });
+    if (isNaN(id)) return res.status(400).json({ success: false, error: req.t("auth.invalid_id") });
 
     const design = await prisma.design.findUnique({ where: { id } });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     if (design.status !== "flagged") {
-      return res.status(409).json({ success: false, error: "Seuls les designs flaggés peuvent être unflaggés" });
+      return res.status(409).json({ success: false, error: req.t("superadmin.design.not_flagged") });
     }
 
     const [updated] = await prisma.$transaction([
@@ -342,7 +342,7 @@ export const unflagDesign = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Flag retiré — design restauré en brouillon",
+      message: req.t("superadmin.design.not_flagged"),
       data:    formatDesign(updated),
     });
   } catch (e) { next(e); }
@@ -355,16 +355,16 @@ export const unflagDesign = async (req, res, next) => {
 export const archiveDesignSuperadmin = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ success: false, error: "ID invalide" });
+    if (isNaN(id)) return res.status(400).json({ success: false, error: req.t("auth.invalid_id") });
 
     const design = await prisma.design.findUnique({ where: { id } });
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     if (design.status === "locked") {
-      return res.status(409).json({ success: false, error: "Impossible d'archiver un design verrouillé (commande en cours)" });
+      return res.status(409).json({ success: false, error: req.t("superadmin.design.cannot_archive_locked") });
     }
     if (design.status === "archived") {
-      return res.status(409).json({ success: false, error: "Design déjà archivé" });
+      return res.status(409).json({ success: false, error: req.t("superadmin.design.already_archived") });
     }
 
     const [updated] = await prisma.$transaction([
@@ -386,7 +386,7 @@ export const archiveDesignSuperadmin = async (req, res, next) => {
 
     res.json({
       success: true,
-      message: "Design archivé",
+      message: req.t("superadmin.design.archived"),
       data:    formatDesign(updated),
     });
   } catch (e) { next(e); }
@@ -403,7 +403,7 @@ export const archiveDesignSuperadmin = async (req, res, next) => {
 export const deleteDesignSuperadmin = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    if (isNaN(id)) return res.status(400).json({ success: false, error: "ID invalide" });
+    if (isNaN(id)) return res.status(400).json({ success: false, error: req.t("auth.invalid_id") });
 
     const design = await prisma.design.findUnique({
       where:   { id },
@@ -413,13 +413,13 @@ export const deleteDesignSuperadmin = async (req, res, next) => {
       },
     });
 
-    if (!design) return res.status(404).json({ success: false, error: "Design introuvable" });
+    if (!design) return res.status(404).json({ success: false, error: req.t("design.not_found") });
 
     // ── Guard 1 : commande en cours ────────────────────────
     if (design.status === "locked") {
       return res.status(409).json({
         success: false,
-        error:   "Impossible de supprimer un design lié à une commande en cours",
+        error:   req.t("superadmin.design.cannot_delete_locked"),
       });
     }
 
@@ -427,7 +427,7 @@ export const deleteDesignSuperadmin = async (req, res, next) => {
     if (design.orderItem?.length > 0) {
       return res.status(409).json({
         success: false,
-        error:   `Ce design est référencé par ${design.orderItem.length} ligne(s) de commande. Archivez-le plutôt.`,
+        error:   req.t("superadmin.design.referenced_by_orders", { count: design.orderItem.length }),
       });
     }
 
@@ -438,7 +438,7 @@ export const deleteDesignSuperadmin = async (req, res, next) => {
     if (activeCards.length > 0) {
       return res.status(409).json({
         success: false,
-        error:   `Ce design est utilisé par ${activeCards.length} carte(s) NFC active(s)`,
+        error:   req.t("superadmin.design.used_by_nfc_cards", { count: activeCards.length }),
       });
     }
 
@@ -455,6 +455,6 @@ export const deleteDesignSuperadmin = async (req, res, next) => {
       }),
     ]);
 
-    res.json({ success: true, message: "Design supprimé définitivement" });
+    res.json({ success: true, message: req.t("superadmin.design.permanently_deleted") });
   } catch (e) { next(e); }
 };
