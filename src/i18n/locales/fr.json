@@ -288,6 +288,21 @@
       "order_updated": "Ordre mis à jour.",
       "cannot_delete_has_faqs": "Impossible de supprimer. {{count}} FAQ(s) utilisent cette catégorie."
     },
+    "plan": {
+      "not_found": "Plan introuvable.",
+      "slug_taken": "Le slug \"{{slug}}\" est déjà utilisé.",
+      "invalid_slug": "Le slug doit contenir uniquement des lettres minuscules, chiffres et tirets.",
+      "fields_required": "slug, price, annual et au moins une traduction sont requis.",
+      "invalid_languages": "Une ou plusieurs langues sont invalides.",
+      "invalid_status": "Statut invalide (Active | inactive | archived).",
+      "created": "Plan créé.",
+      "updated": "Plan mis à jour.",
+      "deleted": "Plan supprimé.",
+      "cannot_delete_in_use": "Impossible de supprimer ce plan : {{companies}} entreprise(s) et {{subscriptions}} abonnement(s) actif(s) l'utilisent.",
+      "orders_required": "orders est requis (array).",
+      "order_updated": "Ordre d'affichage mis à jour.",
+      "status_updated": "Statut du plan mis à jour : {{status}}."
+    },
     "page": {
       "fields_required": "slug et au moins une traduction sont requis.",
       "invalid_slug": "Le slug doit contenir uniquement des lettres minuscules, chiffres et tirets.",

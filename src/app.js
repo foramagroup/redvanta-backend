@@ -151,6 +151,8 @@ app.use(cors({
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization", "X-App-Language"],
+  exposedHeaders: ["X-App-Language"],
 }));
 
 app.post(

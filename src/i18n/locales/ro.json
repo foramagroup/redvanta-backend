@@ -288,6 +288,21 @@
       "order_updated": "Ordine actualizată.",
       "cannot_delete_has_faqs": "Imposibil de șters. {{count}} FAQ(uri) folosesc această categorie."
     },
+    "plan": {
+      "not_found": "Planul nu a fost găsit.",
+      "slug_taken": "Slug-ul \"{{slug}}\" este deja utilizat.",
+      "invalid_slug": "Slug-ul trebuie să conțină numai litere mici, cifre și cratime.",
+      "fields_required": "slug, price, annual și cel puțin o traducere sunt obligatorii.",
+      "invalid_languages": "Una sau mai multe limbi sunt nevalide.",
+      "invalid_status": "Status nevalid (Active | inactive | archived).",
+      "created": "Plan creat.",
+      "updated": "Plan actualizat.",
+      "deleted": "Plan șters.",
+      "cannot_delete_in_use": "Nu se poate șterge acest plan: {{companies}} companie(ii) și {{subscriptions}} abonament(e) active îl folosesc.",
+      "orders_required": "orders este obligatoriu (array).",
+      "order_updated": "Ordine de afișare actualizată.",
+      "status_updated": "Statusul planului actualizat la {{status}}."
+    },
     "page": {
       "fields_required": "slug și cel puțin o traducere sunt necesare.",
       "invalid_slug": "Slug-ul trebuie să conțină numai litere mici, cifre și cratime.",

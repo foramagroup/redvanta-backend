@@ -13,15 +13,16 @@ export async function languageMiddleware(req, res, next) {
   try {
     let locale = "en"; // Langue par défaut du système
 
-    // 1. Langue depuis le header (priorité max)
-    const headerLang = req.headers["accept-language"]?.split(",")[0]?.split("-")[0];
-    if (headerLang && i18n.hasLocale(headerLang)) {
-      // locale = headerLang;
-      locale = "en";
+    // 1. Langue depuis le header custom X-App-Language (choix explicite de l'app)
+    // On utilise X-App-Language et non Accept-Language car le navigateur envoie
+    // Accept-Language automatiquement selon sa propre locale, pas celle choisie dans l'app.
+    const appLang = req.headers["x-app-language"]?.split("-")[0]?.toLowerCase();
+    if (appLang) {
+      locale = appLang;
     }
 
-    // 2. Langue de la company (si user connecté)
-    if (req.user?.companyId && !headerLang) {
+    // 2. Langue de la company (si user connecté et aucun header app reçu)
+    if (req.user?.companyId && !appLang) {
       const company = await prisma.company.findUnique({
         where: { id: req.user.companyId },
         include: {
@@ -38,8 +39,9 @@ export async function languageMiddleware(req, res, next) {
 
     // Attacher la locale et la fonction de traduction à req
     req.locale = locale;
+    console.log(locale);
     req.t = (key, vars) => i18n.t(locale, key, vars);
-
+    
     next();
   } catch (error) {
     console.error("[languageMiddleware] Error:", error);

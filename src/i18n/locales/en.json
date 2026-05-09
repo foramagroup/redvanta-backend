@@ -288,6 +288,21 @@
       "order_updated": "Order updated.",
       "cannot_delete_has_faqs": "Cannot delete. {{count}} FAQ(s) use this category."
     },
+    "plan": {
+      "not_found": "Plan not found.",
+      "slug_taken": "The slug \"{{slug}}\" is already in use.",
+      "invalid_slug": "Slug must contain only lowercase letters, digits, and hyphens.",
+      "fields_required": "slug, price, annual, and at least one translation are required.",
+      "invalid_languages": "One or more languages are invalid.",
+      "invalid_status": "Invalid status (Active | inactive | archived).",
+      "created": "Plan created.",
+      "updated": "Plan updated.",
+      "deleted": "Plan deleted.",
+      "cannot_delete_in_use": "Cannot delete this plan: {{companies}} company(ies) and {{subscriptions}} active subscription(s) are using it.",
+      "orders_required": "orders is required (array).",
+      "order_updated": "Display order updated.",
+      "status_updated": "Plan status updated to {{status}}."
+    },
     "page": {
       "fields_required": "slug and at least one translation are required.",
       "invalid_slug": "Slug must contain only lowercase letters, digits, and hyphens.",

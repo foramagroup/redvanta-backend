@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import express from "express";
+
 import {
   listFAQCategories,
   getFAQCategory,
@@ -11,6 +12,7 @@ import {
   deleteFAQCategory,
   reorderFAQCategories,
 } from "../../controllers/superadmin/faqCategories.controller.js";
+
 import { authenticateSuperAdmin, requireSuperAdmin } from "../../middleware/auth.middleware.js";
 
 const router = express.Router();

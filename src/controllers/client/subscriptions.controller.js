@@ -23,37 +23,93 @@ function getCompanyId(req) {
   return parseInt(id);
 }
 
-// ═══════════════════════════════════════════════════════════
-// src/controllers/client/subscriptions.controller.js
-// ═══════════════════════════════════════════════════════════
+function parseSlugs(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  try { return JSON.parse(value); } catch { return []; }
+}
 
+// ═══════════════════════════════════════════════════════════
+// GET /api/client/subscriptions/plans
+// Liste les plans actifs avec toutes les features du catalogue
+// marquées active:true (incluse dans le plan) ou active:false.
+// ═══════════════════════════════════════════════════════════
 export const listPlans = async (req, res, next) => {
   try {
+    // Langue : query param > locale du middleware > "en"
+    const lang = req.query.lang || req.locale || "en";
+
+    // ── Plans actifs avec leurs traductions ─────────────────
     const plans = await prisma.planSetting.findMany({
       where: { status: "Active" },
+      include: {
+        translations: {
+          include: { language: { select: { code: true } } },
+        },
+      },
       orderBy: { displayOrder: "asc" },
     });
 
+    // ── Catalogue de features actives (noms en lang + fallback "en") ──
+    const features = await prisma.feature.findMany({
+      where: { status: "active" },
+      include: {
+        translations: {
+          where: { language: { code: { in: [lang, "en"] } } },
+          include: { language: { select: { code: true } } },
+        },
+      },
+      orderBy: [{ category: "asc" }, { displayOrder: "asc" }],
+    });
+
+    // Résoudre le nom d'une feature dans la bonne langue
+    const featureName = (f) => {
+      const tr = f.translations.find((t) => t.language?.code === lang)
+        ?? f.translations.find((t) => t.language?.code === "en")
+        ?? f.translations[0];
+      return tr?.name ?? f.slug;
+    };
+
+    // Résoudre la traduction d'un plan dans la bonne langue
+    const pickTr = (translations) =>
+      translations.find((t) => t.language?.code === lang)
+      ?? translations.find((t) => t.language?.code === "en")
+      ?? translations[0]
+      ?? null;
+
     res.json({
       success: true,
-      data: plans.map(p => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        price: Number(p.price),
-        annual: Number(p.annual),
-        // ⚠️ PARSER LES FEATURES SI STRING
-        features: typeof p.features === 'string' 
-          ? JSON.parse(p.features) 
-          : (p.features || []),
-        apiLimit: p.apiLimit,
-        smsLimit: p.smsLimit,
-        locationLimit: p.locationLimit,
-        userLimit: p.userLimit,
-        trialDays: p.trialDays,
-        isPopular: p.isPopular,
-        isDefault: p.isDefault,
-      })),
+      data: plans.map((plan) => {
+        const tr = pickTr(plan.translations);
+        const featureSlugs = parseSlugs(tr?.featureSlugs);
+        const trialFeatureSlugs = parseSlugs(tr?.trialFeatureSlugs);
+
+        return {
+          id:            plan.id,
+          slug:          plan.slug,
+          name:          tr?.name        ?? plan.slug,
+          title:         tr?.title       ?? null,
+          description:   tr?.description ?? null,
+          price:         Number(plan.price),
+          annual:        Number(plan.annual),
+          apiLimit:      plan.apiLimit,
+          smsLimit:      plan.smsLimit,
+          webhookLimit:  plan.webhookLimit,
+          locationLimit: plan.locationLimit,
+          userLimit:     plan.userLimit,
+          trialDays:     plan.trialDays,
+          isPopular:     plan.isPopular,
+          isDefault:     plan.isDefault,
+          // Toutes les features du catalogue : active = incluse dans ce plan
+          features: features.map((f) => ({
+            slug:         f.slug,
+            category:     f.category,
+            name:         featureName(f),
+            active:       featureSlugs.includes(f.slug),
+            trialOnly:    trialFeatureSlugs.includes(f.slug),
+          })),
+        };
+      }),
     });
   } catch (e) {
     next(e);

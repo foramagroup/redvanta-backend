@@ -1342,33 +1342,122 @@ model permission {
   rolepermission rolePermission[]
 }
 
+model Feature {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique       // "api-calls", "review-monitoring" (IMMUABLE)
+  category    FeatureCategory        // limits, analytics, automation, support, branding
+  icon        String?  @db.VarChar(50)  // "api", "chart", "users"
+  
+  // Type de feature
+  featureType FeatureType @default(standard)  // standard | trial_only | premium_only
+  
+  // Métadonnées
+  displayOrder Int     @default(0)
+  status      FeatureStatus @default(active)
+  
+  // Dates
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  translations FeatureTranslation[]
+  
+  @@index([slug])
+  @@index([category])
+  @@index([status])
+  @@index([featureType])
+  @@map("features")
+}
+
+model FeatureTranslation {
+  id         Int      @id @default(autoincrement())
+  featureId  Int
+  languageId Int
+  
+  // Contenu traduit
+  name        String   @db.VarChar(255)  // "API Access", "Accès API", "Acceso API"
+  description String?  @db.Text
+  
+  // Dates
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relations
+  feature    Feature  @relation(fields: [featureId],  references: [id], onDelete: Cascade)
+  language   Language @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  
+  @@unique([featureId, languageId])
+  @@index([featureId])
+  @@map("feature_translations")
+}
+
 model PlanSetting {
   id            Int      @id @default(autoincrement())
-  name          String   // "Starter", "Growth", "Enterprise"
-  slug          String   @unique // "starter", "growth", "enterprise"
-  price         Int // Prix mensuel
-  annual        Int // Prix annuel (avec réduction)
-
-// Limites du plan
-  apiLimit   Int      @default(1000)
-  smsLimit   Int      @default(100)
-  webhookLimit  Int    @default(500)
-  locationLimit Int   @default(1)
+  slug          String   @unique
+  
+  // Prix (en centimes)
+  price         Int
+  annual        Int
+  
+  // Limites
+  apiLimit      Int      @default(1000)
+  smsLimit      Int      @default(100)
+  webhookLimit  Int      @default(500)
+  locationLimit Int      @default(1)
   userLimit     Int      @default(3)
- // Fonctionnalités
-  trialDays     Int
-  trialFeatures String   @db.LongText
-  features      Json     // Array de features: ["API Access", "Email Support", ...]
-   // Métadonnées
+  
+  // Essai
+  trialDays     Int      @default(0)
+  
+  // Métadonnées
   isDefault     Boolean  @default(false)
   isPopular     Boolean  @default(false)
   status        PlanStatus @default(Active)
   displayOrder  Int      @default(0)
+  
+  // Dates
   createdAt     DateTime @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  translations  PlanSettingTranslation[]
   companies     Company[]
   subscriptions Subscription[]
+  
+  @@index([slug])
+  @@index([status])
   @@map("plansetting")
+}
+
+model PlanSettingTranslation {
+  id            Int      @id @default(autoincrement())
+  planId        Int
+  languageId    Int
+  
+  // Contenu traduit
+  name          String   @db.VarChar(100)
+  title         String?  @db.VarChar(255)
+  description   String?  @db.Text
+  
+  // Features sélectionnées (array de slugs)
+  // Format: ["api-calls", "review-monitoring", "analytics-dashboard", "email-support"]
+  featureSlugs      Json?  
+  
+  // Trial features sélectionnées (array de slugs)
+  // Format: ["review-monitoring", "basic-analytics"]
+  trialFeatureSlugs Json? 
+  
+  // Dates
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  plan          PlanSetting @relation(fields: [planId],     references: [id], onDelete: Cascade)
+  language      Language    @relation(fields: [languageId], references: [id], onDelete: Cascade)
+  
+  @@unique([planId, languageId])
+  @@index([planId])
+  @@map("plansettingtranslations")
 }
 
 
@@ -1421,7 +1510,9 @@ model Language {
   pageTranslations StaticPageTranslation[]
   faqTranslations FAQTranslation[]
   faqCategoryTranslations FAQCategoryTranslation[]
+  featureTranslations FeatureTranslation[]
   companies Company[]
+  planTranslations PlanSettingTranslation[]
   @@map("languages")
 }
 
@@ -2474,6 +2565,26 @@ enum FilterRedirectPlatform {
 enum PageStatus {
   draft
   published
+}
+
+enum FeatureCategory {
+  limits
+  analytics
+  automation
+  support
+  branding
+  security
+  collaboration
+}
+enum FeatureType {
+  standard      // Disponible pour tous les plans
+  trial_only    // Uniquement pour trial
+  premium_only  // Uniquement pour plans premium
+}
+enum FeatureStatus {
+  active
+  inactive
+  deprecated
 }
 
 
