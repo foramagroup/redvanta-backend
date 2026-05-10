@@ -37,7 +37,7 @@ function parseSlugs(value) {
 export const listPlans = async (req, res, next) => {
   try {
     // Langue : query param > locale du middleware > "en"
-    const lang = req.query.lang || req.locale || "en";
+     const lang = req.query.lang || req.locale || "en";
 
     // ── Plans actifs avec leurs traductions ─────────────────
     const plans = await prisma.planSetting.findMany({
@@ -553,9 +553,9 @@ export const stripeWebhook = async (req, res, next) => {
     console.log(`[Webhook] PaymentIntent succeeded: ${pi.id}`);
 
     // ─────────────────────────────────────────────────────────
-    // SUBSCRIPTION
+    // SUBSCRIPTION (nouvelle souscription ou upgrade/downgrade)
     // ─────────────────────────────────────────────────────────
-    if (metadata.type === "subscription") {
+    if (metadata.type === "subscription" || metadata.type === "subscription_upgrade") {
       try {
         const companyId = parseInt(metadata.companyId);
 
@@ -701,7 +701,8 @@ export const stripeWebhook = async (req, res, next) => {
 
         await sendSubscriptionWelcomeEmail(subscription, user, company, invoice);
 
-        console.log(`[Webhook] ✅ Subscription ${subscription.id} activée`);
+        const actionLabel = metadata.type === "subscription_upgrade" ? "upgrade activé" : "activée";
+        console.log(`[Webhook] ✅ Subscription ${subscription.id} ${actionLabel}`);
 
       } catch (error) {
         console.error('[Webhook] Erreur subscription:', error);

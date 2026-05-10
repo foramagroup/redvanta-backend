@@ -57,18 +57,22 @@ function generateVerifyToken() {
   return crypto.randomBytes(32).toString("hex");
 }
 
-// Trouver le plan trial par défaut
+// Trouver le plan par défaut (isDefault:true, sinon price:0, sinon le moins cher)
+// "name" n'est plus sur PlanSetting — il est dans PlanSettingTranslation.
 async function getDefaultPlan() {
   return prisma.planSetting.findFirst({
     where: {
+      status: "Active",
       OR: [
-        { name: { contains: "Trial"} },
-        { name: { contains: "free" } },
+        { isDefault: true },
         { price: 0 },
       ],
-      status: "Active",
     },
-    orderBy: { id: "asc" },
+    orderBy: [
+      { isDefault: "desc" },
+      { price:     "asc"  },
+      { id:        "asc"  },
+    ],
   });
 }
 

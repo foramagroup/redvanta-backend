@@ -9,7 +9,6 @@ import { getStripe } from "../services/Stripe.service.js";
 import {
   getOrCreateStripeCustomer,
   getDefaultPaymentMethod,
-  createSetupIntent,
   calculatePeriodDates,
   createSubscriptionInvoice,
   sendSubscriptionWelcomeEmail,
@@ -32,6 +31,19 @@ function intervalFactor(interval) {
   return interval === "yearly" ? 0.9 : 1;
 }
 
+function parseSlugs(value) {
+  if (Array.isArray(value)) return value;
+  if (!value) return [];
+  try { return JSON.parse(value); } catch { return []; }
+}
+
+// Include Prisma pour charger les traductions d'un plan
+const PLAN_WITH_TRANSLATIONS = {
+  include: {
+    translations: { include: { language: { select: { code: true } } } },
+  },
+};
+
 // Calcule tous les montants à partir du plan + addons + locations
 function computeAmounts({ plan, addons, extraLocations = 0, interval }) {
   const factor = intervalFactor(interval);
@@ -53,16 +65,22 @@ function computeAmounts({ plan, addons, extraLocations = 0, interval }) {
   };
 }
 
-// Formate un plan
-function formatPlan(p) {
+// Formate un plan (locale-aware — résout name/description depuis les traductions)
+function formatPlan(p, locale = "en") {
+  const trs = p.translations ?? [];
+  const tr = trs.find(t => t.language?.code === locale)
+    ?? trs.find(t => t.language?.code === "en")
+    ?? trs[0]
+    ?? null;
   return {
     id: p.id,
-    name: p.name,
+    name: tr?.name ?? p.slug,
     slug: p.slug,
-    price: p.price,
-    annual: p.annual,
-    description: p.description ?? null,
-    features: p.features ?? [],
+    price: Number(p.price),
+    annual: Number(p.annual),
+    description: tr?.description ?? null,
+    featureSlugs: parseSlugs(tr?.featureSlugs),
+    trialFeatureSlugs: parseSlugs(tr?.trialFeatureSlugs),
     locationLimit: p.locationLimit,
     userLimit: p.userLimit,
     apiLimit: p.apiLimit,
@@ -93,7 +111,7 @@ function formatAddon(a) {
 }
 
 // Formate la subscription
-function formatSubscription(sub) {
+function formatSubscription(sub, locale = "en") {
   return {
     id: sub.id,
     status: sub.status,
@@ -106,7 +124,7 @@ function formatSubscription(sub) {
     nextBillingDate: sub.nextBillingDate,
     trialEnd: sub.trialEnd ?? null,
     cancelAt: sub.cancelAt ?? null,
-    plan: sub.plan ? formatPlan(sub.plan) : null,
+    plan: sub.plan ? formatPlan(sub.plan, locale) : null,
     addons: (sub.addons ?? [])
       .filter((sa) => sa.status === "active")
       .map((sa) => ({
@@ -124,9 +142,13 @@ function formatSubscription(sub) {
 // ═══════════════════════════════════════════════════════════
 export const getCatalog = async (req, res, next) => {
   try {
+    const locale = req.locale || "en";
     const [plans, addons] = await Promise.all([
       prisma.planSetting.findMany({
         where: { status: "Active" },
+        include: {
+          translations: { include: { language: { select: { code: true } } } },
+        },
         orderBy: { displayOrder: "asc" },
       }),
       prisma.addon.findMany({
@@ -138,7 +160,7 @@ export const getCatalog = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        plans: plans.map(formatPlan),
+        plans: plans.map(p => formatPlan(p, locale)),
         addons: addons.map(formatAddon),
         taxRate: TAX_RATE,
         locationUnitPrice: 29,
@@ -159,7 +181,11 @@ export const getCurrentSubscription = async (req, res, next) => {
     const sub = await prisma.subscription.findUnique({
       where: { companyId },
       include: {
-        plan: true,
+        plan: {
+          include: {
+            translations: { include: { language: { select: { code: true } } } },
+          },
+        },
         addons: {
           include: { addon: true },
           where: { status: "active" },
@@ -171,7 +197,7 @@ export const getCurrentSubscription = async (req, res, next) => {
       return res.json({ success: true, data: null });
     }
 
-    res.json({ success: true, data: formatSubscription(sub) });
+    res.json({ success: true, data: formatSubscription(sub, req.locale || "en") });
   } catch (e) {
     next(e);
   }
@@ -193,9 +219,13 @@ export const previewSubscription = async (req, res, next) => {
 
     const plan = await prisma.planSetting.findFirst({
       where: { id: parseInt(planId), status: "Active" },
+      include: {
+        translations: { include: { language: { select: { code: true } } } },
+      },
     });
     if (!plan) return res.status(404).json({ success: false, error: req.t("subscription.plan_not_found") });
 
+    const locale = req.locale || "en";
     let addons = [];
     if (addonIds.length > 0) {
       addons = await prisma.addon.findMany({
@@ -205,17 +235,18 @@ export const previewSubscription = async (req, res, next) => {
 
     const amounts = computeAmounts({ plan, addons, extraLocations, interval });
     const factor = intervalFactor(interval);
+    const formattedPlan = formatPlan(plan, locale);
 
     res.json({
       success: true,
       data: {
-        plan: formatPlan(plan),
+        plan: formattedPlan,
         addons: addons.map(formatAddon),
         extraLocations,
         interval,
         breakdown: {
           planLine: {
-            label: plan.name,
+            label: formattedPlan.name,
             amount: Math.round((interval === "yearly" ? plan.annual : plan.price) * factor * 100) / 100,
           },
           addonLines: addons.map((a) => ({
@@ -367,7 +398,11 @@ export const subscribe = async (req, res, next) => {
     const fresh = await prisma.subscription.findUnique({
       where: { companyId },
       include: {
-        plan: true,
+        plan: {
+          include: {
+            translations: { include: { language: { select: { code: true } } } },
+          },
+        },
         addons: { include: { addon: true }, where: { status: "active" } },
       },
     });
@@ -375,7 +410,7 @@ export const subscribe = async (req, res, next) => {
     res.status(existing ? 200 : 201).json({
       success: true,
       message: existing ? req.t("admin.plan_builder.subscription_updated") : req.t("admin.plan_builder.subscription_created"),
-      data: formatSubscription(fresh),
+      data: formatSubscription(fresh, req.locale || "en"),
     });
   } catch (e) {
     next(e);
@@ -384,7 +419,12 @@ export const subscribe = async (req, res, next) => {
 
 // ═══════════════════════════════════════════════════════════
 // POST /api/admin/plan-builder/checkout
-// Payer l'upgrade (Stripe ou Manuel)
+// Payer l'upgrade/downgrade en attente (Stripe ou Manuel)
+// Appelé après /subscribe qui a déjà mis à jour le plan sur la subscription.
+// STRIPE sans carte : PaymentIntent + setup_future_usage (1 étape)
+// STRIPE avec carte : PaymentIntent charge directe
+// MANUAL : Order + BillingHistory + Invoice → en attente superadmin
+// Confirmation Stripe via webhook (type: "subscription_upgrade")
 // ═══════════════════════════════════════════════════════════
 export const checkoutUpgrade = async (req, res, next) => {
   try {
@@ -403,23 +443,19 @@ export const checkoutUpgrade = async (req, res, next) => {
       });
     }
 
-    // Méthode manuelle
     let manualMethod = null;
     if (isManual) {
       if (!paymentMethodId) {
         return res.status(422).json({ success: false, error: req.t("order.payment_method_id_required") });
       }
-
       manualMethod = await prisma.manualPaymentMethod.findFirst({
         where: { id: parseInt(paymentMethodId), status: "Active" },
       });
-
       if (!manualMethod) {
         return res.status(422).json({ success: false, error: req.t("subscription.invalid_manual_method") });
       }
     }
 
-    // Charger subscription
     const subscription = await prisma.subscription.findUnique({
       where: { companyId },
       include: {
@@ -434,7 +470,6 @@ export const checkoutUpgrade = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     const company = await prisma.company.findUnique({ where: { id: companyId } });
-
     const periods = calculatePeriodDates(subscription.interval, new Date());
 
     // ═══════════════════════════════════════════════════════════
@@ -442,42 +477,16 @@ export const checkoutUpgrade = async (req, res, next) => {
     // ═══════════════════════════════════════════════════════════
     if (isStripe) {
       const stripe = await getStripe();
+      const customer = await getOrCreateStripeCustomer(user, company);
+      const stripeCustomerId = customer.id;
 
-      // Customer
-      let stripeCustomerId = subscription.stripeCustomerId;
-
-      if (!stripeCustomerId) {
-        const customer = await getOrCreateStripeCustomer(user, company);
-        stripeCustomerId = customer.id;
-
-        await prisma.subscription.update({
-          where: { id: subscription.id },
-          data: { stripeCustomerId },
-        });
-      }
-
-      // Vérifier carte
       const savedCard = await getDefaultPaymentMethod(stripeCustomerId);
-
-      if (!savedCard) {
-        const setupIntent = await createSetupIntent(stripeCustomerId);
-
-        return res.json({
-          success: true,
-          requiresPaymentMethod: true,
-          clientSecret: setupIntent.client_secret,
-          message: req.t("subscription.requires_card"),
-        });
-      }
-
       const orderNumber = await generateSubscriptionOrderNumber();
 
-      // PaymentIntent
-      const paymentIntent = await stripe.paymentIntents.create({
+      const intentBase = {
         amount: Math.round(subscription.totalAmount * 100),
         currency: "eur",
         customer: stripeCustomerId,
-        payment_method: savedCard.id,
         automatic_payment_methods: { enabled: true },
         metadata: {
           type: "subscription_upgrade",
@@ -486,11 +495,15 @@ export const checkoutUpgrade = async (req, res, next) => {
           subscriptionId: String(subscription.id),
           orderNumber,
         },
-      });
+      };
 
-      // Créer Order + BillingHistory (pending)
+      const paymentIntent = await stripe.paymentIntents.create(
+        savedCard
+          ? { ...intentBase, payment_method: savedCard.id }
+          : { ...intentBase, setup_future_usage: "off_session" }
+      );
+
       await prisma.$transaction(async (tx) => {
-        // Order
         await tx.order.create({
           data: {
             userId,
@@ -508,7 +521,6 @@ export const checkoutUpgrade = async (req, res, next) => {
           },
         });
 
-        // BillingHistory
         await tx.billingHistory.create({
           data: {
             subscriptionId: subscription.id,
@@ -523,10 +535,9 @@ export const checkoutUpgrade = async (req, res, next) => {
           },
         });
 
-        // Subscription → incomplete (en attente paiement)
         await tx.subscription.update({
           where: { id: subscription.id },
-          data: { status: "incomplete" },
+          data: { status: "incomplete", stripeCustomerId },
         });
       });
 
@@ -549,7 +560,6 @@ export const checkoutUpgrade = async (req, res, next) => {
       const orderNumber = await generateSubscriptionOrderNumber();
 
       const result = await prisma.$transaction(async (tx) => {
-        // Order
         const order = await tx.order.create({
           data: {
             userId,
@@ -566,7 +576,6 @@ export const checkoutUpgrade = async (req, res, next) => {
           },
         });
 
-        // BillingHistory
         const billingHistory = await tx.billingHistory.create({
           data: {
             subscriptionId: subscription.id,
@@ -580,7 +589,6 @@ export const checkoutUpgrade = async (req, res, next) => {
           },
         });
 
-        // Invoice
         const invoice = await createSubscriptionInvoice({
           subscription,
           billingHistory,
@@ -590,7 +598,6 @@ export const checkoutUpgrade = async (req, res, next) => {
           orderId: order.id,
         });
 
-        // Subscription → incomplete
         await tx.subscription.update({
           where: { id: subscription.id },
           data: { status: "incomplete" },
@@ -599,14 +606,7 @@ export const checkoutUpgrade = async (req, res, next) => {
         return { order, invoice };
       });
 
-      // Email pending
-      await sendSubscriptionPendingEmail(
-        subscription,
-        user,
-        company,
-        result.invoice,
-        manualMethod
-      );
+      await sendSubscriptionPendingEmail(subscription, user, company, result.invoice, manualMethod);
 
       return res.json({
         success: true,
@@ -699,7 +699,11 @@ export const updateAddons = async (req, res, next) => {
     const fresh = await prisma.subscription.findUnique({
       where: { companyId },
       include: {
-        plan: true,
+        plan: {
+          include: {
+            translations: { include: { language: { select: { code: true } } } },
+          },
+        },
         addons: { include: { addon: true }, where: { status: "active" } },
       },
     });
@@ -707,7 +711,7 @@ export const updateAddons = async (req, res, next) => {
     res.json({
       success: true,
       message: req.t("admin.plan_builder.addons_updated"),
-      data: formatSubscription(fresh),
+      data: formatSubscription(fresh, req.locale || "en"),
     });
   } catch (e) {
     next(e);
@@ -775,7 +779,11 @@ export const updateInterval = async (req, res, next) => {
     const fresh = await prisma.subscription.findUnique({
       where: { companyId },
       include: {
-        plan: true,
+        plan: {
+          include: {
+            translations: { include: { language: { select: { code: true } } } },
+          },
+        },
         addons: { include: { addon: true }, where: { status: "active" } },
       },
     });
@@ -783,7 +791,7 @@ export const updateInterval = async (req, res, next) => {
     res.json({
       success: true,
       message: interval === "yearly" ? req.t("admin.plan_builder.billing_yearly") : req.t("admin.plan_builder.billing_monthly"),
-      data: formatSubscription(fresh),
+      data: formatSubscription(fresh, req.locale || "en"),
     });
   } catch (e) {
     next(e);

@@ -374,7 +374,13 @@ export const getPendingSubscriptionInvoices = async (req, res, next) => {
         billingHistory: {
           include: {
             subscription: {
-              include: { plan: true },
+              include: {
+                plan: {
+                  include: {
+                    translations: { include: { language: { select: { code: true } } } },
+                  },
+                },
+              },
             },
           },
         },
@@ -406,7 +412,16 @@ export const getPendingSubscriptionInvoices = async (req, res, next) => {
         subscription: inv.billingHistory[0]?.subscription
           ? {
               id: inv.billingHistory[0].subscription.id,
-              planName: inv.billingHistory[0].subscription.plan.name,
+              planName: (() => {
+                const plan = inv.billingHistory[0].subscription.plan;
+                if (!plan) return null;
+                const lang = req.locale || "en";
+                const trs = plan.translations ?? [];
+                const tr = trs.find(t => t.language?.code === lang)
+                  ?? trs.find(t => t.language?.code === "en")
+                  ?? trs[0];
+                return tr?.name ?? plan.slug;
+              })(),
               status: inv.billingHistory[0].subscription.status,
             }
           : null,
