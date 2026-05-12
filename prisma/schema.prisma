@@ -148,14 +148,56 @@ model PlatformSetting {
   twoFactorPhone   Boolean @default(false)
   twoFactorGoogle  Boolean @default(false)
   
+  // Shipping
+  shippingFallbackCost Float @default(14.99)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
    smsSetting   SmsSetting?  @relation(fields: [sms_setting_id], references: [id])
-  
+
   @@map("platform_settings")
 }
 
+model ShippingRule {
+  id       Int     @id @default(autoincrement())
+  name     String  @db.VarChar(100)
+  active   Boolean @default(true)
+  priority Int     @default(10)
+
+  // Geographic scope ("*" = global)
+  country  String  @default("*") @db.VarChar(100)
+  state    String? @db.VarChar(100)
+  city     String? @db.VarChar(100)
+
+  // Rule type: flat | free | weight | price | quantity
+  type     String  @db.VarChar(20)
+
+  // Flat rate
+  flatCost        Float?
+  // Free shipping
+  freeMinTotal    Float?
+  // Weight-based
+  weightBaseCost  Float?
+  weightCostPerKg Float?
+  // Price tiers (JSON): [{ minTotal, maxTotal, cost }]
+  priceTiers      Json?
+  // Quantity tiers (JSON): [{ minQty, maxQty, cost }]
+  quantityTiers   Json?
+
+  // Optional cart/weight condition filters
+  minTotal  Float?
+  maxTotal  Float?
+  minWeight Float?
+  maxWeight Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+  @@index([priority])
+  @@map("shipping_rules")
+}
 
 model Location {
   id          Int      @id @default(autoincrement())
