@@ -37,6 +37,7 @@ import {
 
 import { sendTemplatedMail }  from "../../services/client/mail.service.js";
 import { generateNfcCardsForOrder } from "../../services/nfc.service.js";
+import { generateInvoicePdfBuffer } from "../../services/InvoicePdf.service.js";
 
 
 // ─── GET /api/superadmin/billing/stats ───────────────────────
@@ -227,7 +228,7 @@ export const createInvoice = async (req, res, next) => {
 export const updateInvoice = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    const { status, dueDate, notes, terms, billingVat, reference } = req.body;
+    const { status, dueDate, notes, terms, billingVat, reference, emailStatus, emailSentAt } = req.body;
 
     const inv = await prisma.invoice.findUnique({ where: { id } });
     if (!inv) return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
@@ -241,6 +242,8 @@ export const updateInvoice = async (req, res, next) => {
         ...(terms     !== undefined && { terms }),
         ...(billingVat !== undefined && { billingVat }),
         ...(reference !== undefined && { reference }),
+        ...(emailStatus !== undefined && { emailStatus }),
+        ...(emailSentAt !== undefined && { emailSentAt: emailSentAt ? new Date(emailSentAt) : null }),
       },
       include: { items: true },
     });
@@ -584,6 +587,138 @@ export const retryPayment = async (req, res, next) => {
     const pi     = await stripe.paymentIntents.confirm(inv.stripePaymentIntentId);
 
     res.json({ success: true, status: pi.status, message: `PaymentIntent: ${pi.status}` });
+  } catch (e) { next(e); }
+};
+
+// ─── POST /api/superadmin/billing/invoices/:id/send-email ─────
+
+export const sendInvoiceEmail = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { to, mode = "send" } = req.body;
+
+    const inv = await prisma.invoice.findUnique({
+      where:   { id },
+      include: { items: true, company: true, user: true },
+    });
+    if (!inv) return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
+
+    const recipientEmail = (to || "").trim() || inv.billingEmail || inv.user?.email;
+    if (!recipientEmail) {
+      return res.status(422).json({ success: false, error: "No recipient email available" });
+    }
+
+    const currency = inv.currency || "EUR";
+    const total    = Number(inv.displayTotal ?? inv.total ?? 0);
+
+    const vars = {
+      invoice_number:  inv.invoiceNumber,
+      company_name:    inv.company?.name ?? inv.billingName ?? "Client",
+      billing_name:    inv.billingName   ?? inv.company?.name ?? "Client",
+      billing_email:   recipientEmail,
+      invoice_date:    inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString("fr-FR") : "-",
+      due_date:        inv.dueDate     ? new Date(inv.dueDate).toLocaleDateString("fr-FR")     : "-",
+      total:           total.toFixed(2),
+      currency,
+      status:          inv.status,
+      year:            String(new Date().getFullYear()),
+      items_html:      (inv.items ?? []).map((i) =>
+        `<tr>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee">${i.service}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center">${i.quantity}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(i.unitPrice).toFixed(2)} ${currency}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(i.total).toFixed(2)} ${currency}</td>
+        </tr>`
+      ).join(""),
+    };
+
+    const buildFallback = () => ({
+      subject: `Invoice ${inv.invoiceNumber} — ${vars.company_name}`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><style>
+  body { font-family: sans-serif; color: #222; margin: 0; padding: 0; background: #f6f6f6; }
+  .wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .header { background: #e11d48; padding: 28px 32px; color: #fff; }
+  .header h1 { margin: 0; font-size: 22px; }
+  .header p  { margin: 4px 0 0; font-size: 13px; opacity: .85; }
+  .body { padding: 28px 32px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: #f1f5f9; padding: 8px; text-align: left; font-size: 13px; }
+  th:last-child, td:last-child { text-align: right; }
+  .total-row td { padding: 10px 8px; font-weight: 700; border-top: 2px solid #e11d48; font-size: 15px; }
+  .footer { padding: 16px 32px; background: #f9f9f9; font-size: 12px; color: #888; text-align: center; }
+</style></head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Invoice ${inv.invoiceNumber}</h1>
+    <p>Date: ${vars.invoice_date}${vars.due_date !== "-" ? ` &nbsp;·&nbsp; Due: ${vars.due_date}` : ""}</p>
+  </div>
+  <div class="body">
+    <p>Hello <strong>${vars.billing_name}</strong>,</p>
+    <p>Please find your invoice details below.</p>
+    <table>
+      <thead><tr>
+        <th>Service</th><th style="text-align:center">Qty</th>
+        <th style="text-align:right">Unit price</th><th style="text-align:right">Total</th>
+      </tr></thead>
+      <tbody>${vars.items_html}</tbody>
+      <tfoot><tr class="total-row">
+        <td colspan="3">Total</td>
+        <td>${vars.total} ${vars.currency}</td>
+      </tr></tfoot>
+    </table>
+    <p style="font-size:13px;color:#555">Status: <strong>${vars.status}</strong></p>
+    ${inv.notes ? `<p style="font-size:13px;color:#555">${inv.notes}</p>` : ""}
+    ${inv.terms ? `<p style="font-size:12px;color:#888"><em>${inv.terms}</em></p>` : ""}
+    <p>Thank you for your business.</p>
+  </div>
+  <div class="footer">&copy; ${vars.year} ${vars.company_name}. All rights reserved.</div>
+</div>
+</body></html>`,
+      text: `Invoice ${inv.invoiceNumber}\nDate: ${vars.invoice_date}\nTotal: ${vars.total} ${vars.currency}\nStatus: ${vars.status}`,
+    });
+
+    // Generate PDF attachment
+    let pdfAttachment = null;
+    try {
+      const pdfBuffer = await generateInvoicePdfBuffer(inv);
+      pdfAttachment = {
+        filename:    `invoice-${inv.invoiceNumber}.pdf`,
+        content:     pdfBuffer,
+        contentType: "application/pdf",
+      };
+    } catch (pdfErr) {
+      console.warn(`[billing] PDF generation failed for #${inv.invoiceNumber}:`, pdfErr.message);
+    }
+
+    let emailStatus = "Sent";
+    let emailSentAt = new Date();
+    let emailError  = null;
+
+    try {
+      await sendTemplatedMail({
+        slug:        "invoice_email",
+        to:          recipientEmail,
+        variables:   vars,
+        fallbackFn:  buildFallback,
+        attachments: pdfAttachment ? [pdfAttachment] : [],
+      });
+    } catch (err) {
+      emailStatus = "Failed";
+      emailError  = err.message?.slice(0, 495) ?? "Send failed";
+      console.error(`[billing] sendInvoiceEmail failed for #${inv.invoiceNumber}:`, err.message);
+    }
+
+    const updated = await prisma.invoice.update({
+      where:   { id },
+      data:    { emailStatus, emailSentAt, emailError, ...(to?.trim() && { billingEmail: to.trim() }) },
+      include: { items: true, company: true },
+    });
+
+    res.json({ success: true, data: formatInvoice(updated) });
   } catch (e) { next(e); }
 };
 

@@ -28,20 +28,18 @@ export const getPageBySlug = async (req, res, next) => {
       });
     }
 
-    // Trouver traduction
-    const translation = await prisma.staticPageTranslation.findFirst({
-      where: {
-        slug,
-        languageId: language.id,
-        page: {
-          status: "published",
-        },
-      },
-      include: {
-        page: true,
-        language: true,
-      },
+    // Trouver traduction — d'abord par slug + langue, sinon par slug seul (slug d'une autre langue)
+    let translation = await prisma.staticPageTranslation.findFirst({
+      where: { slug, languageId: language.id, page: { status: "published" } },
+      include: { page: true, language: true },
     });
+
+    if (!translation) {
+      translation = await prisma.staticPageTranslation.findFirst({
+        where: { slug, page: { status: "published" } },
+        include: { page: true, language: true },
+      });
+    }
 
     if (!translation) {
       return res.status(404).json({

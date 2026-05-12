@@ -24,7 +24,7 @@ function createTransporter() {
 
 // ─── Envoi générique ──────────────────────────────────────────
 
-export async function sendMail({ to, subject, html, text }) {
+export async function sendMail({ to, subject, html, text, attachments = [] }) {
   const transporter = createTransporter();
   const info = await transporter.sendMail({
     from: `"${appName || "OPINOOR"}" <${process.env.MAIL_FROM_ADDRESS || process.env.MAIL_FROM || "no-reply@opinoor.com"}>`,
@@ -32,6 +32,7 @@ export async function sendMail({ to, subject, html, text }) {
     subject,
     html,
     text,
+    ...(attachments.length > 0 && { attachments }),
   });
   console.log(`[mail] Envoyé à ${to} — messageId: ${info.messageId}`);
   return info;
@@ -129,7 +130,7 @@ export async function loadTemplate(slug, variables = {}, langId = null) {
 // langId       : langue préférée (optionnel)
 // fallbackFn   : fonction () => { subject, html, text } si template DB absent
 
-export async function sendTemplatedMail({ slug, variables = {}, to, langId = null, fallbackFn = null }) {
+export async function sendTemplatedMail({ slug, variables = {}, to, langId = null, fallbackFn = null, attachments = [] }) {
   // 1. Essayer la DB
   let payload = await loadTemplate(slug, variables, langId);
 
@@ -144,7 +145,7 @@ export async function sendTemplatedMail({ slug, variables = {}, to, langId = nul
     }
   }
 
-  return sendMail({ to, ...payload });
+  return sendMail({ to, ...payload, attachments });
 }
 
 // ─── Exemples d'utilisation dans les controllers ─────────────

@@ -177,6 +177,9 @@ export function formatInvoice(inv) {
     notes:             inv.notes,
     terms:             inv.terms,
     reference:         inv.reference,
+    emailStatus:       inv.emailStatus ?? "Not Sent",
+    emailSentAt:       inv.emailSentAt ?? null,
+    emailError:        inv.emailError  ?? null,
     payments,
     refunds,
     items: inv.items?.map((i) => ({
