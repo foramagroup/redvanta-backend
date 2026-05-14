@@ -199,6 +199,39 @@ model ShippingRule {
   @@map("shipping_rules")
 }
 
+model FrontPageSeo {
+  id           Int                       @id @default(autoincrement())
+  key          String                    @unique @db.VarChar(100)
+  metaImage    String?                   @db.LongText
+  isPublished  Boolean                   @default(true)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  translations FrontPageSeoTranslation[]
+
+  @@index([isPublished])
+  @@map("front_page_seo")
+}
+
+model FrontPageSeoTranslation {
+  id         Int          @id @default(autoincrement())
+  pageId     Int
+  languageId Int
+  name       String       @db.VarChar(255)
+  slug       String       @db.VarChar(255)
+  seoTitle   String?      @db.VarChar(255)
+  seoDesc    String?      @db.Text
+
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  page       FrontPageSeo @relation(fields: [pageId],     references: [id], onDelete: Cascade)
+  language   Language     @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([pageId, languageId])
+  @@index([pageId])
+  @@map("front_page_seo_translations")
+}
+
 model Location {
   id          Int      @id @default(autoincrement())
   companyId   Int              
@@ -341,7 +374,12 @@ model Order {
   shippingState     String?
   shippingZip       String?
   shippingCountry   String?  @default("United States")
-  shippingMethod    ShippingMethod @default(standard)
+  shippingMethod    String?  @default("standard")
+  shippingPhone     String?
+
+  isCompany         Boolean  @default(false)
+  companyName       String?
+  taxId             String?
 
   stripePaymentIntentId String? @unique
   stripeClientSecret    String?
@@ -956,18 +994,6 @@ model ReviewRequest {
 
 
 
-model ShippingRate {
-  id          Int            @id @default(autoincrement())
-  method      ShippingMethod @unique
-  label       String
-  description String?
-  price       Float
-  active      Boolean        @default(true)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  @@map("shipping_rates")
-}
-
 
 
 model setting {
@@ -1555,6 +1581,7 @@ model Language {
   featureTranslations FeatureTranslation[]
   companies Company[]
   planTranslations PlanSettingTranslation[]
+  fpsTranslations FrontPageSeoTranslation[]
   @@map("languages")
 }
 
@@ -2482,12 +2509,6 @@ enum OrderStatus {
   refunded     // Remboursé
   partially_paid
   unpaid
-}
-
-enum ShippingMethod {
-  standard    // 5-7 jours
-  express     // 2-3 jours
-  international // 10-14 jours
 }
 
 enum InvoiceStatus {

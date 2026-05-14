@@ -66,6 +66,8 @@ import statusRoutes from "./routes/superadmin/statusRoutes.js";
 import billingRoutes  from "./routes/superadmin/Billing.routes.js";
 import shippingRoutes from "./routes/superadmin/Shipping.routes.js";
 import geoCoverageRoutes from "./routes/superadmin/geoCoverage.routes.js";
+import frontPagesSeoRoutes from "./routes/superadmin/frontPagesSeo.routes.js";
+import publicSeoRoutes from "./routes/client/seo.routes.js";
 import nfcSuperAdminRoutes from "./routes/superadmin/nfc.routes.js";
 import orderSuperAdminRoutes from "./routes/superadmin/order.routes.js";
 import { superNfcRouter } from "./routes/superadmin/nfcCards.routes.js";
@@ -326,7 +328,8 @@ app.use("/api/customization", customizationRoutes);
   app.use('/api/superadmin/status-settings', statusRoutes);
   app.use("/api/superadmin/billing",   billingRoutes);
   app.use("/api/superadmin/shipping",      shippingRoutes);
-  app.use("/api/superadmin/geo-coverage",  geoCoverageRoutes);
+  app.use("/api/superadmin/geo-coverage",      geoCoverageRoutes);
+  app.use("/api/superadmin/front-pages-seo",   frontPagesSeoRoutes);
   app.use('/api/superadmin/general-settings', generalSettingsRoutes);
   app.use('/api/superadmin/card-templates', cardTemplatesRoutes);
   app.use("/api/superadmin/subscription", superadminSubscriptionsRoutes);
@@ -367,6 +370,7 @@ app.use("/api/customization", customizationRoutes);
 // Public / Legacy routes
 app.use("/r", redirectRouter);
 app.use("/api/public-reviews", reviewsPublicController);
+app.use("/api/client/seo",     publicSeoRoutes);
 app.use("/api/superadmin/auth", superadminAuthRoutes);
 app.use("/api/superadmin/dashboard", requireAuth, requireSuperadmin, superadminDashboardRoutes);
 

@@ -1,5 +1,6 @@
 
 import prisma  from "../../config/database.js";
+import { resolveShipping } from "../superadmin/Shipping.controller.js";
 import { getStripe, getWebhookSecret } from "../../services/Stripe.service.js";
 import { createInvoiceFromOrder, formatInvoice, generateInvoiceNumber, createUnpaidInvoice} from "../../services/Invoice.service.js";
 import { sendTemplatedMail }  from "../../services/client/mail.service.js";
@@ -39,7 +40,12 @@ function formatOrder(o) {
       fullName: o.shippingFullName,  address:  o.shippingAddress,
       city:     o.shippingCity,      state:    o.shippingState,
       zip:      o.shippingZip,       country:  o.shippingCountry,
-      method:   o.shippingMethod,
+      method:   o.shippingMethod,    phone:    o.shippingPhone,
+    },
+    billing: {
+      isCompany:   o.isCompany,
+      companyName: o.companyName ?? null,
+      taxId:       o.taxId       ?? null,
     },
     stripeClientSecret: o.stripeClientSecret ?? null,
     paidAt:    o.paidAt,
@@ -58,22 +64,80 @@ function formatOrder(o) {
 }
 
 // ─── GET /api/orders/shipping-rates ──────────────────────────
+// Retourne les règles de livraison actives formatées comme des options sélectionnables.
+// Le coût exact est recalculé à la création de commande selon le contexte adresse.
 export const getShippingRates = async (req, res, next) => {
   try {
     const currency     = req.query.currency?.toUpperCase() || "EUR";
     const exchangeRate = parseFloat(req.query.rate || "1");
-    const rates = await prisma.shippingRate.findMany({
-      where: { active: true }, orderBy: { price: "asc" },
-    });
-    res.json({
-      success: true,
-      data: rates.map((r) => ({
-        id: r.id, method: r.method, label: r.label, description: r.description,
-        priceEUR:     Number(r.price),
-        displayPrice: Math.round(Number(r.price) * exchangeRate * 100) / 100,
+
+    const [rules, settings] = await Promise.all([
+      prisma.shippingRule.findMany({
+        where:   { active: true },
+        orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+      }),
+      prisma.platformSetting.findFirst(),
+    ]);
+
+    const fallbackCost = Number(settings?.shippingFallbackCost ?? 14.99);
+
+    const formatScope = (r) => {
+      if (r.country === "*") return "Worldwide";
+      return [r.country, r.state, r.city].filter(Boolean).join(", ");
+    };
+
+    const estimatedCost = (r) => {
+      switch (r.type) {
+        case "flat":     return Number(r.flatCost ?? 0);
+        case "free":     return 0;
+        case "weight":   return Number(r.weightBaseCost ?? 0);
+        case "price":    return r.priceTiers?.[0]?.cost != null ? Number(r.priceTiers[0].cost) : fallbackCost;
+        case "quantity": return r.quantityTiers?.[0]?.cost != null ? Number(r.quantityTiers[0].cost) : fallbackCost;
+        default:         return fallbackCost;
+      }
+    };
+
+    const descriptionFor = (r) => {
+      const scope = formatScope(r);
+      switch (r.type) {
+        case "free":     return r.freeMinTotal ? `Free above ${r.freeMinTotal} EUR — ${scope}` : `Free — ${scope}`;
+        case "weight":   return `Base ${r.weightBaseCost} EUR + ${r.weightCostPerKg} EUR/kg — ${scope}`;
+        case "price":    return `Price-based tiers — ${scope}`;
+        case "quantity": return `Quantity-based tiers — ${scope}`;
+        default:         return scope;
+      }
+    };
+
+    const rates = rules.map((r) => {
+      const priceEUR = estimatedCost(r);
+      return {
+        id:           r.id,
+        method:       String(r.id),
+        label:        r.name,
+        description:  descriptionFor(r),
+        priceEUR,
+        displayPrice: Math.round(priceEUR * exchangeRate * 100) / 100,
         currency,
-      })),
+        type:         r.type,
+        scope:        formatScope(r),
+      };
     });
+
+    if (!rates.length) {
+      rates.push({
+        id:           null,
+        method:       "fallback",
+        label:        "Standard Shipping",
+        description:  "Default shipping rate",
+        priceEUR:     fallbackCost,
+        displayPrice: Math.round(fallbackCost * exchangeRate * 100) / 100,
+        currency,
+        type:         "flat",
+        scope:        "Worldwide",
+      });
+    }
+
+    res.json({ success: true, data: rates });
   } catch (e) { next(e); }
 };
 
@@ -86,7 +150,8 @@ export const createOrder = async (req, res, next) => {
     const {
       shippingFullName, shippingAddress, shippingCity,
       shippingState,   shippingZip,     shippingCountry,
-      shippingMethod,
+      shippingMethod,  shippingPhone,
+      isCompany = false, companyName, taxId,
       currency     = "EUR",
       exchangeRate = 1,
       paymentMethod,
@@ -138,11 +203,25 @@ export const createOrder = async (req, res, next) => {
       });
     }
  
-    const shippingRate = await prisma.shippingRate.findUnique({
-      where: { method: shippingMethod || "standard" },
+    const subtotalEUR = cartItems.reduce((s, i) => s + Number(i.lineTotal), 0);
+    const itemCount   = cartItems.reduce((s, i) => {
+      const n = i.locations?.length > 0
+        ? i.locations.reduce((a, l) => a + Number(l.quantity ?? 1), 0)
+        : Number(i.quantity ?? 1);
+      return s + n;
+    }, 0);
+    const totalWeight = itemCount * 0.05;
+
+    const [shippingRulesAll, platformSettings] = await Promise.all([
+      prisma.shippingRule.findMany({ where: { active: true }, orderBy: { priority: "desc" } }),
+      prisma.platformSetting.findFirst(),
+    ]);
+    const fallbackCost    = Number(platformSettings?.shippingFallbackCost ?? 14.99);
+    const shippingResult  = resolveShipping(shippingRulesAll, fallbackCost, {
+      cartTotal: subtotalEUR, totalWeight, itemCount,
+      country: shippingCountry ?? "", state: shippingState ?? "", city: shippingCity ?? "",
     });
-    const shippingCostEUR = shippingRate?.price ?? 9.19;
-    const subtotalEUR     = cartItems.reduce((s, i) => s + Number(i.lineTotal), 0);
+    const shippingCostEUR = shippingResult.cost;
     const totalEUR        = subtotalEUR + shippingCostEUR;
     const rate            = parseFloat(exchangeRate) || 1;
     const displayTotal    = Math.round(totalEUR * rate * 100) / 100;
@@ -211,6 +290,10 @@ export const createOrder = async (req, res, next) => {
           shippingZip:      shippingZip      || null,
           shippingCountry:  shippingCountry  || "France",
           shippingMethod:   shippingMethod   || "standard",
+          shippingPhone:    shippingPhone    || null,
+          isCompany:        Boolean(isCompany),
+          companyName:      companyName      || null,
+          taxId:            taxId            || null,
           stripePaymentIntentId: paymentIntent?.id ?? null,
           stripeClientSecret:    stripeClientSecret ?? null,
           items: { create: orderItemsData },
@@ -258,7 +341,12 @@ export const createOrder = async (req, res, next) => {
         manualInstructions: manualMethod.instructions ?? null,
         message: req.t("order.order_created", { orderNumber: order.orderNumber, invoiceNumber }),
       }),
-      amounts: { subtotalEUR, shippingCostEUR, totalEUR, displayTotal, currency, exchangeRate: rate },
+      amounts: {
+        subtotalEUR, shippingCostEUR, totalEUR, displayTotal, currency, exchangeRate: rate,
+        shippingRuleName:  shippingResult.ruleName,
+        shippingMatchLevel: shippingResult.matchLevel,
+        freeShipping:      shippingResult.freeShippingApplied,
+      },
     });
   } catch (e) { next(e); }
 };

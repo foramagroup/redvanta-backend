@@ -5,6 +5,7 @@ import {
   listAllCards,
   getSuperCard,
   downloadSuperCardExport,
+  getSuperCardExportUrl,
   updateCardStatus,
   activateCard,
   regenerateSuperCardExport,
@@ -26,6 +27,7 @@ superNfcRouter.get("/stats",            ...auth,         getSuperNfcStats);
 // Cartes (toutes companies)
 superNfcRouter.get("/cards",          ...auth,           listAllCards);
 superNfcRouter.get("/cards/:uid",           ...auth,     getSuperCard);
+superNfcRouter.get("/cards/:uid/export-url", ...auth,    getSuperCardExportUrl);
 superNfcRouter.get("/cards/:uid/export",    ...auth,     downloadSuperCardExport);
 
 // Progression production : NOT_PROGRAMMED → PRINTED → SHIPPED → ACTIVE

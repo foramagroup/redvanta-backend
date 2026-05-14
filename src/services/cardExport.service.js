@@ -7,6 +7,7 @@ import fsP from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import QRCode from "qrcode";
+import { chromium } from "playwright";
 import  SettingService  from '../services/superadmin/settingService.js';      
 
 const appName = await SettingService.getCompanyName(); 
@@ -16,6 +17,8 @@ const ROOT_DIR = path.resolve(__dirname, "../..");
 const PUBLIC_DIR = path.join(ROOT_DIR, "public");
 const UPLOAD_DIR = path.resolve(process.cwd(), process.env.UPLOAD_DIR || "uploads");
 const EXPORT_DIR = path.join(PUBLIC_DIR, "uploads", "cards");
+const FRONTEND_BASE_URL = process.env.FRONTEND_BASE_URL || process.env.APP_FRONTEND_URL || "http://localhost:3000";
+export const CARD_EXPORT_VERSION = "printready-v3";
 
 // ✅ Dimensions CR80 réduites de moitié pour export compact
 const CR80 = { W: 506, H: 319 };
@@ -37,6 +40,14 @@ export async function generateCardExport(card, design) {
 
   await fsP.mkdir(EXPORT_DIR, { recursive: true });
 
+  try {
+    await generateCardExportFromFrontend(card, design);
+    return;
+  } catch (frontendErr) {
+    console.error("[cardExport] Frontend print renderer indisponible :", frontendErr?.message || frontendErr);
+    throw frontendErr;
+  }
+
   let logoPngBuffer = null;
   if (design?.logoUrl) {
     logoPngBuffer = await resolveLogoBuffer(design.logoUrl);
@@ -45,21 +56,70 @@ export async function generateCardExport(card, design) {
   const d = normalizeDesign(design, card);
   const qrInner = await buildQrInner(card.payload, d);
 
-  const totalW = d.cardW + 60;
-  const totalH = d.cardH * 2 + 160;
-  const rectoY = 30;
-  const versoY = rectoY + d.cardH + 80;
+  const totalW = 2400;
+  const totalH = 1700;
+  const marginX = 96;
+  const marginY = 96;
+  const gap = 80;
+  const sectionWidth = (totalW - marginX * 2 - gap) / 2;
+  const sectionHeight = totalH - marginY * 2;
+  const framePadding = 20;
+  const frameTop = marginY + 128;
+  const frameHeightAvailable = sectionHeight - 150;
+  const maxImageWidth = sectionWidth - framePadding * 2;
+  const maxImageHeight = frameHeightAvailable - framePadding * 2;
+  const renderScale = Math.min(maxImageWidth / d.cardW, maxImageHeight / d.cardH);
+  const renderCardW = Math.round(d.cardW * renderScale);
+  const renderCardH = Math.round(d.cardH * renderScale);
+  const frameWidth = renderCardW + framePadding * 2;
+  const frameHeight = renderCardH + framePadding * 2;
+  const leftSectionX = marginX;
+  const rightSectionX = marginX + sectionWidth + gap;
+  const frameY = Math.round(frameTop + (frameHeightAvailable - frameHeight) / 2);
+  const leftFrameX = Math.round(leftSectionX + (sectionWidth - frameWidth) / 2);
+  const rightFrameX = Math.round(rightSectionX + (sectionWidth - frameWidth) / 2);
+  const rectoX = leftFrameX + framePadding;
+  const versoX = rightFrameX + framePadding;
+  const rectoY = frameY + framePadding;
+  const versoY = frameY + framePadding;
 
-  const svgContent = buildGlobalSvg(d, qrInner, totalW, totalH, rectoY, versoY);
+  const svgContent = buildGlobalSvg(
+    d,
+    qrInner,
+    totalW,
+    totalH,
+    rectoX,
+    rectoY,
+    versoX,
+    versoY,
+    sectionWidth,
+    marginX,
+    marginY,
+    gap,
+    leftFrameX,
+    rightFrameX,
+    frameY,
+    frameWidth,
+    frameHeight,
+    renderScale,
+    renderCardW,
+    renderCardH,
+  );
   const svgPath = path.join(EXPORT_DIR, `${card.uid}.svg`);
   await fsP.writeFile(svgPath, svgContent, "utf-8");
   console.log(`[cardExport] ✅ SVG → ${svgPath}`);
 
   const pngPath = path.join(EXPORT_DIR, `${card.uid}.png`);
-  await writePngWithLogoOverlay(svgContent, pngPath, totalW, totalH, d, logoPngBuffer, rectoY);
+  await writePngWithLogoOverlay(svgContent, pngPath, totalW, totalH, d, logoPngBuffer, rectoX, rectoY, renderScale);
 
   const pdfPath = path.join(EXPORT_DIR, `${card.uid}.pdf`);
-  await writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY);
+  await writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoX, rectoY, renderScale);
+
+  const metaPath = path.join(EXPORT_DIR, `${card.uid}.meta.json`);
+  await fsP.writeFile(metaPath, JSON.stringify({
+    version: CARD_EXPORT_VERSION,
+    designUpdatedAt: design?.updatedAt ?? null,
+  }), "utf-8");
 
   const base = (process.env.APP_URL ?? process.env.FRONTEND_URL ?? "http://localhost:3000").replace(/\/$/, "");
   return {
@@ -218,44 +278,144 @@ async function buildQrInner(payload, d) {
 // SVG GLOBAL
 // ─────────────────────────────────────────────────────────────
 
-function buildGlobalSvg(d, qrInner, totalW, totalH, rectoY, versoY) {
+function buildFrontendPrintReadyPayload(card, design) {
+  return {
+    card: {
+      uid: card.uid,
+      payload: card.payload,
+      qrCodeUrl: card.qrCodeUrl ?? null,
+      locationName: card.locationName ?? "",
+    },
+    design: design ?? {},
+  };
+}
+
+async function generateCardExportFromFrontend(card, design) {
+  const payload = buildFrontendPrintReadyPayload(card, design);
+  const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const exportUrl = `${FRONTEND_BASE_URL}/export/print-ready?data=${encodeURIComponent(encoded)}`;
+  const sharp = (await import("sharp")).default;
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 2400, height: 1700 },
+      deviceScaleFactor: 1,
+    });
+
+    await page.goto(exportUrl, { waitUntil: "networkidle", timeout: 30000 });
+    await page.locator("[data-export-root]").waitFor({ state: "visible", timeout: 30000 });
+    await page.evaluate(async () => {
+      if (document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+      const images = Array.from(document.images || []);
+      await Promise.all(images.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true });
+        });
+      }));
+    });
+
+    const root = page.locator("[data-export-root]");
+    const pngBuffer = await root.screenshot({ type: "png" });
+
+    await fsP.writeFile(path.join(EXPORT_DIR, `${card.uid}.png`), pngBuffer);
+
+    const pngDataUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+    const svgWrapper = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1700" viewBox="0 0 2400 1700">
+  <image href="${pngDataUrl}" width="2400" height="1700" />
+</svg>`;
+    await fsP.writeFile(path.join(EXPORT_DIR, `${card.uid}.svg`), svgWrapper, "utf8");
+
+    const jpegBuffer = await sharp(pngBuffer).jpeg({ quality: 92 }).toBuffer();
+    const pdfBuffer = buildMinimalPdf(jpegBuffer, 2400, 1700);
+    await fsP.writeFile(path.join(EXPORT_DIR, `${card.uid}.pdf`), pdfBuffer);
+
+    await fsP.writeFile(
+      path.join(EXPORT_DIR, `${card.uid}.meta.json`),
+      JSON.stringify({
+        version: CARD_EXPORT_VERSION,
+        designUpdatedAt: design?.updatedAt ? new Date(design.updatedAt).toISOString() : null,
+        renderer: "frontend-playwright",
+      }, null, 2),
+      "utf8",
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
+function buildGlobalSvg(
+  d,
+  qrInner,
+  totalW,
+  totalH,
+  rectoX,
+  rectoY,
+  versoX,
+  versoY,
+  sectionWidth,
+  marginX,
+  marginY,
+  gap,
+  leftFrameX,
+  rightFrameX,
+  frameY,
+  frameWidth,
+  frameHeight,
+  renderScale,
+  renderCardW,
+  renderCardH,
+) {
+  const titleY = marginY + 52;
+  const subtitleY = marginY + 86;
+  const leftSectionCenterX = marginX + sectionWidth / 2;
+  const rightSectionCenterX = marginX + sectionWidth + gap + sectionWidth / 2;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
   width="${totalW}" height="${totalH}" viewBox="0 0 ${totalW} ${totalH}">
 <defs>
   ${buildGradientDefs(d)}
   <clipPath id="cr">
-    <rect x="30" y="${rectoY}" width="${d.cardW}" height="${d.cardH}" rx="${RX}"/>
+    <rect x="${rectoX}" y="${rectoY}" width="${renderCardW}" height="${renderCardH}" rx="${Math.round(RX * renderScale)}"/>
   </clipPath>
   <clipPath id="cv">
-    <rect x="30" y="${versoY}" width="${d.cardW}" height="${d.cardH}" rx="${RX}"/>
+    <rect x="${versoX}" y="${versoY}" width="${renderCardW}" height="${renderCardH}" rx="${Math.round(RX * renderScale)}"/>
   </clipPath>
 </defs>
-
-<text x="30" y="${rectoY - 10}" font-family="Arial,sans-serif" font-size="16" fill="#555">RECTO</text>
-<g clip-path="url(#cr)">
-  ${buildRecto(d, qrInner, 30, rectoY)}
-</g>
-
-<line x1="30" y1="${rectoY + d.cardH + 40}" x2="${30 + d.cardW}" y2="${rectoY + d.cardH + 40}"
-      stroke="#333" stroke-width="1" stroke-dasharray="6 4" opacity="0.4"/>
-
-<text x="30" y="${versoY - 10}" font-family="Arial,sans-serif" font-size="16" fill="#555">VERSO</text>
-<g clip-path="url(#cv)">
-  ${buildVerso(d, qrInner, 30, versoY)}
-</g>
+<rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#FFFFFF"/>
+<text x="${leftSectionCenterX}" y="${titleY}" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="#111111">RECTO (Front)</text>
+<text x="${leftSectionCenterX}" y="${subtitleY}" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#6B7280">${d.businessName} · 85.6mm × 54.0mm · Print-ready</text>
+<rect x="${leftFrameX}" y="${frameY}" width="${frameWidth}" height="${frameHeight}" rx="18" fill="none" stroke="#D1D5DB" stroke-width="2" stroke-dasharray="8 6"/>
+  <g clip-path="url(#cr)">
+    <g transform="translate(${rectoX}, ${rectoY}) scale(${renderScale})">
+      ${buildRecto(d, qrInner, 0, 0)}
+    </g>
+  </g>
+<text x="${rightSectionCenterX}" y="${titleY}" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="700" fill="#111111">VERSO (Back)</text>
+<text x="${rightSectionCenterX}" y="${subtitleY}" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="#6B7280">${d.businessName} · 85.6mm × 54.0mm · Print-ready</text>
+<rect x="${rightFrameX}" y="${frameY}" width="${frameWidth}" height="${frameHeight}" rx="18" fill="none" stroke="#D1D5DB" stroke-width="2" stroke-dasharray="8 6"/>
+  <g clip-path="url(#cv)">
+    <g transform="translate(${versoX}, ${versoY}) scale(${renderScale})">
+      ${buildVerso(d, qrInner, 0, 0)}
+    </g>
+  </g>
 </svg>`;
 }
 
 function buildGradientDefs(d) {
   return `
-  <linearGradient id="rectoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
-    <stop offset="0%" stop-color="${d.bg1}"/>
-    <stop offset="70%" stop-color="${d.bg2}"/>
-  </linearGradient>
-  <linearGradient id="versoGrad" x1="94%" y1="34%" x2="6%" y2="66%">
+  <linearGradient id="rectoGrad" x1="0%" y1="50%" x2="100%" y2="50%">
     <stop offset="0%" stop-color="${d.bg2}"/>
     <stop offset="100%" stop-color="${d.bg1}"/>
+  </linearGradient>
+  <linearGradient id="versoGrad" x1="0%" y1="50%" x2="100%" y2="50%">
+    <stop offset="0%" stop-color="${d.bg1}"/>
+    <stop offset="100%" stop-color="${d.bg2}"/>
   </linearGradient>
   <linearGradient id="bandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
     <stop offset="0%" stop-color="${d.accentBand1}"/>
@@ -416,10 +576,6 @@ function buildVerso(d, qrInner, ox, oy) {
     : oy + H - Math.round(5 * SCALE) - gSzPx + gOffsetY;
   const gX = ox + W - Math.round(6 * SCALE) - gSzPx + gOffsetX;
 
-  // ✅ QR : fond blanc + brackets blancs
-  const bracketSize = Math.round(qrSzPx * 0.28);
-  const bracketW = Math.round(bracketSize * 0.25);
-
   const isQrHoriz = d.qrPosition === "left" || d.qrPosition === "right";
   const isQrFirst = d.qrPosition === "left" || d.qrPosition === "top";
 
@@ -464,15 +620,6 @@ function buildVerso(d, qrInner, ox, oy) {
   ${d.showGoogleIcon ? buildGoogleIcon(gX, gBandCenterY, gSzPx, 1.0) : ""}
 
   <rect x="${qrX}" y="${qrY}" width="${qrSzPx}" height="${qrSzPx}" rx="6" fill="#FFFFFF"/>
-  
-  <rect x="${qrX}" y="${qrY}" width="${bracketSize}" height="${bracketW}" fill="#FFFFFF"/>
-  <rect x="${qrX}" y="${qrY}" width="${bracketW}" height="${bracketSize}" fill="#FFFFFF"/>
-  <rect x="${qrX + qrSzPx - bracketSize}" y="${qrY}" width="${bracketSize}" height="${bracketW}" fill="#FFFFFF"/>
-  <rect x="${qrX + qrSzPx - bracketW}" y="${qrY}" width="${bracketW}" height="${bracketSize}" fill="#FFFFFF"/>
-  <rect x="${qrX}" y="${qrY + qrSzPx - bracketW}" width="${bracketSize}" height="${bracketW}" fill="#FFFFFF"/>
-  <rect x="${qrX}" y="${qrY + qrSzPx - bracketSize}" width="${bracketW}" height="${bracketSize}" fill="#FFFFFF"/>
-  <rect x="${qrX + qrSzPx - bracketSize}" y="${qrY + qrSzPx - bracketW}" width="${bracketSize}" height="${bracketW}" fill="#FFFFFF"/>
-  <rect x="${qrX + qrSzPx - bracketW}" y="${qrY + qrSzPx - bracketSize}" width="${bracketW}" height="${bracketSize}" fill="#FFFFFF"/>
 
   <svg x="${qrX + Math.round(qrSzPx * 0.1)}" y="${qrY + Math.round(qrSzPx * 0.1)}"
        width="${Math.round(qrSzPx * 0.8)}" height="${Math.round(qrSzPx * 0.8)}"
@@ -597,15 +744,15 @@ function esc(s) {
 // PNG + PDF (inchangé)
 // ─────────────────────────────────────────────────────────────
 
-async function writePngWithLogoOverlay(svgContent, outPath, w, h, d, logoPngBuffer, rectoY) {
+async function writePngWithLogoOverlay(svgContent, outPath, w, h, d, logoPngBuffer, rectoX, rectoY, renderScale = 1) {
   try {
     const sharp = (await import("sharp")).default;
     let img = sharp(Buffer.from(svgContent)).resize(w, h);
     if (logoPngBuffer) {
-      const logoSzPx = Math.round(d.logoSize * SCALE);
-      const logoX = 30 + PAD;
-      const bizRowY = Math.round((d.cardH - 180) / 2);
-      const logoY = rectoY + bizRowY;
+      const logoSzPx = Math.round(d.logoSize * SCALE * renderScale);
+      const logoX = Math.round(rectoX + PAD * renderScale);
+      const bizRowY = Math.round(((d.cardH - 180) / 2) * renderScale);
+      const logoY = Math.round(rectoY + bizRowY);
       const logoBuf = await sharp(logoPngBuffer)
         .resize({ width: logoSzPx, height: logoSzPx, fit: "inside", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
@@ -619,18 +766,17 @@ async function writePngWithLogoOverlay(svgContent, outPath, w, h, d, logoPngBuff
   }
 }
 
-async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY) {
+async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoX, rectoY, renderScale = 1) {
   try {
-    const { chromium } = await import("playwright");
     const sharp = (await import("sharp")).default;
     
     let img = sharp(Buffer.from(svgContent)).resize(totalW, totalH);
 
     if (logoPngBuffer) {
-      const logoSzPx = Math.round(d.logoSize * SCALE);
-      const logoX = 30 + PAD;
-      const bizRowY = Math.round((d.cardH - 180) / 2);
-      const logoY = rectoY + bizRowY;
+      const logoSzPx = Math.round(d.logoSize * SCALE * renderScale);
+      const logoX = Math.round(rectoX + PAD * renderScale);
+      const bizRowY = Math.round(((d.cardH - 180) / 2) * renderScale);
+      const logoY = Math.round(rectoY + bizRowY);
       const logoBuf = await sharp(logoPngBuffer)
         .resize({ width: logoSzPx, height: logoSzPx, fit: "inside", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
@@ -638,48 +784,17 @@ async function writePdfWithPlaywright(svgContent, pdfPath, totalW, totalH, d, lo
       img = img.composite([{ input: logoBuf, left: Math.round(logoX), top: Math.round(logoY), blend: "over" }]);
     }
 
-    const pngBuffer = await img.png({ compressionLevel: 6 }).toBuffer();
-    const base64Png = pngBuffer.toString("base64");
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8"/>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: ${totalW}px; height: ${totalH}px; background: white; }
-  img { display: block; width: ${totalW}px; height: ${totalH}px; }
-</style>
-</head>
-<body>
-  <img src="data:image/png;base64,${base64Png}" />
-</body>
-</html>`;
-
-    const browser = await chromium.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-    const page = await browser.newPage();
-
-    await page.setViewportSize({ width: totalW, height: totalH });
-    await page.setContent(html, { waitUntil: "networkidle" });
-
-    await page.pdf({
-      path: pdfPath,
-      width: `${totalW}px`,
-      height: `${totalH}px`,
-      printBackground: true,
-      margin: { top: "0", right: "0", bottom: "0", left: "0" },
-    });
-
-    await browser.close();
+    const jpegBuffer = await img.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+    const pdfContent = buildMinimalPdf(jpegBuffer, totalW, totalH);
+    await fsP.writeFile(pdfPath, pdfContent);
     console.log(`[cardExport] ✅ PDF → ${pdfPath}`);
   } catch (e) {
-    console.warn(`[cardExport] ⚠️ Erreur PDF Playwright : ${e.message}`);
-    // ✅ CORRECTION : Passer svgContent au fallback au lieu de le relire
-    await writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY);
+    console.warn(`[cardExport] ⚠️ Erreur PDF rapide : ${e.message}`);
+    await writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoX, rectoY, renderScale);
   }
 }
 
-async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoY) {
+async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngBuffer, rectoX, rectoY, renderScale = 1) {
   try {
     const sharp = (await import("sharp")).default;
     
@@ -687,10 +802,10 @@ async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngB
     let img = sharp(Buffer.from(svgContent)).resize(totalW, totalH);
 
     if (logoPngBuffer) {
-      const logoSzPx = Math.round(d.logoSize * SCALE);
-      const logoX = 30 + PAD;
-      const bizRowY = Math.round((d.cardH - 180) / 2);
-      const logoY = rectoY + bizRowY;
+      const logoSzPx = Math.round(d.logoSize * SCALE * renderScale);
+      const logoX = Math.round(rectoX + PAD * renderScale);
+      const bizRowY = Math.round(((d.cardH - 180) / 2) * renderScale);
+      const logoY = Math.round(rectoY + bizRowY);
       const logoBuf = await sharp(logoPngBuffer)
         .resize({ width: logoSzPx, height: logoSzPx, fit: "inside", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
@@ -709,8 +824,8 @@ async function writePdfFallback(svgContent, pdfPath, totalW, totalH, d, logoPngB
 }
 
 function buildMinimalPdf(jpegBuffer, widthPx, heightPx) {
-  const wPt = Math.round(widthPx * 72 / 96);
-  const hPt = Math.round(heightPx * 72 / 96);
+  const wPt = 842;
+  const hPt = 595;
   const imgLen = jpegBuffer.length;
 
   const xref = [];
@@ -719,7 +834,7 @@ function buildMinimalPdf(jpegBuffer, widthPx, heightPx) {
   const push = (s) => { xref.push(parts.reduce((a, b) => a + b.length, 0)); parts.push(Buffer.isBuffer(s) ? s : Buffer.from(s, "latin1")); };
 
   push("%PDF-1.4\n");
-  push(`1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`);
+  push(`1 0 obj\n<< /Type /Catalog /Pages 2 0 R /PageMode /UseNone /OpenAction [3 0 R /XYZ null null 1] >>\nendobj\n`);
   push(`2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n`);
   push(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${wPt} ${hPt}]\n   /Contents 4 0 R /Resources << /XObject << /Im1 5 0 R >> >> >>\nendobj\n`);
   push(`4 0 obj\n<< /Length 35 >>\nstream\nq ${wPt} 0 0 ${hPt} 0 0 cm /Im1 Do Q\nendstream\nendobj\n`);

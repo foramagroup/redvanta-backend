@@ -23,7 +23,7 @@
 import path   from "path";
 import fs     from "fs";
 import prisma from "../../config/database.js";
-import { generateCardExport, deriveCardUrls, deleteCardExportFiles } from "../../services/cardExport.service.js";
+import { generateCardExport, deriveCardUrls, deleteCardExportFiles, CARD_EXPORT_VERSION } from "../../services/cardExport.service.js";
 import { formatNfcCard, assignTagToCard, regenerateQrCode } from "../../services/nfc.service.js";
 import {sendNfcCardStatusEmail} from "../../services/nfcCardStatus.email.js"
 
@@ -69,6 +69,39 @@ function formatCardFull(card) {
     } : null,
     design: card.design,
   };
+}
+
+async function ensureCardExportGenerated(uid, format, req) {
+  if (!["svg", "png", "pdf"].includes(format)) {
+    return { status: 422, body: { success: false, error: req.t("superadmin.nfc.invalid_format") } };
+  }
+
+  const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true } });
+  if (!card) return { status: 404, body: { success: false, error: req.t("nfc.card_not_found") } };
+  if (!card.payload) return { status: 422, body: { success: false, error: req.t("superadmin.nfc.no_payload") } };
+
+  const exportDir = path.join(process.cwd(), "public", "uploads", "cards");
+  const filePath = path.join(exportDir, `${uid}.${format}`);
+
+  try {
+    await generateCardExport(card, card.design);
+  } catch (genErr) {
+    console.error("[export] generateCardExport failed:", genErr);
+    return {
+      status: 500,
+      body: {
+        success: false,
+        error: req.t("superadmin.nfc.generation_failed"),
+        detail: genErr.message,
+      },
+    };
+  }
+
+  if (!fs.existsSync(filePath)) {
+    return { status: 500, body: { success: false, error: req.t("superadmin.nfc.generation_failed") } };
+  }
+
+  return { card, filePath };
 }
 
 // Statuts valides pour la progression production
@@ -202,19 +235,16 @@ export const downloadSuperCardExport = async (req, res, next) => {
     // process.cwd() = racine du backend (compatible Windows/XAMPP)
     const EXPORT_DIR = path.join(process.cwd(), "public", "uploads", "cards");
     const filePath   = path.join(EXPORT_DIR, `${uid}.${format}`);
-
-    if (!fs.existsSync(filePath)) {
-      console.log(`[export] Fichier absent, génération : ${filePath}`);
-      try {
-        await generateCardExport(card, card.design);
-      } catch (genErr) {
-        console.error("[export] ❌ generateCardExport a échoué :", genErr);
-        return res.status(500).json({
-          success: false,
-          error:   req.t("superadmin.nfc.generation_failed"),
-          detail:  genErr.message,
-        });
-      }
+    console.log(`[export] Régénération forcée : ${filePath}`);
+    try {
+      await generateCardExport(card, card.design);
+    } catch (genErr) {
+      console.error("[export] ❌ generateCardExport a échoué :", genErr);
+      return res.status(500).json({
+        success: false,
+        error:   req.t("superadmin.nfc.generation_failed"),
+        detail:  genErr.message,
+      });
     }
     console.log(`[export] Vérification fichier : ${filePath}`);
 
@@ -228,9 +258,51 @@ export const downloadSuperCardExport = async (req, res, next) => {
 
     res.setHeader("Content-Type",        mimeTypes[format]);
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Cache-Control",       "private, max-age=3600");
+    res.setHeader("Cache-Control",       "private, no-store, max-age=0");
 
     fs.createReadStream(filePath).pipe(res);
+  } catch (e) { next(e); }
+};
+
+export const getSuperCardExportUrl = async (req, res, next) => {
+  try {
+    const { uid } = req.params;
+    const format = (req.query.format ?? "pdf").toLowerCase();
+
+    if (!["svg", "png", "pdf"].includes(format)) {
+      return res.status(422).json({ success: false, error: req.t("superadmin.nfc.invalid_format") });
+    }
+
+    const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true } });
+    if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
+    if (!card.payload) return res.status(422).json({ success: false, error: req.t("superadmin.nfc.no_payload") });
+
+    const exportDir = path.join(process.cwd(), "public", "uploads", "cards");
+    const filePath = path.join(exportDir, `${uid}.${format}`);
+
+    try {
+      await generateCardExport(card, card.design);
+    } catch (genErr) {
+      console.error("[export-url] generateCardExport failed:", genErr);
+      return res.status(500).json({
+        success: false,
+        error: req.t("superadmin.nfc.generation_failed"),
+        detail: genErr.message,
+      });
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(500).json({ success: false, error: req.t("superadmin.nfc.generation_failed") });
+    }
+
+    const safeName = (card.locationName ?? card.design?.businessName ?? "card")
+      .replace(/[^a-z0-9]/gi, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .toLowerCase() || "card";
+    const filename = `${safeName}.${format}`;
+    const url = `${req.protocol}://${req.get("host")}/api/public/uploads/cards/${uid}.${format}`;
+    return res.json({ success: true, data: { url, format, filename } });
   } catch (e) { next(e); }
 };
 
