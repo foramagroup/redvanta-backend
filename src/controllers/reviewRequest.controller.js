@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import prisma from "../config/database.js";
-import { sendTemplatedMail } from "../services/client/mail.service.js";
+import { sendTemplatedMail, resolveCompanyLangId } from "../services/client/mail.service.js";
 // import { sendSms } from "../../services/sms.service.js"; // décommenter quand prêt
 
 function getCompanyId(req) {
@@ -57,9 +57,11 @@ async function dispatchRequest(reviewRequest, company) {
   const reviewUrl = company.googleReviewUrl || company.googleLink || "#";
 
   if (method === "email" && email) {
+    const langId = await resolveCompanyLangId(company.id);
     await sendTemplatedMail({
       slug: "review_request",
       to:   email,
+      langId,
       variables: {
         customer_name:  customerName,
         company_name:   company.name,

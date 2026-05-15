@@ -6,7 +6,7 @@ import {
   getCookieOptions,
   blacklistToken,
 } from "../../services/token.service.js";
-import { sendMail }                   from "../../services/client/mail.service.js";
+import { sendMail, sendTemplatedMail, resolveCompanyLangId } from "../../services/client/mail.service.js";
 import { buildConfirmEmailTemplate }  from "../../templates/client/confirmEmail.template.js";
 import { loadUserByEmail, loadUserForAuth, formatAdmin } from "../../services/superadmin/auth.service.js";
 import { createSubscriptionForCompany } from '../../helpers/subscription.helpers.js';
@@ -212,14 +212,26 @@ export const signup = async (req, res, next) => {
     await logActivity(result.user.id, result.user.name, ip, userAgent, "signup");
 
     //  ENVOYER EMAIL AVEC CODE OTP
-    const emailPayload = buildVerificationCodeTemplate({
-      name: companyName,
-      companyName,
-      verificationCode,
-      expiresHours: OTP_EXPIRATION_DAYS * 24,
-    });
+    const formattedCode = `${verificationCode.substring(0, 3)} ${verificationCode.substring(3)}`;
+    const langId = await resolveCompanyLangId(result.company.id).catch(() => null);
 
-    sendMail({ to: email, ...emailPayload }).catch((err) => {
+    sendTemplatedMail({
+      slug: "verification_code",
+      to: email,
+      langId,
+      variables: {
+        name:           companyName,
+        company_name:   companyName,
+        formatted_code: formattedCode,
+        expires_hours:  String(OTP_EXPIRATION_DAYS * 24),
+      },
+      fallbackFn: () => buildVerificationCodeTemplate({
+        name: companyName,
+        companyName,
+        verificationCode,
+        expiresHours: OTP_EXPIRATION_DAYS * 24,
+      }),
+    }).catch((err) => {
       console.error(`[signup] Email verification code error -> ${email}:`, err.message);
     });
 
@@ -676,14 +688,27 @@ export const resendVerificationCode = async (req, res, next) => {
     const companyLink = user.companies.find(uc => uc.isOwner) || user.companies[0];
 
     // Envoyer l'email
-    const emailPayload = buildVerificationCodeTemplate({
-      name: user.name || email,
-      companyName: companyLink?.company?.name || "your company",
-      verificationCode: newCode,
-      expiresHours: OTP_EXPIRATION_DAYS * 24,
-    });
+    const resendFormatted = `${newCode.substring(0, 3)} ${newCode.substring(3)}`;
+    const resendCompanyName = companyLink?.company?.name || "your company";
+    const resendLangId = await resolveCompanyLangId(companyLink?.company?.id).catch(() => null);
 
-    await sendMail({ to: email, ...emailPayload });
+    await sendTemplatedMail({
+      slug: "verification_code",
+      to: email,
+      langId: resendLangId,
+      variables: {
+        name:           user.name || email,
+        company_name:   resendCompanyName,
+        formatted_code: resendFormatted,
+        expires_hours:  String(OTP_EXPIRATION_DAYS * 24),
+      },
+      fallbackFn: () => buildVerificationCodeTemplate({
+        name: user.name || email,
+        companyName: resendCompanyName,
+        verificationCode: newCode,
+        expiresHours: OTP_EXPIRATION_DAYS * 24,
+      }),
+    });
 
     return res.json({
       success: true,

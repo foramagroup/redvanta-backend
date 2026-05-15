@@ -13,7 +13,7 @@
 
 import prisma    from "../config/database.js";
 import crypto    from "crypto";
-import { sendTemplatedMail } from "../services/client/mail.service.js";
+import { sendTemplatedMail, resolveCompanyLangId } from "../services/client/mail.service.js";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
@@ -257,9 +257,11 @@ export const inviteTeamMember = async (req, res, next) => {
       ? `${FRONTEND_URL}/welcome?token=${result.user.welcomeToken}`
       : `${FRONTEND_URL}/login`;
 
+    const langId = await resolveCompanyLangId(companyId);
     await sendTemplatedMail({
       slug: result.isNew ? "team_invite_new" : "team_invite_existing",
       to:   email,
+      langId,
       variables: {
         member_name:   result.user.name || email,
         company_name:  company.name,

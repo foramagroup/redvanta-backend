@@ -2,7 +2,7 @@
 import prisma from "../config/database.js";
 import  SettingService  from '../services/superadmin/settingService.js';      
 const appName = await SettingService.getCompanyName(); 
-import { sendTemplatedMail } from "../services/client/mail.service.js";
+import { sendTemplatedMail, resolveCompanyLangId } from "../services/client/mail.service.js";
 
 /**
  * Envoie un email à l'admin quand le superadmin change le statut d'une carte NFC
@@ -22,33 +22,31 @@ export async function sendNfcCardStatusEmail(card, status) {
       return;
     }
 
-    const adminEmail = ownerLink.user.email;
-    const adminName = ownerLink.user.name || "Customer";
+    const langId      = await resolveCompanyLangId(card.companyId);
+    const adminEmail  = ownerLink.user.email;
+    const adminName   = ownerLink.user.name || "Customer";
     const companyName = card.company?.name || "Your business";
     const businessName = card.design?.businessName || card.locationName || companyName;
     const cardId = card.uid.slice(0, 8);
-    const today = new Date().toLocaleDateString("en-US", { 
-      year: "numeric", 
-      month: "long", 
-      day: "numeric" 
+    const today = new Date().toLocaleDateString("en-US", {
+      year: "numeric", month: "long", day: "numeric"
     });
 
-    // Router vers le bon template
     switch (status) {
       case "PRINTED":
-        await sendPrintedEmail(adminEmail, adminName, businessName, cardId, today);
+        await sendPrintedEmail(adminEmail, adminName, businessName, cardId, today, langId);
         break;
       case "SHIPPED":
-        await sendShippedEmail(adminEmail, adminName, businessName, cardId, today);
+        await sendShippedEmail(adminEmail, adminName, businessName, cardId, today, langId);
         break;
-    case "DELIVERED":  // ✅ NOUVEAU
-        await sendDeliveredEmail(adminEmail, adminName, businessName, cardId, today);
+      case "DELIVERED":
+        await sendDeliveredEmail(adminEmail, adminName, businessName, cardId, today, langId);
         break;
       case "ACTIVE":
-        await sendActivatedEmail(adminEmail, adminName, businessName, cardId, today);
+        await sendActivatedEmail(adminEmail, adminName, businessName, cardId, today, langId);
         break;
       case "DISABLED":
-        await sendDisabledEmail(adminEmail, adminName, businessName, cardId, today);
+        await sendDisabledEmail(adminEmail, adminName, businessName, cardId, today, langId);
         break;
       default:
         console.log(`[email] ⚠️ No email template for status: ${status}`);
@@ -66,9 +64,9 @@ export async function sendNfcCardStatusEmail(card, status) {
 // ✅ PRINTED - Card has been printed
 // ─────────────────────────────────────────────────────────────
 
-async function sendPrintedEmail(to, adminName, businessName, cardId, date) {
+async function sendPrintedEmail(to, adminName, businessName, cardId, date, langId) {
   await sendTemplatedMail({
-    slug: "nfc_card_printed",
+    slug: "nfc_card_printed", langId,
     to,
     variables: { adminName, businessName, cardId, printedDate: date },
     fallbackFn: () => ({
@@ -104,9 +102,9 @@ async function sendPrintedEmail(to, adminName, businessName, cardId, date) {
 // ─────────────────────────────────────────────────────────────
 // 📬 DELIVERED - Card has been delivered
 // ─────────────────────────────────────────────────────────────
-async function sendDeliveredEmail(to, adminName, businessName, cardId, date) {
+async function sendDeliveredEmail(to, adminName, businessName, cardId, date, langId) {
   await sendTemplatedMail({
-    slug: "nfc_card_delivered",
+    slug: "nfc_card_delivered", langId,
     to,
     variables: { adminName, businessName, cardId, deliveredDate: date },
     fallbackFn: () => ({
@@ -147,9 +145,9 @@ async function sendDeliveredEmail(to, adminName, businessName, cardId, date) {
 // 📦 SHIPPED - Card has been shipped
 // ─────────────────────────────────────────────────────────────
 
-async function sendShippedEmail(to, adminName, businessName, cardId, date) {
+async function sendShippedEmail(to, adminName, businessName, cardId, date, langId) {
   await sendTemplatedMail({
-    slug: "nfc_card_shipped",
+    slug: "nfc_card_shipped", langId,
     to,
     variables: { adminName, businessName, cardId, shippedDate: date },
     fallbackFn: () => ({
@@ -190,9 +188,9 @@ async function sendShippedEmail(to, adminName, businessName, cardId, date) {
 // 🎉 ACTIVE - Card has been activated
 // ─────────────────────────────────────────────────────────────
 
-async function sendActivatedEmail(to, adminName, businessName, cardId, date) {
+async function sendActivatedEmail(to, adminName, businessName, cardId, date, langId) {
   await sendTemplatedMail({
-    slug: "nfc_card_activated",
+    slug: "nfc_card_activated", langId,
     to,
     variables: { adminName, businessName, cardId, activatedDate: date },
     fallbackFn: () => ({
@@ -233,9 +231,9 @@ async function sendActivatedEmail(to, adminName, businessName, cardId, date) {
 // 🔴 DISABLED - Card has been disabled
 // ─────────────────────────────────────────────────────────────
 
-async function sendDisabledEmail(to, adminName, businessName, cardId, date) {
+async function sendDisabledEmail(to, adminName, businessName, cardId, date, langId) {
   await sendTemplatedMail({
-    slug: "nfc_card_disabled",
+    slug: "nfc_card_disabled", langId,
     to,
     variables: { adminName, businessName, cardId, disabledDate: date },
     fallbackFn: () => ({

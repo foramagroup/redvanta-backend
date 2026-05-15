@@ -417,6 +417,28 @@ async function createLocationDesign(tx, { userId, companyId, productId, company,
 
   const design = await tx.design.create({ data: designData });
 
+  // ── Mettre à jour le champ URL de la company selon la plateforme ──
+  const PLATFORM_COMPANY_FIELD = {
+    google:      "googleLink",
+    facebook:    "facebookLink",
+    instagram:   "instagramLink",
+    tiktok:      "tiktokLink",
+    tripadvisor: "tripadvisorLink",
+    airbnb:      "airbnbLink",
+    booking:     "bookingLink",
+    custom:      "customReviewLink",
+  };
+
+  const companyField = PLATFORM_COMPANY_FIELD[platform];
+  const urlToSave    = platform === "google" ? googleReviewUrl : Url;
+
+  if (companyField && urlToSave) {
+    await tx.company.update({
+      where: { id: companyId },
+      data:  { [companyField]: urlToSave },
+    });
+  }
+
   console.log("✅ Location design created:", {
     designId: design.id,
     platform,

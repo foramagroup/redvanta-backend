@@ -4,7 +4,7 @@
 
 import prisma from "../config/database.js";
 import { getStripe } from "./Stripe.service.js";
-import { sendTemplatedMail } from "./client/mail.service.js";
+import { sendTemplatedMail, resolveCompanyLangId } from "./client/mail.service.js";
 
 // ─── Génération numéros ───────────────────────────────────────
 
@@ -234,6 +234,7 @@ export async function createSubscriptionInvoice({
 // ─── Emails ───────────────────────────────────────────────────
 
 export async function sendSubscriptionWelcomeEmail(subscription, user, company, invoice) {
+  const langId = await resolveCompanyLangId(company.id);
   const vars = {
     customer_name: user.name || user.email,
     company_name: company.name,
@@ -250,6 +251,7 @@ export async function sendSubscriptionWelcomeEmail(subscription, user, company, 
     slug: "subscription_welcome",
     to: user.email,
     variables: vars,
+    langId,
     fallbackFn: () => ({
       subject: `Welcome to ${subscription.plan.name}!`,
       html: `
@@ -276,6 +278,7 @@ export async function sendSubscriptionWelcomeEmail(subscription, user, company, 
 }
 
 export async function sendSubscriptionPendingEmail(subscription, user, company, invoice, manualMethod) {
+  const langId = await resolveCompanyLangId(company.id);
   const vars = {
     customer_name: user.name || user.email,
     plan_name: subscription.plan.name,
@@ -290,6 +293,7 @@ export async function sendSubscriptionPendingEmail(subscription, user, company, 
     slug: "subscription_pending_payment",
     to: user.email,
     variables: vars,
+    langId,
     fallbackFn: () => ({
       subject: `Subscription ${vars.plan_name} — Awaiting Payment`,
       html: `
@@ -313,6 +317,7 @@ export async function sendSubscriptionPendingEmail(subscription, user, company, 
 // ─── Email carte expirée / paiement échoué ────────────────────
 
 export async function sendSubscriptionPaymentFailedEmail(subscription, user, company, reason) {
+  const langId = await resolveCompanyLangId(company.id);
   const vars = {
     customer_name: user.name || user.email,
     company_name: company.name,
@@ -326,6 +331,7 @@ export async function sendSubscriptionPaymentFailedEmail(subscription, user, com
     slug: "subscription_payment_failed",
     to: user.email,
     variables: vars,
+    langId,
     fallbackFn: () => ({
       subject: `Payment Failed - ${subscription.plan.name}`,
       html: `

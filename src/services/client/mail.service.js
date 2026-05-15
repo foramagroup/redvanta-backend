@@ -1,8 +1,9 @@
 
 import nodemailer from "nodemailer";
 import prisma     from "../../config/database.js";
-import  SettingService  from '../../services/superadmin/settingService.js';      
-const appName = await SettingService.getCompanyName(); 
+import  SettingService  from '../../services/superadmin/settingService.js';
+import { getEmailFallback } from "../../i18n/emailFallbacks.js";
+const appName = await SettingService.getCompanyName();
 
 
 function createTransporter() {
@@ -61,6 +62,24 @@ function stripHtml(html = "") {
     .replace(/&gt;/g, ">")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+// ─── Résoudre la langue d'une company ────────────────────────
+// Priorité : defaultLanguageId de la company → langue "en" → langue système par défaut.
+export async function resolveCompanyLangId(companyId) {
+  if (companyId) {
+    const company = await prisma.company.findUnique({
+      where:  { id: companyId },
+      select: { defaultLanguageId: true },
+    });
+    if (company?.defaultLanguageId) return company.defaultLanguageId;
+  }
+  // Fallback : langue "en" active
+  const en = await prisma.language.findFirst({
+    where:  { code: "en", status: "Active" },
+    select: { id: true },
+  });
+  return en?.id ?? null; // null → getDefaultLangId() prendra le relais
 }
 
 // ─── Chercher la langue par défaut ───────────────────────────
@@ -122,22 +141,39 @@ export async function loadTemplate(slug, variables = {}, langId = null) {
   return { subject, html, text: stripHtml(html) };
 }
 
-// ─── Envoyer un email avec template DB + fallback hardcodé ───
+// ─── Envoyer un email avec template DB + fallback i18n + fallback hardcodé ───
 //
 // slug         : slug du template dans la table email_templates
 // variables    : objet de substitution { customer_name, company_name, ... }
 // to           : adresse du destinataire
-// langId       : langue préférée (optionnel)
-// fallbackFn   : fonction () => { subject, html, text } si template DB absent
+// langId       : ID de la langue préférée (optionnel)
+// langCode     : code de la langue ("fr","en","ro") — si absent, résolu depuis langId
+// fallbackFn   : fonction () => { subject, html, text } si aucun template trouvé
 
-export async function sendTemplatedMail({ slug, variables = {}, to, langId = null, fallbackFn = null, attachments = [] }) {
-  // 1. Essayer la DB
+export async function sendTemplatedMail({ slug, variables = {}, to, langId = null, langCode = null, fallbackFn = null, attachments = [] }) {
+  // 1. Essayer le template en DB
   let payload = await loadTemplate(slug, variables, langId);
 
-  // 2. Fallback hardcodé
+  // 2. Fallback fichier i18n (traduit selon la langue de la company)
+  if (!payload) {
+    let code = langCode;
+    if (!code && langId) {
+      const lang = await prisma.language.findUnique({ where: { id: langId }, select: { code: true } });
+      code = lang?.code ?? "en";
+    }
+    code = code ?? "en";
+
+    const fileFallback = getEmailFallback(slug, code, variables);
+    if (fileFallback) {
+      console.log(`[mail] Template "${slug}" absent en DB → i18n fichier (${code})`);
+      payload = fileFallback;
+    }
+  }
+
+  // 3. Fallback hardcodé (dernière option, toujours en anglais)
   if (!payload) {
     if (typeof fallbackFn === "function") {
-      console.log(`[mail] Template "${slug}" absent en DB → fallback hardcodé`);
+      console.log(`[mail] Template "${slug}" → fallback hardcodé`);
       payload = fallbackFn();
     } else {
       console.warn(`[mail] Template "${slug}" absent en DB et pas de fallback fourni`);

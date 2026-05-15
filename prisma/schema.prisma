@@ -1120,8 +1120,18 @@ model CardTemplate {
   colorMode  String @default("template") @db.VarChar(20) 
   
   // Element offsets
-  elementOffsets Json? 
-  
+  elementOffsets Json?
+
+  // Serial Number Tag
+  showSerialNumber      Boolean @default(true)
+  serialNumber          String  @default("NFC-123456") @db.VarChar(100)
+  serialNumberTextColor String  @default("#FFFFFF") @db.VarChar(20)
+  serialNumberBgColor   String  @default("transparent") @db.VarChar(30)
+  serialNumberFontSize  Int     @default(10)
+  serialNumberPaddingX  Int     @default(8)
+  serialNumberPaddingY  Int     @default(3)
+  serialNumberRadius    Int     @default(999)
+
   // Gradient colors (stored as JSON array)
   gradient    Json     // ["#FFFFFF", "#F1F5F9"]
   
@@ -1612,7 +1622,7 @@ model StaticPage {
   slug        String   @unique  // "terms", "privacy", "about" (slug de base en anglais)
   
   // SEO global
-  metaImage   String?  @db.Text  // Image meta par défaut
+  metaImage   String?  @db.LongText  // Image meta par défaut
   
   // Statut global
   status      PageStatus @default(draft)  // draft | published
@@ -2047,6 +2057,10 @@ model Company {
   yelpLink       String?
   tripadvisorLink String?
   customReviewLink String? // ← NOUVEAU
+  instagramLink String? // ← NOUVEAU
+  tiktokLink String? // ← NOUVEAU
+  airbnbLink String? // ← NOUVEAU
+  bookingLink String? // ← NOUVEAU
 
   billingAmount     String?
   billingDate       DateTime?

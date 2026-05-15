@@ -3,7 +3,7 @@ import prisma  from "../../config/database.js";
 import { resolveShipping } from "../superadmin/Shipping.controller.js";
 import { getStripe, getWebhookSecret } from "../../services/Stripe.service.js";
 import { createInvoiceFromOrder, formatInvoice, generateInvoiceNumber, createUnpaidInvoice} from "../../services/Invoice.service.js";
-import { sendTemplatedMail }  from "../../services/client/mail.service.js";
+import { sendTemplatedMail, resolveCompanyLangId }  from "../../services/client/mail.service.js";
 import {
   buildOrderConfirmationCustomer,
   buildOrderNotificationAdmin,
@@ -518,8 +518,9 @@ export const getPaymentMethods = async (req, res, next) => {
 // ─── Emails post-paiement ─────────────────────────────────────
 async function sendOrderEmails(order, invoice) {
   if (order.confirmationEmailSentAt) return;
- 
-  const currency     = order.currency ?? "EUR";
+
+  const langId   = await resolveCompanyLangId(order.companyId);
+  const currency = order.currency ?? "EUR";
   const rate         = Number(order.exchangeRate ?? 1);
   const displayTotal = order.displayTotal ? Number(order.displayTotal) : Number(order.total);
  
@@ -568,9 +569,10 @@ async function sendOrderEmails(order, invoice) {
     slug:       "order_confirmation_customer",
     to:         order.user.email,
     variables:  vars,
+    langId,
     fallbackFn: () => applyV(buildOrderConfirmationCustomer({ order, items, currency, displayTotal })),
   });
- 
+
   const ownerLink = await prisma.userCompany.findFirst({
     where: { companyId: order.companyId, isOwner: true },
     include: { user: true },
@@ -580,11 +582,13 @@ async function sendOrderEmails(order, invoice) {
       slug:       "order_confirmation_admin",
       to:         ownerLink.user.email,
       variables:  vars,
+      langId,
       fallbackFn: () => applyV(buildOrderNotificationAdmin({ order, items, companyName: order.company.name, currency, displayTotal })),
     });
   }
   const saEmail = process.env.SUPERADMIN_EMAIL || process.env.MAIL_FROM_ADDRESS;
   if (saEmail) {
+    // Superadmin → langue système par défaut (pas langId de la company)
     await sendTemplatedMail({
       slug:       "order_notification_superadmin",
       to:         saEmail,
@@ -599,9 +603,11 @@ async function sendOrderEmails(order, invoice) {
  
 async function sendOrderPendingEmail(order, invoice, manualMethod) {
   try {
+    const langId = await resolveCompanyLangId(order.companyId);
     await sendTemplatedMail({
       slug: "order_pending_payment",
       to:   order.user.email,
+      langId,
       variables: {
         customer_name:        order.user?.name || order.user?.email,
         order_number:         order.orderNumber,

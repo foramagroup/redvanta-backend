@@ -442,8 +442,11 @@ export const checkoutSubscription = async (req, res, next) => {
     if (isManual) {
       const orderNumber = await generateSubscriptionOrderNumber();
 
-      const result = await prisma.$transaction(async (tx) => {
-        // 1. Order
+      // Transaction : order + subscription + billingHistory uniquement.
+      // L'invoice est créée APRÈS le commit car createSubscriptionInvoice
+      // utilise le client prisma global — elle ne voit pas les données
+      // non encore committées, ce qui violerait la FK orderId.
+      const { order, subscription, billingHistory } = await prisma.$transaction(async (tx) => {
         const order = await tx.order.create({
           data: {
             userId,
@@ -460,10 +463,21 @@ export const checkoutSubscription = async (req, res, next) => {
           },
         });
 
-        // 2. Subscription
-        const subscription = await tx.subscription.create({
-          data: {
+        const subscription = await tx.subscription.upsert({
+          where: { companyId },
+          create: {
             companyId,
+            planId: plan.id,
+            status: "incomplete",
+            interval,
+            baseAmount: amounts.baseAmount,
+            addonsAmount: amounts.addonsAmount,
+            totalAmount: amounts.totalAmount,
+            currentPeriodStart: periods.currentPeriodStart,
+            currentPeriodEnd: periods.currentPeriodEnd,
+            nextBillingDate: periods.nextBillingDate,
+          },
+          update: {
             planId: plan.id,
             status: "incomplete",
             interval,
@@ -476,7 +490,6 @@ export const checkoutSubscription = async (req, res, next) => {
           },
         });
 
-        // 3. BillingHistory
         const billingHistory = await tx.billingHistory.create({
           data: {
             subscriptionId: subscription.id,
@@ -490,18 +503,20 @@ export const checkoutSubscription = async (req, res, next) => {
           },
         });
 
-        // 4. Invoice
-        const invoice = await createSubscriptionInvoice({
-          subscription: { ...subscription, plan },
-          billingHistory,
-          user,
-          company,
-          paymentMethod: manualMethod.name,
-          orderId: order.id,
-        });
-
-        return { order, subscription, invoice };
+        return { order, subscription, billingHistory };
       });
+
+      // Invoice créée après le commit — l'order existe maintenant en base.
+      const invoice = await createSubscriptionInvoice({
+        subscription: { ...subscription, plan },
+        billingHistory,
+        user,
+        company,
+        paymentMethod: manualMethod.name,
+        orderId: order.id,
+      });
+
+      const result = { order, subscription, invoice };
 
       // Email pending
       await sendSubscriptionPendingEmail(

@@ -84,7 +84,17 @@ function formatTemplate(template) {
     
     // Element offsets
     elementOffsets: template.elementOffsets,
-    
+
+    // Serial Number Tag
+    showSerialNumber:      template.showSerialNumber ?? true,
+    serialNumber:          template.serialNumber ?? "NFC-123456",
+    serialNumberTextColor: template.serialNumberTextColor ?? "#FFFFFF",
+    serialNumberBgColor:   template.serialNumberBgColor ?? "transparent",
+    serialNumberFontSize:  template.serialNumberFontSize ?? 10,
+    serialNumberPaddingX:  template.serialNumberPaddingX ?? 8,
+    serialNumberPaddingY:  template.serialNumberPaddingY ?? 3,
+    serialNumberRadius:    template.serialNumberRadius ?? 999,
+
     // ✅ Platform logo/icon settings - NOUVEAU
     useLogo: template.useLogo ?? true,
     selectedIconId: template.selectedIconId,
@@ -316,12 +326,22 @@ export const createTemplate = async (req, res) => {
         
         // Element offsets
         elementOffsets: data.elementOffsets || null,
-        
+
+        // Serial Number Tag
+        showSerialNumber:      data.showSerialNumber !== undefined ? data.showSerialNumber : true,
+        serialNumber:          data.serialNumber || 'NFC-123456',
+        serialNumberTextColor: data.serialNumberTextColor || '#FFFFFF',
+        serialNumberBgColor:   data.serialNumberBgColor || 'transparent',
+        serialNumberFontSize:  data.serialNumberFontSize ?? 10,
+        serialNumberPaddingX:  data.serialNumberPaddingX ?? 8,
+        serialNumberPaddingY:  data.serialNumberPaddingY ?? 3,
+        serialNumberRadius:    data.serialNumberRadius ?? 999,
+
         // ✅ Platform logo/icon settings - NOUVEAU
         useLogo: data.useLogo ?? true,
         selectedIconId: data.selectedIconId || null,
         iconColor: data.iconColor || data.accentColor || '#4285F4',
-        
+
         // Colors
         gradient: JSON.stringify(data.gradient),
         accentColor: data.accentColor || '#4285F4',
@@ -466,7 +486,17 @@ export const updateTemplate = async (req, res) => {
     
     // Element offsets
     if (data.elementOffsets !== undefined) updateData.elementOffsets = data.elementOffsets;
-    
+
+    // Serial Number Tag
+    if (data.showSerialNumber !== undefined)      updateData.showSerialNumber      = data.showSerialNumber;
+    if (data.serialNumber !== undefined)          updateData.serialNumber          = data.serialNumber;
+    if (data.serialNumberTextColor !== undefined) updateData.serialNumberTextColor = data.serialNumberTextColor;
+    if (data.serialNumberBgColor !== undefined)   updateData.serialNumberBgColor   = data.serialNumberBgColor;
+    if (data.serialNumberFontSize !== undefined)  updateData.serialNumberFontSize  = data.serialNumberFontSize;
+    if (data.serialNumberPaddingX !== undefined)  updateData.serialNumberPaddingX  = data.serialNumberPaddingX;
+    if (data.serialNumberPaddingY !== undefined)  updateData.serialNumberPaddingY  = data.serialNumberPaddingY;
+    if (data.serialNumberRadius !== undefined)    updateData.serialNumberRadius    = data.serialNumberRadius;
+
     // ✅ Platform logo/icon settings - NOUVEAU
     if (data.useLogo !== undefined) updateData.useLogo = data.useLogo;
     if (data.selectedIconId !== undefined) updateData.selectedIconId = data.selectedIconId;
@@ -663,6 +693,16 @@ export const duplicateTemplate = async (req, res) => {
         
         // Element offsets
         elementOffsets: original.elementOffsets || null,
+
+        // Serial Number Tag
+        showSerialNumber:      original.showSerialNumber ?? true,
+        serialNumber:          original.serialNumber || 'NFC-123456',
+        serialNumberTextColor: original.serialNumberTextColor || '#FFFFFF',
+        serialNumberBgColor:   original.serialNumberBgColor || 'transparent',
+        serialNumberFontSize:  original.serialNumberFontSize ?? 10,
+        serialNumberPaddingX:  original.serialNumberPaddingX ?? 8,
+        serialNumberPaddingY:  original.serialNumberPaddingY ?? 3,
+        serialNumberRadius:    original.serialNumberRadius ?? 999,
 
         useLogo: original.useLogo ?? true,
         selectedIconId: original.selectedIconId || null,

@@ -437,15 +437,17 @@ export const submitFeedback = async (req, res, next) => {
 // ─── Email admin ───────────────────────────────────────────────
 async function sendFeedbackNotification(feedback, card) {
   try {
-    const { sendTemplatedMail } = await import("../../services/client/mail.service.js");
+    const { sendTemplatedMail, resolveCompanyLangId } = await import("../../services/client/mail.service.js");
     const ownerLink = await prisma.userCompany.findFirst({
       where: { companyId: card.companyId, isOwner: true }, include: { user: true },
     });
     if (!ownerLink) return;
 
+    const langId = await resolveCompanyLangId(card.companyId);
     await sendTemplatedMail({
       slug: "feedback_received",
       to:   ownerLink.user.email,
+      langId,
       variables: {
         stars: String(feedback.stars), message: feedback.message ?? "Aucun message",
         location: card.locationName ?? "Votre établissement",

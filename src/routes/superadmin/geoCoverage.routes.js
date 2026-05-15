@@ -17,7 +17,7 @@ const auth   = [authenticateSuperAdmin, requireSuperAdmin];
 router.get("/all",               ...auth, getAll);
 
 // Full catalog (used by LocationSelect + shipping matrix)
-router.get("/catalog",           ...auth, getCatalog);
+router.get("/catalog",  getCatalog);
 
 // Individual resources
 router.get("/coverage",          ...auth, getCoverage);
