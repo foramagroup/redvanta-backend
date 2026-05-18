@@ -2669,4 +2669,16 @@ enum FeatureStatus {
   deprecated
 }
 
+model ContactMessage {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  email     String   @db.VarChar(255)
+  company   String?  @db.VarChar(255)
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("contact_messages")
+}
+
 

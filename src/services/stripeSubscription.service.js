@@ -234,11 +234,12 @@ export async function createSubscriptionInvoice({
 // ─── Emails ───────────────────────────────────────────────────
 
 export async function sendSubscriptionWelcomeEmail(subscription, user, company, invoice) {
-  const langId = await resolveCompanyLangId(company.id);
+  const langId = await resolveCompanyLangId(company?.id);
+  const planName = subscription.plan?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`;
   const vars = {
-    customer_name: user.name || user.email,
-    company_name: company.name,
-    plan_name: subscription.plan.name,
+    customer_name: user?.name || user?.email || "",
+    company_name: company?.name || "",
+    plan_name: planName,
     plan_price: String(Number(subscription.totalAmount).toFixed(2)),
     billing_cycle: subscription.interval === "monthly" ? "Monthly" : "Yearly",
     next_billing_date: subscription.nextBillingDate?.toLocaleDateString("en-US") || "",

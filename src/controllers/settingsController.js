@@ -120,12 +120,18 @@ export const getCompanySettings = async (req, res) => {
     const userId = req.user.userId;
     const companyId = getCompanyId(req);
 
-    const company = await getUserCompany(userId, companyId);
+    const [company, user] = await Promise.all([
+      getUserCompany(userId, companyId),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, email: true, phone: true },
+      }),
+    ]);
 
     if (!company) {
       return res.status(404).json({
         success: false,
-        error: companyId 
+        error: companyId
           ? 'Company not found or you do not have access'
           : 'No company found for this user'
       });
@@ -137,17 +143,16 @@ export const getCompanySettings = async (req, res) => {
         data: { companyId: company.id }
       });
 
-      // Recharger avec les settings
       const updatedCompany = await getUserCompany(userId, company.id);
       return res.json({
         success: true,
-        data: updatedCompany
+        data: { ...updatedCompany, user },
       });
     }
 
     res.json({
       success: true,
-      data: company
+      data: { ...company, user },
     });
   } catch (error) {
     console.error('❌ Error fetching company settings:', error);
@@ -226,7 +231,8 @@ export const updateGeneralSettings = async (req, res) => {
       countryCode,
       address,
       vatNumber,
-      tradeNumber
+      tradeNumber,
+      fullName,
     } = req.body;
 
     if (!companyId) {
@@ -261,19 +267,28 @@ export const updateGeneralSettings = async (req, res) => {
     if (vatNumber !== undefined) updateData.vatNumber = vatNumber;
     if (tradeNumber !== undefined) updateData.tradeNumber = tradeNumber;
 
-    const updated = await prisma.company.update({
-      where: { id: parseInt(companyId) },
-      data: updateData,
-      include: {
-        settings: true,
-        package: true
-      }
-    });
+    const [updated, updatedUser] = await Promise.all([
+      prisma.company.update({
+        where: { id: parseInt(companyId) },
+        data: updateData,
+        include: { settings: true, package: true },
+      }),
+      fullName?.trim()
+        ? prisma.user.update({
+            where: { id: userId },
+            data: { name: fullName.trim() },
+            select: { id: true, name: true, email: true, phone: true },
+          })
+        : prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, name: true, email: true, phone: true },
+          }),
+    ]);
 
     res.json({
       success: true,
       message: 'General settings updated successfully',
-      data: updated
+      data: { ...updated, user: updatedUser },
     });
   } catch (error) {
     console.error('❌ Error updating general settings:', error);

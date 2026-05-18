@@ -92,6 +92,7 @@ import orderClientRoutes   from "./routes/client/Order.route.js";
 import { scanRouter, reviewRouter } from "./routes/client/nfc.routes.js";
 import clientFAQsRoutes from "./routes/client/faqs.routes.js";
 import clientStaticPageRoutes from "./routes/client/staticPages.routes.js";
+import contactRoutes from "./routes/client/contact.routes.js";
 
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
@@ -261,6 +262,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/subscriptions", subscriptionsRoutes);
   app.use("/api/client/faqs", clientFAQsRoutes);
   app.use("/api/client/all-pages", clientStaticPageRoutes);
+  app.use("/api/client/contact", contactRoutes);
   suspendUnverifiedAccounts();
 
 

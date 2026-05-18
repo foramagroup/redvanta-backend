@@ -88,9 +88,9 @@ export const getStats = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        mrr:         `€${mrr.toFixed(2)}`,
-        arr:         `€${arr.toFixed(2)}`,
-        expansion:   `€${expansion.toFixed(2)}`,
+        mrr,
+        arr,
+        expansion,
         churnRate:   `${churnRate}%`,
         failedCount,
         pendingCount,
@@ -112,7 +112,11 @@ export const listInvoices = async (req, res, next) => {
     const from   = req.query.from   || undefined;
     const to     = req.query.to     || undefined;
 
+    const type   = req.query.type || "product"; // "product" | "subscription" | "all"
+
     const where = {
+      ...(type === "product"      && { isRecurring: false }),
+      ...(type === "subscription" && { isRecurring: true }),
       ...(status && { status }),
       ...(from   && { invoiceDate: { gte: new Date(from) } }),
       ...(to     && { invoiceDate: { lte: new Date(to + "T23:59:59") } }),
@@ -347,6 +351,12 @@ export const addManualPayment = async (req, res, next) => {
     }
     if (invoice.status === "refunded") {
       return res.status(422).json({ success: false, error: req.t("superadmin.billing.already_refunded") });
+    }
+    if (invoice.isRecurring) {
+      return res.status(422).json({
+        success: false,
+        error: req.t("superadmin.billing.subscription_invoice_use_subscription_page"),
+      });
     }
  
     const invoiceTotal  = Number(invoice.total);

@@ -26,7 +26,7 @@ const router = express.Router();
 // Configuration Multer pour l'upload de logo
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'public/uploads/logos/');
+    cb(null, 'uploads/logos/');
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

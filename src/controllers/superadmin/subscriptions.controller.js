@@ -15,39 +15,80 @@ import {
 // ═══════════════════════════════════════════════════════════
 export const listAllSubscriptions = async (req, res, next) => {
   try {
-    const { status, companyId, planId, page = 1, limit = 50 } = req.query;
+    const { status, companyId, planId, search, page = 1, limit = 200 } = req.query;
 
     const where = {};
 
-    if (status) {
-      where.status = status;
+    if (status) where.status = status;
+    if (companyId) where.companyId = parseInt(companyId);
+    if (planId) where.planId = parseInt(planId);
+    if (search) {
+      where.company = {
+        OR: [
+          { name: { contains: search } },
+          { email: { contains: search } },
+        ],
+      };
     }
 
-    if (companyId) {
-      where.companyId = parseInt(companyId);
-    }
+    const [subscriptions, total, activeCount, mrrAgg, companiesCount] = await Promise.all([
+      prisma.subscription.findMany({
+        where,
+        include: {
+          plan: {
+            include: {
+              translations: { include: { language: { select: { code: true } } } },
+            },
+          },
+          company: { select: { id: true, name: true, email: true } },
+          addons: { include: { addon: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (parseInt(page) - 1) * parseInt(limit),
+        take: parseInt(limit),
+      }),
+      prisma.subscription.count({ where }),
+      prisma.subscription.count({ where: { status: "active" } }),
+      prisma.subscription.aggregate({
+        where: { status: "active" },
+        _sum: { totalAmount: true },
+      }),
+      prisma.subscription.findMany({
+        where,
+        select: { companyId: true },
+        distinct: ["companyId"],
+      }),
+    ]);
 
-    if (planId) {
-      where.planId = parseInt(planId);
-    }
-
-    const subscriptions = await prisma.subscription.findMany({
-      where,
-      include: {
-        plan: true,
-        company: { select: { id: true, name: true, email: true } },
-        addons: { include: { addon: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (parseInt(page) - 1) * parseInt(limit),
-      take: parseInt(limit),
-    });
-
-    const total = await prisma.subscription.count({ where });
+    const lang = req.locale || "en";
 
     res.json({
       success: true,
-      data: subscriptions.map(formatSubscription),
+      data: subscriptions.map((sub) => {
+        const trs = sub.plan?.translations ?? [];
+        const tr =
+          trs.find((t) => t.language?.code === lang) ??
+          trs.find((t) => t.language?.code === "en") ??
+          trs[0];
+        const planName = tr?.name ?? sub.plan?.name ?? sub.plan?.slug ?? null;
+
+        return {
+          ...formatSubscription(sub),
+          planName,
+          company: sub.company ?? null,
+          addons: (sub.addons ?? []).map((a) => ({
+            id: a.id,
+            name: a.addon?.name ?? null,
+            amount: Number(a.amount ?? 0),
+          })),
+        };
+      }),
+      stats: {
+        total,
+        active: activeCount,
+        mrr: Number(mrrAgg._sum.totalAmount ?? 0),
+        companies: companiesCount.length,
+      },
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
