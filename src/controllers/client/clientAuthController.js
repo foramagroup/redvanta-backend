@@ -10,6 +10,7 @@ import { sendMail, sendTemplatedMail, resolveCompanyLangId } from "../../service
 import { buildConfirmEmailTemplate }  from "../../templates/client/confirmEmail.template.js";
 import { loadUserByEmail, loadUserForAuth, formatAdmin } from "../../services/superadmin/auth.service.js";
 import { createSubscriptionForCompany } from '../../helpers/subscription.helpers.js';
+import { generateInvoiceNumber } from '../../services/Invoice.service.js';
 import { generateOtpCode, getOtpExpiration } from '../../helpers/otp.helpers.js';
 import { buildVerificationCodeTemplate } from '../../templates/client/verificationCode.template.js';
 
@@ -199,11 +200,50 @@ export const signup = async (req, res, next) => {
 
       // Créer la subscription (en trial)
       if (defaultPlan) {
-        await createSubscriptionForCompany(tx, company.id, defaultPlan.id, {
+        const subscription = await createSubscriptionForCompany(tx, company.id, defaultPlan.id, {
           status: 'trialing',
           interval: 'monthly',
           trialDays: defaultPlan.trialDays || 14,
         });
+
+        // Créer la facture $0 pour le plan gratuit
+        if (Number(defaultPlan.price) === 0) {
+          const invoiceNumber = await generateInvoiceNumber();
+          const invoice = await tx.invoice.create({
+            data: {
+              invoiceNumber,
+              companyId: company.id,
+              userId:    user.id,
+              status:    'paid',
+              subtotal:  0,
+              taxAmount: 0,
+              total:     0,
+              paidAmount: 0,
+              currency:  'EUR',
+              isRecurring: true,
+              recurringInterval: 'monthly',
+              paidAt:    new Date(),
+              billingName:  company.name,
+              billingEmail: company.email,
+              notes: 'Free plan — automatically generated on signup',
+            },
+          });
+
+          await tx.billingHistory.create({
+            data: {
+              subscriptionId: subscription.id,
+              invoiceId:      invoice.id,
+              baseAmount:     0,
+              addonsAmount:   0,
+              totalAmount:    0,
+              periodStart:    subscription.currentPeriodStart,
+              periodEnd:      subscription.currentPeriodEnd,
+              status:         'paid',
+              paidAt:         new Date(),
+              paymentMethod:  'Free Plan',
+            },
+          });
+        }
       }
 
       return { user, company };
@@ -961,11 +1001,50 @@ export const addCompany = async (req, res, next) => {
 
       // Créer la subscription (en trial)
       if (defaultPlan) {
-        await createSubscriptionForCompany(tx, company.id, defaultPlan.id, {
+        const subscription = await createSubscriptionForCompany(tx, company.id, defaultPlan.id, {
           status: 'trialing',
           interval: 'monthly',
           trialDays: defaultPlan.trialDays || 14,
         });
+
+        // Créer la facture $0 pour le plan gratuit
+        if (Number(defaultPlan.price) === 0) {
+          const invoiceNumber = await generateInvoiceNumber();
+          const invoice = await tx.invoice.create({
+            data: {
+              invoiceNumber,
+              companyId: company.id,
+              userId:    user.id,
+              status:    'paid',
+              subtotal:  0,
+              taxAmount: 0,
+              total:     0,
+              paidAmount: 0,
+              currency:  'EUR',
+              isRecurring: true,
+              recurringInterval: 'monthly',
+              paidAt:    new Date(),
+              billingName:  company.name,
+              billingEmail: company.email,
+              notes: 'Free plan — automatically generated on company creation',
+            },
+          });
+
+          await tx.billingHistory.create({
+            data: {
+              subscriptionId: subscription.id,
+              invoiceId:      invoice.id,
+              baseAmount:     0,
+              addonsAmount:   0,
+              totalAmount:    0,
+              periodStart:    subscription.currentPeriodStart,
+              periodEnd:      subscription.currentPeriodEnd,
+              status:         'paid',
+              paidAt:         new Date(),
+              paymentMethod:  'Free Plan',
+            },
+          });
+        }
       }
 
       return { company, userCompanyLink };

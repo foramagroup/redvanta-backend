@@ -19,6 +19,7 @@
 
 import prisma from "../../config/database.js";
 import crypto  from "crypto";
+import { fireAlert } from "../../services/alertTrigger.service.js";
 
 // ─── Constantes de comportement ───────────────────────────────
 
@@ -329,6 +330,12 @@ export const submitRating = async (req, res, next) => {
           },
         });
         console.log(`[nfc] ✅ Review created: ${starsNum}★ (posted) - company=${card.companyId}, location=${card.locationId || 'none'}`);
+        fireAlert(
+          card.companyId,
+          "review",
+          "New Public Review",
+          `A ${starsNum}-star review was submitted at ${card.locationName ?? card.company?.name ?? "your location"}.`
+        ).catch(() => {});
       } catch (err) {
         console.error(`[nfc] ❌ Failed to create Review:`, err);
       }
@@ -429,6 +436,12 @@ export const submitFeedback = async (req, res, next) => {
 
     logEvent(uid, card.companyId, "FEEDBACK_SUBMITTED", { stars: starsNum }).catch(console.error);
     sendFeedbackNotification(feedback, card).catch((e) => console.error("[nfc] feedback email:", e.message));
+    fireAlert(
+      card.companyId,
+      "negative",
+      "Negative Review Alert",
+      `A ${starsNum}-star feedback was received at ${card.locationName ?? "your location"}.`
+    ).catch(() => {});
 
     res.json({ success: true, message: req.t("nfc.feedback_submitted") });
   } catch (e) { next(e); }

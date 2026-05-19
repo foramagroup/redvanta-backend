@@ -2095,6 +2095,14 @@ model Company {
 
   feedbacks   Feedback[]  // Tous les feedbacks reçus par l'entreprise
   analytics   AnalyticsEvent[]
+  contacts              Contact[]
+  contactGroups         ContactGroup[]
+  campaignTemplates     CampaignTemplate[]
+  automationWorkflows   AutomationWorkflow[]
+  alertSettings         AlertSettings?
+  alertNotifications    AlertNotification[]
+  companyIntegrations   CompanyIntegration[]
+  companyWebhook        CompanyWebhook?
   @@map("companies")
 }
 
@@ -2681,4 +2689,195 @@ model ContactMessage {
   @@map("contact_messages")
 }
 
+// ── Campaign Contacts ──────────────────────────────────────────
 
+model Contact {
+  id                Int       @id @default(autoincrement()) @db.UnsignedInt
+  companyId         Int       @db.UnsignedInt
+  firstName         String?   @db.VarChar(255)
+  lastName          String?   @db.VarChar(255)
+  email             String?   @db.VarChar(255)
+  phone             String?   @db.VarChar(50)
+  preferredLanguage String    @default("en") @db.VarChar(10)
+  tags              Json      @default("[]")
+  notes             String?   @db.Text
+  status            String    @default("Active") @db.VarChar(30)
+  lastContactedAt   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  company      Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  groupMembers ContactGroupMember[]
+
+  @@index([companyId])
+  @@map("contacts")
+}
+
+model ContactGroup {
+  id            Int      @id @default(autoincrement()) @db.UnsignedInt
+  companyId     Int      @db.UnsignedInt
+  name          String   @db.VarChar(255)
+  description   String?  @db.Text
+  type          String   @default("manual") @db.VarChar(20)
+  rule          String?  @db.Text
+  campaignsUsed Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company  Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  members  ContactGroupMember[]
+
+  @@index([companyId])
+  @@map("contact_groups")
+}
+
+model ContactGroupMember {
+  contactId Int @db.UnsignedInt
+  groupId   Int @db.UnsignedInt
+
+  contact Contact      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  group   ContactGroup @relation(fields: [groupId],   references: [id], onDelete: Cascade)
+
+  @@id([contactId, groupId])
+  @@map("contact_group_members")
+}
+
+// ── Campaign Templates ─────────────────────────────────────────
+
+model CampaignTemplate {
+  id         Int      @id @default(autoincrement()) @db.UnsignedInt
+  companyId  Int      @db.UnsignedInt
+  name       String   @db.VarChar(255)
+  category   String   @default("Custom") @db.VarChar(100)
+  channel    String   @default("email") @db.VarChar(20)
+  isDefault  Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  variants CampaignTemplateVariant[]
+
+  @@index([companyId])
+  @@map("campaign_templates")
+}
+
+model CampaignTemplateVariant {
+  id         Int      @id @default(autoincrement()) @db.UnsignedInt
+  templateId Int      @db.UnsignedInt
+  language   String   @db.VarChar(10)
+  subject    String?  @db.VarChar(500)
+  body       String?  @db.Text
+  sms        String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  template CampaignTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, language])
+  @@map("campaign_template_variants")
+}
+
+
+
+// ── Automation Workflows ───────────────────────────────────────
+
+model AutomationWorkflow {
+  id            Int      @id @default(autoincrement()) @db.UnsignedInt
+  companyId     Int      @db.UnsignedInt
+  name          String   @db.VarChar(255)
+  trigger       String   @db.VarChar(50)
+  action        String   @db.VarChar(20)
+  delay         String   @db.VarChar(30)
+  template      String   @db.Text
+  enabled       Boolean  @default(false)
+  statSent      Int      @default(0)
+  statConverted Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("automation_workflows")
+}
+
+// ── Alert Settings + Notifications ────────────────────────────
+
+model AlertSettings {
+  id             Int      @id @default(autoincrement()) @db.UnsignedInt
+  companyId      Int      @unique @db.UnsignedInt
+  negativeAlert  Boolean  @default(true)
+  reviewAlert    Boolean  @default(true)
+  weeklySummary  String   @default("monday") @db.VarChar(20)
+  emailNotif     String?  @db.VarChar(255)
+  slackUrl       String?  @db.VarChar(500)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("alert_settings")
+}
+
+model AlertNotification {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  companyId Int      @db.UnsignedInt
+  type      String   @db.VarChar(30)
+  title     String   @db.VarChar(255)
+  message   String   @db.Text
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("alert_notifications")
+}
+
+// ── Marketplace Integrations ───────────────────────────────────
+
+model MarketplaceIntegration {
+  id          Int     @id @default(autoincrement()) @db.UnsignedInt
+  name        String  @db.VarChar(100)
+  description String  @db.Text
+  category    String  @db.VarChar(50)
+  logoUrl     String? @db.VarChar(500)
+  active      Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  connections CompanyIntegration[]
+
+  @@map("marketplace_integrations")
+}
+
+model CompanyIntegration {
+  id            Int      @id @default(autoincrement()) @db.UnsignedInt
+  companyId     Int      @db.UnsignedInt
+  integrationId Int      @db.UnsignedInt
+  status        String   @default("connected") @db.VarChar(20)
+  apiKey        String?  @db.VarChar(500)
+  apiSecret     String?  @db.VarChar(500)
+  connectedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company     Company                @relation(fields: [companyId],     references: [id], onDelete: Cascade)
+  integration MarketplaceIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, integrationId])
+  @@index([companyId])
+  @@map("company_integrations")
+}
+
+model CompanyWebhook {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt
+  companyId Int      @unique @db.UnsignedInt
+  token     String   @unique @db.VarChar(64)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_webhooks")
+}

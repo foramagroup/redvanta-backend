@@ -34,6 +34,10 @@ import analyticsEventsRoutes from './routes/analyticsEvents.routes.js';
 import billingAdminRoutes from './routes/billing.routes.js';
 import nfcCardsRoutes from "./routes/nfcCards.routes.js";
 import reviewRequestRoutes from "./routes/reviewRequest.routes.js";
+import requestRoutes from "./routes/request.routes.js";
+import automationRoutes from "./routes/automation.routes.js";
+import alertsRoutes from "./routes/alerts.routes.js";
+import marketplaceRoutes from "./routes/marketplace.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
 import teamRoutes from "./routes/team.routes.js";
 import filteringRoutes from "./routes/filtering.routes.js";
@@ -77,6 +81,7 @@ import generalSettingsRoutes from './routes/superadmin/generalSetting.routes.js'
 import cardTemplatesRoutes from './routes/superadmin/cardTemplates.routes.js';
 import superadminSubscriptionsRoutes from "./routes/superadmin/subscriptions.routes.js";
 import startBillingCron from './cron/billing.cron.js';
+import { startWeeklyAlertsCron } from './cron/weeklyAlerts.cron.js';
 import superadminFAQsRoutes from "./routes/superadmin/faqs.routes.js";
 import superadminStaticPageRoutes from "./routes/superadmin/staticPages.routes.js";
 import faqCategoriesRoutes from "./routes/superadmin/faqCategories.routes.js";
@@ -289,8 +294,15 @@ app.use("/api/customization", customizationRoutes);
   //ges NFCcard
   app.use("/api/admin/nfc-cards", nfcCardsRoutes);
 
-  //ges Review Request
+  //ges Review Request + Contacts/Groups/Templates/Campaigns/Analytics
+  app.use("/api/admin/requests", requestRoutes);       // monté EN PREMIER (évite conflit /:id)
   app.use("/api/admin/requests", reviewRequestRoutes);
+  //ges Automation Workflows
+  app.use("/api/admin/automation", automationRoutes);
+  //ges Alerts
+  app.use("/api/admin/alerts", alertsRoutes);
+  //ges Marketplace
+  app.use("/api/admin/marketplace", marketplaceRoutes);
   //ges Analytics
   app.use("/api/admin/analytics", analyticsRoutes);
   //ges team
@@ -339,6 +351,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/superadmin/all-pages", superadminStaticPageRoutes);
   app.use("/api/superadmin/faq-categories", faqCategoriesRoutes);
   startBillingCron();
+  startWeeklyAlertsCron();
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
     // app.use("/uploads", express.static(uploadDir));

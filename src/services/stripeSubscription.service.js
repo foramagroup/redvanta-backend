@@ -363,7 +363,7 @@ export function formatSubscription(sub) {
   return {
     id: sub.id,
     planId: sub.planId,
-    planName: sub.plan?.name || null,
+    planName: sub.plan?.translations?.[0]?.name ?? sub.plan?.slug ?? null,
     status: sub.status,
     interval: sub.interval,
     baseAmount: Number(sub.baseAmount),
