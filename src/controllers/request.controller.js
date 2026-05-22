@@ -340,15 +340,31 @@ export const listTemplates = async (req, res, next) => {
     const companyId = getCompanyId(req);
     const { category, channel, archived } = req.query;
 
-    const where = { companyId, isArchived: archived === "true" };
-    if (category && category !== "All") where.category = category;
-    if (channel  && channel  !== "all") where.channel  = channel;
+    const isArchived = archived === "true";
+    const extraFilters = {};
+    if (category && category !== "All") extraFilters.category = category;
+    if (channel  && channel  !== "all") extraFilters.channel  = channel;
 
-    const templates = await prisma.campaignTemplate.findMany({
-      where,
+    // Requête company-specific (toujours safe)
+    const companyTemplates = await prisma.campaignTemplate.findMany({
+      where: { companyId, isArchived, ...extraFilters },
       include: { variants: true },
       orderBy: { createdAt: "desc" },
     });
+
+    // Requête templates globaux (companyId IS NULL) — nécessite prisma generate après ALTER TABLE
+    let globalTemplates = [];
+    try {
+      globalTemplates = await prisma.campaignTemplate.findMany({
+        where: { companyId: null, isDefault: true, isArchived: false, ...extraFilters },
+        include: { variants: true },
+        orderBy: { createdAt: "desc" },
+      });
+    } catch (_) {
+      // Prisma client pas encore régénéré — ignoré silencieusement
+    }
+
+    const templates = [...globalTemplates, ...companyTemplates];
 
     res.json({ success: true, data: templates.map(formatTemplate) });
   } catch (e) {

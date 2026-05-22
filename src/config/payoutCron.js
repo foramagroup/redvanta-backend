@@ -9,6 +9,13 @@ import { approveAndProcessPayout } from "../services/payoutService.js";
  */
 cron.schedule("30 2 * * *", async () => {
   console.log("[payoutCron] running scheduled payout job");
+
+  // PayoutRequest model not yet in schema — skip silently
+  if (!prisma.payoutRequest) {
+    console.log("[payoutCron] skipped: PayoutRequest model not in schema");
+    return;
+  }
+
   try {
     // find approved/processing requests or scheduled with scheduledDate <= now (if you added scheduledDate)
     const items = await prisma.payoutRequest.findMany({

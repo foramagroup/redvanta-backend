@@ -2746,7 +2746,7 @@ model ContactGroupMember {
 
 model CampaignTemplate {
   id         Int      @id @default(autoincrement()) @db.UnsignedInt
-  companyId  Int      @db.UnsignedInt
+  companyId  Int?     @db.UnsignedInt
   name       String   @db.VarChar(255)
   category   String   @default("Custom") @db.VarChar(100)
   channel    String   @default("email") @db.VarChar(20)
@@ -2755,7 +2755,7 @@ model CampaignTemplate {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  company  Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company  Company?                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   variants CampaignTemplateVariant[]
 
   @@index([companyId])
