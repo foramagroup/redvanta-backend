@@ -279,6 +279,13 @@ async function buildQrInner(payload, d) {
 // ─────────────────────────────────────────────────────────────
 
 function buildFrontendPrintReadyPayload(card, design) {
+  const d = design ?? {};
+  // Si la carte est assignée à un tag physique et que showSerialNumber est activé,
+  // on remplace le placeholder par le vrai numéro de série du tag
+  const resolvedSerialNumber =
+    (d.showSerialNumber && card.tag?.tagSerial)
+      ? card.tag.tagSerial
+      : (d.serialNumber ?? null);
   return {
     card: {
       uid: card.uid,
@@ -286,7 +293,10 @@ function buildFrontendPrintReadyPayload(card, design) {
       qrCodeUrl: card.qrCodeUrl ?? null,
       locationName: card.locationName ?? "",
     },
-    design: design ?? {},
+    design: {
+      ...d,
+      serialNumber: resolvedSerialNumber,
+    },
   };
 }
 

@@ -633,7 +633,24 @@ model dashboardstat {
     // ── Step 2 : Positions drag-and-drop ─────────────────────
     // JSON complet des offsets par orientation/face/élément
     // Format : { "landscape": { "front": { "businessInfo": {x,y}, "instructions": {x,y}, ... }, "back": {...} }, "portrait": {...} }
-    elementOffsets  Json?                               // ← NOUVEAU                            // ← NOUVEAU
+    elementOffsets  Json?
+
+    // ── Serial Number Tag ─────────────────────────────────────
+    showSerialNumber      Boolean? @default(false)
+    serialNumber          String?  @db.VarChar(100)
+    serialNumberTextColor String?  @db.VarChar(20)
+    serialNumberBgColor   String?  @db.VarChar(30)
+    serialNumberFontSize  Int?
+    serialNumberPaddingX  Int?
+    serialNumberPaddingY  Int?
+    serialNumberRadius    Int?
+
+    // ── Platform Icon Background ──────────────────────────────
+    platformIconBgEnabled Boolean? @default(false)
+    platformIconBgColor   String?  @db.VarChar(30)
+    platformIconBgPadding Int?
+    platformIconBgRadius  Int?
+    platformIconBgShadow  Boolean? @default(false)
 
     // ── Step 3 : Review ──────────────────────────────────────
     version       Int       @default(1)
@@ -1131,6 +1148,13 @@ model CardTemplate {
   serialNumberPaddingX  Int     @default(8)
   serialNumberPaddingY  Int     @default(3)
   serialNumberRadius    Int     @default(999)
+
+  // Platform Icon Background
+  platformIconBgEnabled Boolean @default(false)
+  platformIconBgColor   String  @default("#FFFFFF") @db.VarChar(30)
+  platformIconBgPadding Int     @default(4)
+  platformIconBgRadius  Int     @default(999)
+  platformIconBgShadow  Boolean @default(false)
 
   // Gradient colors (stored as JSON array)
   gradient    Json     // ["#FFFFFF", "#F1F5F9"]
@@ -2252,7 +2276,7 @@ model Product {
   id        Int      @id @default(autoincrement())
   price     Float
   active    Boolean  @default(true)
-  image     String?  // primary image URL / base64
+  image String? @db.LongText // primary image URL / base64
   defaultTemplateId     Int?     
   defaultTemplate       CardTemplate? @relation("ProductDefaultTemplate", fields: [defaultTemplateId], references: [id], onDelete: SetNull)
   cardSettings   Json?  // { width, height, cornerRadius, cornerRadiusEnabled }
@@ -2338,7 +2362,7 @@ model CartItem {
   lineTotal     Float    // totalCards x unitPrice
   // Options
   cardTypeId    String?
-  designId      Int?     @unique
+  designId      Int?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

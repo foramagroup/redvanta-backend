@@ -83,6 +83,7 @@ function resolveInvoiceStatus(d) {
 function formatDesign(d) {
   const invoiceStatus = d.__blockingStatus ?? resolveInvoiceStatus(d);
   const paymentLockActive = Boolean(invoiceStatus && invoiceStatus !== "paid");
+  const tpl = d.product?.defaultTemplate ?? null;
 
   return {
     // ── Identifiants ──────────────────────────────────────
@@ -158,11 +159,31 @@ function formatDesign(d) {
     frontBandHeight: d.frontBandHeight ?? 22,
     backBandHeight:  d.backBandHeight  ?? 12,
 
-    // Icônes
+    // Icônes plateforme
     showNfcIcon:    d.showNfcIcon    ?? true,
     showGoogleIcon: d.showGoogleIcon ?? true,
     nfcIconSize:    d.nfcIconSize    ?? 24,
     googleLogoSize: d.googleLogoSize ?? 20,
+    useLogo:        d.useLogo        ?? true,
+    selectedIconId: d.selectedIconId ?? null,
+    iconColor:      d.iconColor      ?? null,
+
+    // Serial Number Tag — valeurs du design, fallback sur le CardTemplate du produit
+    showSerialNumber:      d.showSerialNumber      ?? tpl?.showSerialNumber      ?? false,
+    serialNumber:          d.nfcCards?.[0]?.tag?.tagSerial ?? d.serialNumber ?? tpl?.serialNumber ?? "NFC-XXXXXX",
+    serialNumberTextColor: d.serialNumberTextColor ?? tpl?.serialNumberTextColor ?? "#FFFFFF",
+    serialNumberBgColor:   d.serialNumberBgColor   ?? tpl?.serialNumberBgColor   ?? "rgba(17,24,39,0.88)",
+    serialNumberFontSize:  d.serialNumberFontSize  ?? tpl?.serialNumberFontSize  ?? 10,
+    serialNumberPaddingX:  d.serialNumberPaddingX  ?? tpl?.serialNumberPaddingX  ?? 8,
+    serialNumberPaddingY:  d.serialNumberPaddingY  ?? tpl?.serialNumberPaddingY  ?? 3,
+    serialNumberRadius:    d.serialNumberRadius    ?? tpl?.serialNumberRadius    ?? 999,
+
+    // Platform Icon Background
+    platformIconBgEnabled: d.platformIconBgEnabled ?? tpl?.platformIconBgEnabled ?? false,
+    platformIconBgColor:   d.platformIconBgColor   ?? tpl?.platformIconBgColor   ?? "#FFFFFF",
+    platformIconBgPadding: d.platformIconBgPadding ?? tpl?.platformIconBgPadding ?? 4,
+    platformIconBgRadius:  d.platformIconBgRadius  ?? tpl?.platformIconBgRadius  ?? 999,
+    platformIconBgShadow:  d.platformIconBgShadow  ?? tpl?.platformIconBgShadow  ?? false,
 
     // Typo Nom
     businessFont:          d.businessFont          ?? "'Space Grotesk', sans-serif",
@@ -226,6 +247,7 @@ const DESIGN_PAYMENT_INCLUDE = {
       uid: true,
       payload: true,
       qrCodeUrl: true,
+      tag: { select: { tagSerial: true } },
       orderItem: {
         select: {
           order: { select: { status: true, invoice: { select: { status: true } } } },
@@ -236,6 +258,27 @@ const DESIGN_PAYMENT_INCLUDE = {
   orderItem: {
     select: {
       order: { select: { status: true, invoice: { select: { status: true } } } },
+    },
+  },
+  product: {
+    select: {
+      defaultTemplate: {
+        select: {
+          showSerialNumber: true,
+          serialNumber: true,
+          serialNumberTextColor: true,
+          serialNumberBgColor: true,
+          serialNumberFontSize: true,
+          serialNumberPaddingX: true,
+          serialNumberPaddingY: true,
+          serialNumberRadius: true,
+          platformIconBgEnabled: true,
+          platformIconBgColor: true,
+          platformIconBgPadding: true,
+          platformIconBgRadius: true,
+          platformIconBgShadow: true,
+        },
+      },
     },
   },
 };

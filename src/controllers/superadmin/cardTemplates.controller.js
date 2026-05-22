@@ -95,6 +95,13 @@ function formatTemplate(template) {
     serialNumberPaddingY:  template.serialNumberPaddingY ?? 3,
     serialNumberRadius:    template.serialNumberRadius ?? 999,
 
+    // Platform Icon Background
+    platformIconBgEnabled: template.platformIconBgEnabled ?? false,
+    platformIconBgColor:   template.platformIconBgColor   ?? "#FFFFFF",
+    platformIconBgPadding: template.platformIconBgPadding ?? 4,
+    platformIconBgRadius:  template.platformIconBgRadius  ?? 999,
+    platformIconBgShadow:  template.platformIconBgShadow  ?? false,
+
     // ✅ Platform logo/icon settings - NOUVEAU
     useLogo: template.useLogo ?? true,
     selectedIconId: template.selectedIconId,
@@ -337,6 +344,13 @@ export const createTemplate = async (req, res) => {
         serialNumberPaddingY:  data.serialNumberPaddingY ?? 3,
         serialNumberRadius:    data.serialNumberRadius ?? 999,
 
+        // Platform Icon Background
+        platformIconBgEnabled: data.platformIconBgEnabled ?? false,
+        platformIconBgColor:   data.platformIconBgColor   ?? "#FFFFFF",
+        platformIconBgPadding: data.platformIconBgPadding ?? 4,
+        platformIconBgRadius:  data.platformIconBgRadius  ?? 999,
+        platformIconBgShadow:  data.platformIconBgShadow  ?? false,
+
         // ✅ Platform logo/icon settings - NOUVEAU
         useLogo: data.useLogo ?? true,
         selectedIconId: data.selectedIconId || null,
@@ -496,6 +510,13 @@ export const updateTemplate = async (req, res) => {
     if (data.serialNumberPaddingX !== undefined)  updateData.serialNumberPaddingX  = data.serialNumberPaddingX;
     if (data.serialNumberPaddingY !== undefined)  updateData.serialNumberPaddingY  = data.serialNumberPaddingY;
     if (data.serialNumberRadius !== undefined)    updateData.serialNumberRadius    = data.serialNumberRadius;
+
+    // Platform Icon Background
+    if (data.platformIconBgEnabled !== undefined) updateData.platformIconBgEnabled = data.platformIconBgEnabled;
+    if (data.platformIconBgColor !== undefined)   updateData.platformIconBgColor   = data.platformIconBgColor;
+    if (data.platformIconBgPadding !== undefined) updateData.platformIconBgPadding = data.platformIconBgPadding;
+    if (data.platformIconBgRadius !== undefined)  updateData.platformIconBgRadius  = data.platformIconBgRadius;
+    if (data.platformIconBgShadow !== undefined)  updateData.platformIconBgShadow  = data.platformIconBgShadow;
 
     // ✅ Platform logo/icon settings - NOUVEAU
     if (data.useLogo !== undefined) updateData.useLogo = data.useLogo;
@@ -703,6 +724,13 @@ export const duplicateTemplate = async (req, res) => {
         serialNumberPaddingX:  original.serialNumberPaddingX ?? 8,
         serialNumberPaddingY:  original.serialNumberPaddingY ?? 3,
         serialNumberRadius:    original.serialNumberRadius ?? 999,
+
+        // Platform Icon Background
+        platformIconBgEnabled: original.platformIconBgEnabled ?? false,
+        platformIconBgColor:   original.platformIconBgColor   ?? "#FFFFFF",
+        platformIconBgPadding: original.platformIconBgPadding ?? 4,
+        platformIconBgRadius:  original.platformIconBgRadius  ?? 999,
+        platformIconBgShadow:  original.platformIconBgShadow  ?? false,
 
         useLogo: original.useLogo ?? true,
         selectedIconId: original.selectedIconId || null,

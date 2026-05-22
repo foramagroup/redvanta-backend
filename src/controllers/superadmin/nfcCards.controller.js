@@ -76,7 +76,7 @@ async function ensureCardExportGenerated(uid, format, req) {
     return { status: 422, body: { success: false, error: req.t("superadmin.nfc.invalid_format") } };
   }
 
-  const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true } });
+  const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true, tag: { select: { tagSerial: true } } } });
   if (!card) return { status: 404, body: { success: false, error: req.t("nfc.card_not_found") } };
   if (!card.payload) return { status: 422, body: { success: false, error: req.t("superadmin.nfc.no_payload") } };
 
@@ -228,7 +228,7 @@ export const downloadSuperCardExport = async (req, res, next) => {
       return res.status(422).json({ success: false, error: req.t("superadmin.nfc.invalid_format") });
     }
 
-    const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true } });
+    const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true, tag: { select: { tagSerial: true } } } });
     if (!card)         return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
     if (!card.payload) return res.status(422).json({ success: false, error: req.t("superadmin.nfc.no_payload") });
 
@@ -273,7 +273,7 @@ export const getSuperCardExportUrl = async (req, res, next) => {
       return res.status(422).json({ success: false, error: req.t("superadmin.nfc.invalid_format") });
     }
 
-    const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true } });
+    const card = await prisma.nFCCard.findUnique({ where: { uid }, include: { design: true, tag: { select: { tagSerial: true } } } });
     if (!card) return res.status(404).json({ success: false, error: req.t("nfc.card_not_found") });
     if (!card.payload) return res.status(422).json({ success: false, error: req.t("superadmin.nfc.no_payload") });
 

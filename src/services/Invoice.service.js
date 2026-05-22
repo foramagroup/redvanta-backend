@@ -6,21 +6,23 @@ import prisma from "../config/database.js";
 
 export async function generateInvoiceNumber() {
   const year = new Date().getFullYear();
+  const prefix = `INV-${year}-`;
+
+  // Cherche le numéro le plus élevé pour l'année en cours uniquement
   const lastInvoice = await prisma.invoice.findFirst({
-    orderBy: { id: 'desc' },
-    select: { invoiceNumber: true }
+    where: { invoiceNumber: { startsWith: prefix } },
+    orderBy: { invoiceNumber: "desc" },
+    select: { invoiceNumber: true },
   });
+
   let nextNumber = 1;
-  if (lastInvoice && lastInvoice.invoiceNumber) {
-    // On extrait le nombre du format "INV-2026-000042"
-    const parts = lastInvoice.invoiceNumber.split('-');
-    const lastSequence = parseInt(parts[parts.length - 1]);
-    
-    if (!isNaN(lastSequence)) {
-      nextNumber = lastSequence + 1;
-    }
+  if (lastInvoice?.invoiceNumber) {
+    const parts = lastInvoice.invoiceNumber.split("-");
+    const seq = parseInt(parts[parts.length - 1]);
+    if (!isNaN(seq)) nextNumber = seq + 1;
   }
-  return `INV-${year}-${String(nextNumber).padStart(6, "0")}`;
+
+  return `${prefix}${String(nextNumber).padStart(6, "0")}`;
 }
 
 
@@ -201,8 +203,13 @@ export function formatInvoice(inv) {
 
 
 export async function createUnpaidInvoice(order) {
-  const invoiceNumber = await generateInvoiceNumber();
-  console.log(invoiceNumber);
+  // Idempotence — si une invoice existe déjà pour cette commande, la retourner
+  const existing = await prisma.invoice.findUnique({ where: { orderId: order.id } });
+  if (existing) {
+    console.log(`[invoice] Invoice ${existing.invoiceNumber} already exists for order #${order.orderNumber} — skipping creation`);
+    return existing;
+  }
+
   const items = (order.items ?? []).map((i) => {
     const sub = Number(i.totalPrice);
     return {
@@ -218,34 +225,46 @@ export async function createUnpaidInvoice(order) {
       total:       sub,
     };
   });
- 
-  const invoice = await prisma.invoice.create({
-    data: {
-      invoiceNumber,
-      orderId:    order.id,
-      companyId:  order.companyId,
-      userId:     order.userId,
-      // ── UNPAID : en attente de confirmation du superadmin ──
-      status:     "unpaid",
-      // Pas de paidAt
-      subtotal:     Number(order.subtotal),
-      taxAmount:    0,
-      shippingCost: Number(order.shippingCost),
-      total:        Number(order.total),
-      currency:     order.currency     ?? "EUR",
-      exchangeRate: Number(order.exchangeRate ?? 1),
-      displayTotal: order.displayTotal ? Number(order.displayTotal) : Number(order.total),
-      billingName:  order.user?.name        ?? null,
-      billingEmail: order.user?.email       ?? null,
-      paymentMethod: order.manualPaymentMethod?.name ?? "Manuel",
-      invoiceDate:  new Date(),
-      dueDate:      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // +7 jours
-      items: { create: items },
-    },
-  });
- 
-  console.log(`[order] Facture ${invoiceNumber} créée (status=unpaid) pour commande #${order.orderNumber}`);
-  return invoice;
+
+  const invoiceData = {
+    orderId:      order.id,
+    companyId:    order.companyId,
+    userId:       order.userId,
+    status:       "unpaid",
+    subtotal:     Number(order.subtotal),
+    taxAmount:    0,
+    shippingCost: Number(order.shippingCost),
+    total:        Number(order.total),
+    currency:     order.currency     ?? "EUR",
+    exchangeRate: Number(order.exchangeRate ?? 1),
+    displayTotal: order.displayTotal ? Number(order.displayTotal) : Number(order.total),
+    billingName:  order.user?.name        ?? null,
+    billingEmail: order.user?.email       ?? null,
+    paymentMethod: order.manualPaymentMethod?.name ?? "Manuel",
+    invoiceDate:  new Date(),
+    dueDate:      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    items: { create: items },
+  };
+
+  // Retry sur collision de numéro (race condition entre requêtes simultanées)
+  const MAX_RETRIES = 5;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const invoiceNumber = await generateInvoiceNumber();
+    try {
+      const invoice = await prisma.invoice.create({ data: { invoiceNumber, ...invoiceData } });
+      console.log(`[invoice] ${invoiceNumber} créée (status=unpaid) pour commande #${order.orderNumber}`);
+      return invoice;
+    } catch (err) {
+      const isNumberCollision = err?.code === "P2002" &&
+        (err?.meta?.target?.includes("invoiceNumber") || err?.message?.includes("invoiceNumber"));
+      if (isNumberCollision && attempt < MAX_RETRIES - 1) {
+        console.warn(`[invoice] Collision sur ${invoiceNumber} (tentative ${attempt + 1}/${MAX_RETRIES}), nouvelle tentative…`);
+        await new Promise((r) => setTimeout(r, 30 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 

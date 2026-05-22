@@ -124,6 +124,9 @@ function formatDesign(d) {
     showGoogleIcon: d.showGoogleIcon,
     nfcIconSize:    d.nfcIconSize,
     googleLogoSize: d.googleLogoSize,
+    useLogo:        d.useLogo        ?? true,
+    selectedIconId: d.selectedIconId ?? null,
+    iconColor:      d.iconColor      ?? null,
     businessFont:          d.businessFont,
     businessFontSize:      d.businessFontSize,
     businessFontWeight:    d.businessFontWeight,
@@ -155,6 +158,24 @@ function formatDesign(d) {
     qrCodeSize:  d.qrCodeSize,
     cardModel: d.cardModel,
     elementOffsets: d.elementOffsets ?? null,
+
+    // Serial Number Tag
+    showSerialNumber:      d.showSerialNumber      ?? false,
+    serialNumber:          d.nfcCards?.[0]?.tag?.tagSerial ?? d.serialNumber  ?? null,
+    serialNumberTextColor: d.serialNumberTextColor ?? null,
+    serialNumberBgColor:   d.serialNumberBgColor   ?? null,
+    serialNumberFontSize:  d.serialNumberFontSize  ?? null,
+    serialNumberPaddingX:  d.serialNumberPaddingX  ?? null,
+    serialNumberPaddingY:  d.serialNumberPaddingY  ?? null,
+    serialNumberRadius:    d.serialNumberRadius    ?? null,
+
+    // Platform Icon Background
+    platformIconBgEnabled: d.platformIconBgEnabled ?? false,
+    platformIconBgColor:   d.platformIconBgColor   ?? "#FFFFFF",
+    platformIconBgPadding: d.platformIconBgPadding ?? 4,
+    platformIconBgRadius:  d.platformIconBgRadius  ?? 999,
+    platformIconBgShadow:  d.platformIconBgShadow  ?? false,
+
     primaryCardUid: d.nfcCards?.[0]?.uid ?? null,
     primaryCardPayload: paymentLockActive
       ? PAYMENT_LOCK_MESSAGE
@@ -181,6 +202,7 @@ const DESIGN_PAYMENT_INCLUDE = {
       uid: true,
       payload: true,
       qrCodeUrl: true,
+      tag: { select: { tagSerial: true } },
       orderItem: {
         select: {
           order: { select: { status: true, invoice: { select: { status: true } } } },
@@ -484,6 +506,9 @@ export const saveStep2 = async (req, res, next) => {
       showGoogleIcon: body.showGoogleIcon ?? design.showGoogleIcon,
       nfcIconSize:    body.nfcIconSize    ?? design.nfcIconSize,
       googleLogoSize: body.googleLogoSize ?? design.googleLogoSize,
+      useLogo:        body.useLogo        ?? design.useLogo,
+      selectedIconId: body.selectedIconId ?? design.selectedIconId,
+      iconColor:      body.iconColor      ?? design.iconColor,
 
       // Typo Nom
       businessFont:          body.businessFont          ?? design.businessFont,
@@ -529,6 +554,23 @@ export const saveStep2 = async (req, res, next) => {
 
       // Positions drag-and-drop (objet JSON complet)
       elementOffsets: body.elementOffsets ?? design.elementOffsets,
+
+      // Serial Number Tag
+      showSerialNumber:      body.showSerialNumber      ?? design.showSerialNumber,
+      serialNumber:          body.serialNumber          ?? design.serialNumber,
+      serialNumberTextColor: body.serialNumberTextColor ?? design.serialNumberTextColor,
+      serialNumberBgColor:   body.serialNumberBgColor   ?? design.serialNumberBgColor,
+      serialNumberFontSize:  body.serialNumberFontSize  ?? design.serialNumberFontSize,
+      serialNumberPaddingX:  body.serialNumberPaddingX  ?? design.serialNumberPaddingX,
+      serialNumberPaddingY:  body.serialNumberPaddingY  ?? design.serialNumberPaddingY,
+      serialNumberRadius:    body.serialNumberRadius    ?? design.serialNumberRadius,
+
+      // Platform Icon Background
+      platformIconBgEnabled: body.platformIconBgEnabled ?? design.platformIconBgEnabled,
+      platformIconBgColor:   body.platformIconBgColor   ?? design.platformIconBgColor,
+      platformIconBgPadding: body.platformIconBgPadding ?? design.platformIconBgPadding,
+      platformIconBgRadius:  body.platformIconBgRadius  ?? design.platformIconBgRadius,
+      platformIconBgShadow:  body.platformIconBgShadow  ?? design.platformIconBgShadow,
 
       lastAutoSave: new Date(),
     }, design);

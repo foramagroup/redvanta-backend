@@ -213,6 +213,19 @@ async function resolveDesignDefaultsFromTemplate(product, company) {
         frontInstruction2: "Tap to leave a review",
         backInstruction1: "Scan the QR code with your camera",
         backInstruction2: "Write a review on our profile page",
+        showSerialNumber: false,
+        serialNumber: null,
+        serialNumberTextColor: null,
+        serialNumberBgColor: null,
+        serialNumberFontSize: null,
+        serialNumberPaddingX: null,
+        serialNumberPaddingY: null,
+        serialNumberRadius: null,
+        platformIconBgEnabled: false,
+        platformIconBgColor: "#FFFFFF",
+        platformIconBgPadding: 4,
+        platformIconBgRadius: 999,
+        platformIconBgShadow: false,
       };
     }
 
@@ -286,6 +299,23 @@ async function resolveDesignDefaultsFromTemplate(product, company) {
       qrCodeSize: template.qrSize || 60,
       cardModel,
       elementOffsets: template.elementOffsets || null,
+
+      // Serial Number Tag
+      showSerialNumber:      template.showSerialNumber      ?? false,
+      serialNumber:          template.serialNumber          || null,
+      serialNumberTextColor: template.serialNumberTextColor || null,
+      serialNumberBgColor:   template.serialNumberBgColor   || null,
+      serialNumberFontSize:  template.serialNumberFontSize  ?? null,
+      serialNumberPaddingX:  template.serialNumberPaddingX  ?? null,
+      serialNumberPaddingY:  template.serialNumberPaddingY  ?? null,
+      serialNumberRadius:    template.serialNumberRadius    ?? null,
+
+      // Platform Icon Background
+      platformIconBgEnabled: template.platformIconBgEnabled ?? false,
+      platformIconBgColor:   template.platformIconBgColor   ?? "#FFFFFF",
+      platformIconBgPadding: template.platformIconBgPadding ?? 4,
+      platformIconBgRadius:  template.platformIconBgRadius  ?? 999,
+      platformIconBgShadow:  template.platformIconBgShadow  ?? false,
     };
   } catch (error) {
     console.error("❌ Error resolving design defaults from template:", error);
@@ -299,6 +329,14 @@ async function resolveDesignDefaultsFromTemplate(product, company) {
       accentColor: company?.primaryColor || "#E10600",
       frontInstruction1: "Approach your phone to the card",
       frontInstruction2: "Tap to leave a review",
+      showSerialNumber: false,
+      serialNumber: null,
+      serialNumberTextColor: null,
+      serialNumberBgColor: null,
+      serialNumberFontSize: null,
+      serialNumberPaddingX: null,
+      serialNumberPaddingY: null,
+      serialNumberRadius: null,
     };
   }
 }
