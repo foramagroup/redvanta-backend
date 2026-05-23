@@ -2769,20 +2769,22 @@ model ContactGroupMember {
 // ── Campaign Templates ─────────────────────────────────────────
 
 model CampaignTemplate {
-  id         Int      @id @default(autoincrement()) @db.UnsignedInt
-  companyId  Int?     @db.UnsignedInt
-  name       String   @db.VarChar(255)
-  category   String   @default("Custom") @db.VarChar(100)
-  channel    String   @default("email") @db.VarChar(20)
-  isDefault  Boolean  @default(false)
-  isArchived Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id               Int      @id @default(autoincrement()) @db.UnsignedInt
+  companyId        Int?     @db.UnsignedInt
+  sourceTemplateId Int?     @db.UnsignedInt
+  name             String   @db.VarChar(255)
+  category         String   @default("Custom") @db.VarChar(100)
+  channel          String   @default("email") @db.VarChar(20)
+  isDefault        Boolean  @default(false)
+  isArchived       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   company  Company?                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   variants CampaignTemplateVariant[]
 
   @@index([companyId])
+  @@index([sourceTemplateId])
   @@map("campaign_templates")
 }
 

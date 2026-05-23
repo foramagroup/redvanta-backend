@@ -51,6 +51,7 @@ function formatTemplate(t) {
     channel: t.channel,
     isDefault: t.isDefault,
     archived: t.isArchived,
+    sourceTemplateId: t.sourceTemplateId ?? null,
     createdAt: t.createdAt,
     variants: t.variants.map((v) => ({
       id: v.id,
@@ -345,28 +346,30 @@ export const listTemplates = async (req, res, next) => {
     if (category && category !== "All") extraFilters.category = category;
     if (channel  && channel  !== "all") extraFilters.channel  = channel;
 
-    // Requête company-specific (toujours safe)
-    const companyTemplates = await prisma.campaignTemplate.findMany({
-      where: { companyId, isArchived, ...extraFilters },
-      include: { variants: true },
-      orderBy: { createdAt: "desc" },
-    });
-
-    // Requête templates globaux (companyId IS NULL) — nécessite prisma generate après ALTER TABLE
-    let globalTemplates = [];
-    try {
-      globalTemplates = await prisma.campaignTemplate.findMany({
+    const [companyTemplates, globalTemplates] = await Promise.all([
+      prisma.campaignTemplate.findMany({
+        where: { companyId, isArchived, ...extraFilters },
+        include: { variants: true },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.campaignTemplate.findMany({
         where: { companyId: null, isDefault: true, isArchived: false, ...extraFilters },
         include: { variants: true },
         orderBy: { createdAt: "desc" },
-      });
-    } catch (_) {
-      // Prisma client pas encore régénéré — ignoré silencieusement
-    }
+      }),
+    ]);
 
-    const templates = [...globalTemplates, ...companyTemplates];
+    // IDs des templates globaux déjà overridés par cette company
+    const overriddenIds = new Set(
+      companyTemplates
+        .filter((t) => t.sourceTemplateId != null)
+        .map((t) => t.sourceTemplateId)
+    );
 
-    res.json({ success: true, data: templates.map(formatTemplate) });
+    // Masquer les globaux qui ont déjà une copie company-specific
+    const visibleGlobal = globalTemplates.filter((t) => !overriddenIds.has(t.id));
+
+    res.json({ success: true, data: [...visibleGlobal, ...companyTemplates].map(formatTemplate) });
   } catch (e) {
     next(e);
   }
@@ -409,8 +412,51 @@ export const updateTemplate = async (req, res, next) => {
     const id = parseInt(req.params.id);
     const { name, category, channel, variants } = req.body;
 
-    const existing = await prisma.campaignTemplate.findFirst({ where: { id, companyId } });
-    if (!existing) return res.status(404).json({ success: false, error: "Template not found." });
+    // Chercher d'abord un template appartenant à cette company
+    let target = await prisma.campaignTemplate.findFirst({
+      where: { id, companyId },
+      include: { variants: true },
+    });
+
+    // Copy-on-write : si c'est un template global, créer une copie company-specific
+    if (!target) {
+      const globalTpl = await prisma.campaignTemplate.findFirst({
+        where: { id, companyId: null, isDefault: true },
+        include: { variants: true },
+      });
+      if (!globalTpl) return res.status(404).json({ success: false, error: "Template not found." });
+
+      // Vérifier si une copie existe déjà pour cette company
+      const existingOverride = await prisma.campaignTemplate.findFirst({
+        where: { companyId, sourceTemplateId: id },
+        include: { variants: true },
+      });
+
+      if (existingOverride) {
+        target = existingOverride;
+      } else {
+        // Créer une nouvelle copie company-specific à partir du template global
+        target = await prisma.campaignTemplate.create({
+          data: {
+            companyId,
+            sourceTemplateId: globalTpl.id,
+            name:      globalTpl.name,
+            category:  globalTpl.category,
+            channel:   globalTpl.channel,
+            isDefault: false,
+            variants: {
+              create: globalTpl.variants.map((v) => ({
+                language: v.language,
+                subject:  v.subject,
+                body:     v.body,
+                sms:      v.sms,
+              })),
+            },
+          },
+          include: { variants: true },
+        });
+      }
+    }
 
     const data = {};
     if (name     !== undefined) data.name     = name.trim();
@@ -420,15 +466,15 @@ export const updateTemplate = async (req, res, next) => {
     if (Array.isArray(variants)) {
       for (const v of variants) {
         await prisma.campaignTemplateVariant.upsert({
-          where:  { templateId_language: { templateId: id, language: v.language || "en" } },
-          create: { templateId: id, language: v.language || "en", subject: v.subject?.trim() || null, body: v.body?.trim() || null, sms: v.sms?.trim() || null },
+          where:  { templateId_language: { templateId: target.id, language: v.language || "en" } },
+          create: { templateId: target.id, language: v.language || "en", subject: v.subject?.trim() || null, body: v.body?.trim() || null, sms: v.sms?.trim() || null },
           update: { subject: v.subject?.trim() || null, body: v.body?.trim() || null, sms: v.sms?.trim() || null },
         });
       }
     }
 
     const updated = await prisma.campaignTemplate.update({
-      where: { id },
+      where: { id: target.id },
       data,
       include: { variants: true },
     });
@@ -460,10 +506,17 @@ export const duplicateTemplate = async (req, res, next) => {
     const companyId = getCompanyId(req);
     const id = parseInt(req.params.id);
 
-    const original = await prisma.campaignTemplate.findFirst({
+    // Permettre la duplication des templates de la company ET des templates globaux
+    let original = await prisma.campaignTemplate.findFirst({
       where:   { id, companyId },
       include: { variants: true },
     });
+    if (!original) {
+      original = await prisma.campaignTemplate.findFirst({
+        where:   { id, companyId: null, isDefault: true },
+        include: { variants: true },
+      });
+    }
     if (!original) return res.status(404).json({ success: false, error: "Template not found." });
 
     const copy = await prisma.campaignTemplate.create({
