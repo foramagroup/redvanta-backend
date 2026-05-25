@@ -174,7 +174,7 @@ export default {
 
       if (tmpSaved.length === 0) return res.status(400).json({ error: "No images to export" });
 
-      const pdfFilename = await createPdfFromImages(tmpSaved, { dpi: 300, bleedMm: 3, orderId: id });
+      const pdfFilename = await createPdfFromImages(tmpSaved, { dpi: 300, bleedMm: 3, orderId: id, orientation: design.orientation ?? "landscape" });
       res.json({ ok: true, filename: pdfFilename });
     } catch (err) {
       console.error("adminDesign.exportPdf", err);

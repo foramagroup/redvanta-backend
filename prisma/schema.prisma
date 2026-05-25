@@ -1180,7 +1180,8 @@ model CardTemplate {
   updatedAt   DateTime @updatedAt 
 
   products    Product[] @relation("ProductDefaultTemplate")
-  
+  bulkBatches BulkBatch[]
+
   @@index([platform])
   @@index([isActive])
   @@index([isDefault])
@@ -1189,6 +1190,28 @@ model CardTemplate {
   @@map("card_templates")
 }
 
+model BulkBatch {
+  id          String   @id @db.VarChar(50)
+  designId    Int?
+  designName  String   @db.VarChar(255)
+  quantity    Int
+  status      String   @default("Generated") @db.VarChar(20)
+  jobStatus   String   @default("queued")    @db.VarChar(20)
+  progress    Int      @default(0)
+  lastDone    Int      @default(0)
+  settings    Json
+  error       String?  @db.Text
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  template CardTemplate? @relation(fields: [designId], references: [id], onDelete: SetNull)
+
+  @@index([designId])
+  @@index([jobStatus])
+  @@index([status])
+  @@map("bulk_batches")
+}
 
 model SuperAdminSetting {
   id        Int      @id @default(autoincrement())
@@ -2313,7 +2336,7 @@ model ProductTranslation {
   slug            String
   seoTitle        String?
   metaDescription String?
-  metaImage       String?
+  metaImage       String? @db.LongText
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   language        Language @relation(fields: [langId],    references: [id], onDelete: Restrict)
@@ -2327,7 +2350,7 @@ model ProductTranslation {
  model ProductGalleryItem {
   id        Int     @id @default(autoincrement())
   productId Int
-  url       String                  // image/video data URL or YouTube embed URL
+  url       String    @db.LongText              // image/video data URL or YouTube embed URL
   type      GalleryItemType         // "image" | "video" | "youtube"
   poster    String?                 // thumbnail for video / YouTube HQ default
   position  Int     @default(0)     // order in the gallery (0 = primary)

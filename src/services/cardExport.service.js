@@ -327,6 +327,8 @@ async function generateCardExportFromFrontend(card, design) {
           img.addEventListener("error", resolve, { once: true });
         });
       }));
+      // Allow ResizeObserver callbacks (portrait height enforcement) to flush
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     });
 
     const root = page.locator("[data-export-root]");

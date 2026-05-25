@@ -5,45 +5,55 @@ import fs from "fs/promises";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
+// NFC card physical dimensions in mm (ISO/IEC 7810 ID-1)
+const CARD_DIMS_MM = {
+  landscape: { w: 85.6, h: 54   },
+  portrait:  { w: 54,   h: 85.6 },
+  square:    { w: 54,   h: 54   },
+  circle:    { w: 54,   h: 54   },
+};
+const MM_TO_PT = 72 / 25.4; // 1 mm = 2.8346 PDF points
+
 /**
  * savedFiles: array of absolute image paths (png)
- * options: { dpi, bleedMm, orderId }
- * returns filename (relative to uploads)
+ * options: { dpi, bleedMm, orderId, orientation }
+ * returns filename (relative to uploads/pdfs)
+ *
+ * Page size is set to the real physical NFC card dimensions so the PDF
+ * prints at the correct 85.6 × 54 mm (landscape) or 54 × 85.6 mm (portrait).
  */
-export async function createPdfFromImages(savedFiles, { dpi = 300, bleedMm = 3, orderId = "o" } = {}) {
-  // convert bleed mm to px at dpi
-  const bleedPx = Math.round((dpi / 25.4) * bleedMm);
+export async function createPdfFromImages(savedFiles, { dpi = 300, bleedMm = 3, orderId = "o", orientation = "landscape" } = {}) {
+  const dims = CARD_DIMS_MM[orientation] ?? CARD_DIMS_MM.landscape;
 
-  // create temporary resized images to target DPI and add bleed background
+  // Physical page dimensions including bleed, in PDF points
+  const pageW = (dims.w + bleedMm * 2) * MM_TO_PT;
+  const pageH = (dims.h + bleedMm * 2) * MM_TO_PT;
+
+  // Target pixel dimensions at given DPI (card + bleed on all sides)
+  const targetPxW = Math.round((dims.w + bleedMm * 2) * dpi / 25.4);
+  const targetPxH = Math.round((dims.h + bleedMm * 2) * dpi / 25.4);
+
   const tmpPaths = [];
   for (const f of savedFiles) {
-    const img = sharp(f);
-    const metadata = await img.metadata();
-    // scale factor multiplier to reach desired DPI relative to 72
-    const multiplier = dpi / 72;
     const outPath = path.join(process.cwd(), "uploads", "tmp", `pdf_${uuidv4()}.png`);
     await fs.mkdir(path.dirname(outPath), { recursive: true });
 
-    // resize image based on multiplier and add bleed (extend)
-    const w = Math.round((metadata.width || 1000) * multiplier) + bleedPx * 2;
-    const h = Math.round((metadata.height || 1000) * multiplier) + bleedPx * 2;
-
-    await img
-      .resize(Math.round((metadata.width || 1000) * multiplier))
-      .extend({ top: bleedPx, bottom: bleedPx, left: bleedPx, right: bleedPx, background: { r: 255, g: 255, b: 255 } })
+    // Resize to exact card+bleed pixel dimensions (fill — card aspect already matches)
+    await sharp(f)
+      .resize(targetPxW, targetPxH, { fit: "fill" })
       .png()
       .toFile(outPath);
 
     tmpPaths.push(outPath);
   }
 
-  // assemble PDF pages
+  // Assemble PDF with correct physical page size
   const pdfDoc = await PDFDocument.create();
   for (const imgPath of tmpPaths) {
     const imgBytes = await fs.readFile(imgPath);
     const img = await pdfDoc.embedPng(imgBytes);
-    const page = pdfDoc.addPage([img.width, img.height]);
-    page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+    const page = pdfDoc.addPage([pageW, pageH]);
+    page.drawImage(img, { x: 0, y: 0, width: pageW, height: pageH });
   }
 
   const pdfBytes = await pdfDoc.save();
@@ -52,9 +62,8 @@ export async function createPdfFromImages(savedFiles, { dpi = 300, bleedMm = 3, 
   await fs.mkdir(saveDir, { recursive: true });
   await fs.writeFile(path.join(saveDir, filename), pdfBytes);
 
-  // cleanup tmp files
   for (const t of tmpPaths) {
-    try { await fs.unlink(t); } catch(e){ console.warn("tmp cleanup", e.message); }
+    try { await fs.unlink(t); } catch (e) { console.warn("tmp cleanup", e.message); }
   }
 
   return filename;
