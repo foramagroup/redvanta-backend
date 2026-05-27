@@ -8,13 +8,110 @@ function formatTemplate(t) {
     gradient = ["#4285F4"];
   }
 
+  let orientations = [];
+  if (t.orientations) {
+    try { orientations = JSON.parse(t.orientations); } catch { orientations = [t.orientations]; }
+  } else if (t.orientation) {
+    orientations = [t.orientation];
+  }
+
   return {
     id: t.id,
     name: t.name,
     platform: t.platform,
+
+    // Content
+    businessName: t.businessName,
+    slogan: t.slogan,
+    cta: t.cta,
+    logoUrl: t.logoUrl,
+
+    // Layout
     orientation: t.orientation,
+    orientations,
+    bandPosition: t.bandPosition,
+    frontBandHeight: t.frontBandHeight,
+    backBandHeight: t.backBandHeight,
+
+    // Logo and QR
+    logoPosition: t.logoPosition,
+    logoSize: t.logoSize,
+    qrPosition: t.qrPosition,
+    qrSize: t.qrSize,
+
+    // Typography - Name
+    nameFont: t.nameFont,
+    nameFontSize: t.nameFontSize,
+    nameFontWeight: t.nameFontWeight,
+    nameLetterSpacing: t.nameLetterSpacing,
+    nameTextTransform: t.nameTextTransform,
+    nameLineHeight: t.nameLineHeight,
+    nameTextAlign: t.nameTextAlign,
+
+    // Typography - Slogan
+    sloganFont: t.sloganFont,
+    sloganFontSize: t.sloganFontSize,
+    sloganFontWeight: t.sloganFontWeight,
+    sloganLetterSpacing: t.sloganLetterSpacing,
+    sloganTextTransform: t.sloganTextTransform,
+    sloganLineHeight: t.sloganLineHeight,
+    sloganTextAlign: t.sloganTextAlign,
+
+    // Typography - Instructions
+    instructionFont: t.instructionFont,
+    instructionFontSize: t.instructionFontSize,
+    instructionFontWeight: t.instructionFontWeight,
+    instructionLetterSpacing: t.instructionLetterSpacing,
+    instructionLineHeight: t.instructionLineHeight,
+    instructionTextAlign: t.instructionTextAlign,
+
+    // Instructions text
+    frontLine1: t.frontLine1,
+    frontLine2: t.frontLine2,
+    backLine1: t.backLine1,
+    backLine2: t.backLine2,
+
+    // Icons
+    checkStrokeWidth: t.checkStrokeWidth / 10, // 35 → 3.5
+    nfcIconSize: t.nfcIconSize,
+    googleIconSize: t.googleIconSize,
+    showNfcIcon: t.showNfcIcon,
+    showGoogleIcon: t.showGoogleIcon,
+
+    // Visual
+    textShadow: t.textShadow,
+    ctaPaddingTop: t.ctaPaddingTop,
+
+    // Model and mode
     model: t.model,
     colorMode: t.colorMode,
+
+    // Element offsets
+    elementOffsets: t.elementOffsets,
+
+    // Serial Number Tag
+    showSerialNumber:      t.showSerialNumber ?? true,
+    serialNumber:          t.serialNumber ?? 'NFC-123456',
+    serialNumberTextColor: t.serialNumberTextColor ?? '#FFFFFF',
+    serialNumberBgColor:   t.serialNumberBgColor ?? 'transparent',
+    serialNumberFontSize:  t.serialNumberFontSize ?? 10,
+    serialNumberPaddingX:  t.serialNumberPaddingX ?? 8,
+    serialNumberPaddingY:  t.serialNumberPaddingY ?? 3,
+    serialNumberRadius:    t.serialNumberRadius ?? 999,
+
+    // Platform icon background
+    platformIconBgEnabled: t.platformIconBgEnabled ?? false,
+    platformIconBgColor:   t.platformIconBgColor ?? '#FFFFFF',
+    platformIconBgPadding: t.platformIconBgPadding ?? 4,
+    platformIconBgRadius:  t.platformIconBgRadius ?? 999,
+    platformIconBgShadow:  t.platformIconBgShadow ?? false,
+
+    // Platform logo / icon
+    useLogo: t.useLogo ?? true,
+    selectedIconId: t.selectedIconId,
+    iconColor: t.iconColor,
+
+    // Colors
     gradient,
     accentColor: t.accentColor,
     textColor: t.textColor,
@@ -23,24 +120,13 @@ function formatTemplate(t) {
     qrColor: t.qrColor,
     starsColor: t.starsColor,
     iconsColor: t.iconsColor,
+
+    // Pattern & status
     pattern: t.pattern,
-    bandPosition: t.bandPosition,
-    frontBandHeight: t.frontBandHeight,
-    backBandHeight: t.backBandHeight,
-    businessName: t.businessName,
-    slogan: t.slogan,
-    cta: t.cta,
-    logoUrl: t.logoUrl,
-    logoPosition: t.logoPosition,
-    logoSize: t.logoSize,
-    qrPosition: t.qrPosition,
-    qrSize: t.qrSize,
-    showNfcIcon: t.showNfcIcon,
-    showGoogleIcon: t.showGoogleIcon,
-    showSerialNumber: t.showSerialNumber,
-    isDefault: t.isDefault,
     isActive: t.isActive,
+    isDefault: t.isDefault,
     isCardSetting: t.isCardSetting,
+
     createdAt: t.createdAt.toISOString().split('T')[0],
   };
 }

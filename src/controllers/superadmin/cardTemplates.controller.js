@@ -254,9 +254,12 @@ export const createTemplate = async (req, res) => {
      let orientationsValue = null;
     if (data.orientations) {
       if (Array.isArray(data.orientations)) {
-        orientationsValue = JSON.stringify(data.orientations);
+        orientationsValue = JSON.stringify(data.orientations.map(o => o.toLowerCase()));
       } else if (typeof data.orientations === 'string') {
-        orientationsValue = data.orientations;
+        try {
+          const parsed = JSON.parse(data.orientations);
+          orientationsValue = Array.isArray(parsed) ? JSON.stringify(parsed.map(o => o.toLowerCase())) : data.orientations.toLowerCase();
+        } catch { orientationsValue = data.orientations.toLowerCase(); }
       }
     }
     const template = await prisma.cardTemplate.create({
@@ -264,15 +267,15 @@ export const createTemplate = async (req, res) => {
         // Basic
         name: data.name.trim(),
         platform: data.platform,
-        
+
         // Content
         businessName: data.businessName || data.name,
         slogan: data.slogan || null,
         cta: data.cta || 'Powered by RedVanta',
         logoUrl: data.logoUrl || null,
-        
-        // ✅ Layout - NOUVEAU : Support orientations multiples
-        orientation: data.orientation || 'landscape',
+
+        // Layout
+        orientation: (data.orientation || 'landscape').toLowerCase(),
         orientations: orientationsValue,
         bandPosition: data.bandPosition || 'bottom',
         frontBandHeight: data.frontBandHeight || 22,
@@ -434,11 +437,11 @@ export const updateTemplate = async (req, res) => {
     if (data.cta !== undefined) updateData.cta = data.cta;
     if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl;
     
-    // ✅ Layout - NOUVEAU : Support orientations multiples
-    if (data.orientation) updateData.orientation = data.orientation;
+    // Layout
+    if (data.orientation) updateData.orientation = data.orientation.toLowerCase();
     if (data.orientations !== undefined) {
       if (Array.isArray(data.orientations)) {
-        updateData.orientations = JSON.stringify(data.orientations);
+        updateData.orientations = JSON.stringify(data.orientations.map(o => o.toLowerCase()));
       }
     }
     if (data.bandPosition) updateData.bandPosition = data.bandPosition;
