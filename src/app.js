@@ -388,6 +388,10 @@ app.use("/api/customization", customizationRoutes);
 app.use("/r", redirectRouter);
 app.use("/api/public-reviews", reviewsPublicController);
 app.use("/api/client/seo",     publicSeoRoutes);
+
+// Public card activation (GET /api/cards/:uid/activate)
+import { activateCardPublic } from "./controllers/superadmin/cardsBatchController.js";
+app.get("/api/cards/:uid/activate", activateCardPublic);
 app.use("/api/superadmin/auth", superadminAuthRoutes);
 app.use("/api/superadmin/dashboard", requireAuth, requireSuperadmin, superadminDashboardRoutes);
 

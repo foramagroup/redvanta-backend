@@ -9,7 +9,7 @@ import {
   buildOrderNotificationAdmin,
   buildOrderNotificationSuperAdmin,
 } from "../../templates/client/Orderemails.js";
-import { generateNfcCardsForOrder } from "../../services/nfc.service.js";
+import { fulfillNfcForOrder } from "../../services/nfc.service.js";
 
 function getCompanyId(req) {
   const id = req.user.companyId;
@@ -419,8 +419,8 @@ export const stripeWebhook = async (req, res, next) => {
         // generateNfcCardsForOrder itère sur order.items
         // → fonctionne sans modification : chaque OrderItem (y compris les items de location v2)
         //   a son propre designId → une série de cartes NFC générées
-        generateNfcCardsForOrder(fullOrder).catch((e) =>
-          console.error("[webhook] Erreur génération NFC:", e.message)
+        fulfillNfcForOrder(fullOrder).catch((e) =>
+          console.error("[webhook] Erreur fulfillment NFC:", e.message)
         );
         sendOrderEmails(fullOrder, invoice).catch(console.error);
         console.log(`[webhook] Commande #${order.orderNumber} payée`);

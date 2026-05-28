@@ -316,6 +316,9 @@ async function resolveDesignDefaultsFromTemplate(product, company) {
       platformIconBgPadding: template.platformIconBgPadding ?? 4,
       platformIconBgRadius:  template.platformIconBgRadius  ?? 999,
       platformIconBgShadow:  template.platformIconBgShadow  ?? false,
+
+      // Origine template — clé de matching pour l'assignment stock
+      cardTemplateId: template.id,
     };
   } catch (error) {
     console.error("❌ Error resolving design defaults from template:", error);

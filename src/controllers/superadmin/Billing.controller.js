@@ -36,7 +36,7 @@ import {
 } from "../../templates/client/Orderemails.js";
 
 import { sendTemplatedMail }  from "../../services/client/mail.service.js";
-import { generateNfcCardsForOrder } from "../../services/nfc.service.js";
+import { fulfillNfcForOrder } from "../../services/nfc.service.js";
 import { generateInvoicePdfBuffer } from "../../services/InvoicePdf.service.js";
 
 
@@ -460,8 +460,8 @@ export const addManualPayment = async (req, res, next) => {
       // 5. NFC Cards — même logique que le webhook Stripe
       const fullOrder = { ...order, status: "paid", paidAt };
  
-      generateNfcCardsForOrder(fullOrder).catch((e) =>
-        console.error("[billing] Erreur génération NFC:", e.message)
+      fulfillNfcForOrder(fullOrder).catch((e) =>
+        console.error("[billing] Erreur fulfillment NFC:", e.message)
       );
  
       // 6. Emails — même logique que le webhook Stripe

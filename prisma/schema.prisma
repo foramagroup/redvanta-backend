@@ -537,9 +537,9 @@ model dashboardstat {
 
   model Design {
     id          Int             @id @default(autoincrement())
-    userId      Int             @db.UnsignedInt
-    companyId   Int
-    productId   Int
+    userId      Int?            @db.UnsignedInt
+    companyId   Int?
+    productId   Int?
     status      DesignStatus    @default(draft)
     useLogo       Boolean @default(false) 
 
@@ -652,6 +652,9 @@ model dashboardstat {
     platformIconBgRadius  Int?
     platformIconBgShadow  Boolean? @default(false)
 
+    isCustomized    Boolean   @default(false) // true dès que l'admin édite le design
+    cardTemplateId  Int?                      // template d'origine (pour matching stock)
+
     // ── Step 3 : Review ──────────────────────────────────────
     version       Int       @default(1)
     lastAutoSave  DateTime?
@@ -661,9 +664,10 @@ model dashboardstat {
     updatedAt  DateTime  @updatedAt
 
     // Relations
-    user        User        @relation(fields: [userId],    references: [id], onDelete: Cascade)
-    company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+    user         User?         @relation(fields: [userId],          references: [id], onDelete: Cascade)
+    company      Company?      @relation(fields: [companyId],       references: [id], onDelete: Cascade)
+    product      Product?      @relation(fields: [productId],       references: [id], onDelete: Cascade)
+    cardTemplate CardTemplate? @relation("DesignTemplate", fields: [cardTemplateId], references: [id], onDelete: SetNull)
     cartItem    CartItem[]
     orderItem   OrderItem[]
     cartItemLocations CartItemLocation[]
@@ -782,11 +786,14 @@ model NFCCard {
   tag         NFCTag?       @relation(fields: [tagId], references: [id], onDelete: SetNull)
 
   // ── Logique métier ──────────────────────────────────────────
-  companyId   Int           // company propriétaire
-  userId      Int           @db.UnsignedInt  // admin/user qui a commandé
+  companyId   Int?          // nullable pour cartes pré-générées en stock
+  userId      Int?          @db.UnsignedInt  // nullable pour cartes pré-générées
   locationId  Int?          // établissement associé
   designId    Int?          // design utilisé pour l'impression
-  orderItemId Int?
+  orderItemId     Int?
+  customerId      Int?          // company assignée lors de l'attribution
+  assignedAt      DateTime?     // date d'attribution à un client
+  cardTemplateId  Int?          // template d'impression (stock pré-généré)
 
   // ── Payload (URL encodée dans QR + puce NFC) ────────────────
   // Format : https://app.redvanta.com/r/{uid}
@@ -820,15 +827,17 @@ model NFCCard {
   updatedAt    DateTime    @updatedAt
 
   // ── Relations Prisma ────────────────────────────────────────
-  company     Company       @relation(fields: [companyId],  references: [id], onDelete: Cascade)
-  user        User          @relation(fields: [userId],     references: [id], onDelete: Cascade)
-  location    Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  design      Design?       @relation(fields: [designId],   references: [id], onDelete: SetNull)
- orderItem   OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  company       Company?      @relation(fields: [companyId],      references: [id], onDelete: Cascade)
+  user          User?         @relation(fields: [userId],         references: [id], onDelete: Cascade)
+  location      Location?     @relation(fields: [locationId],     references: [id], onDelete: SetNull)
+  design        Design?       @relation(fields: [designId],       references: [id], onDelete: SetNull)
+  orderItem     OrderItem?    @relation(fields: [orderItemId],    references: [id], onDelete: SetNull)
+  cardTemplate  CardTemplate? @relation("NfcCardTemplate", fields: [cardTemplateId], references: [id], onDelete: SetNull)
   scans       NfcScan[]
   events      AnalyticsEvent[]
 
   @@index([companyId])
+  @@index([customerId])
   @@index([locationId])
   @@index([status])
   @@index([active])
@@ -1181,6 +1190,8 @@ model CardTemplate {
 
   products    Product[] @relation("ProductDefaultTemplate")
   bulkBatches BulkBatch[]
+  designs     Design[]   @relation("DesignTemplate")
+  nfcCards    NFCCard[]  @relation("NfcCardTemplate")
 
   @@index([platform])
   @@index([isActive])
@@ -2615,12 +2626,14 @@ enum FeedbackStatus {
 
 
 enum NfcCardStatus {
-  NOT_PROGRAMMED  // tag associé, pas encore encodé physiquement
+  NOT_PROGRAMMED  // pré-générée, pas encore encodée physiquement
   PRINTED         // carte imprimée
   SHIPPED         // expédiée
   DELIVERED       // livrée (mais pas encore activée par l'utilisateur)
-  ACTIVE          // activée — peut recevoir des scans
+  ACTIVE          // activée — peut recevoir des scans (flux commandes)
   DISABLED        // désactivée manuellement
+  ASSIGNED        // attribuée à un client (flux bulk)
+  ACTIVATED       // activée par l'utilisateur final (flux bulk)
 }
 
 

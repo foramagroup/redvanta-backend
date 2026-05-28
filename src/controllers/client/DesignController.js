@@ -690,7 +690,7 @@ async function saveWithVersion(id, data, current) {
 
     return tx.design.update({
       where: { id },
-      data:  { ...data, version: current.version + 1 },
+      data:  { ...data, version: current.version + 1, isCustomized: true },
       include: DESIGN_PAYMENT_INCLUDE,
     });
   });

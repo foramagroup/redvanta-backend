@@ -107,6 +107,101 @@ async function createNfcCard(orderItem, order) {
   return card;
 }
  
+// ─── Dispatcher : génère OU assigne selon isCustomized ───────
+export async function fulfillNfcForOrder(order) {
+  const items = order.items ?? [];
+  const allCards = [];
+
+  for (const item of items) {
+    if (!item.designId) {
+      console.log(`[nfc] orderItem #${item.id} sans design — ignoré`);
+      continue;
+    }
+    if (item.design?.isCustomized) {
+      const cards = await _generateCardsForItem(item, order);
+      allCards.push(...cards);
+    } else {
+      const cards = await _assignStockForItem(item, order);
+      allCards.push(...cards);
+    }
+  }
+
+  console.log(`[nfc] fulfillNfcForOrder #${order.orderNumber} → ${allCards.length} carte(s) traitées`);
+  return allCards;
+}
+
+// ─── Générer des cartes (design customisé) ────────────────────
+async function _generateCardsForItem(item, order) {
+  const totalCards   = item.totalCards ?? item.quantity ?? 1;
+  const alreadyCount = await prisma.nFCCard.count({ where: { orderItemId: item.id } });
+  if (alreadyCount >= totalCards) {
+    return prisma.nFCCard.findMany({ where: { orderItemId: item.id } });
+  }
+  const cards = [];
+  for (let i = 0; i < totalCards - alreadyCount; i++) {
+    cards.push(await createNfcCard(item, order));
+  }
+  return cards;
+}
+
+// ─── Assigner depuis le stock (pas de customisation) ──────────
+async function _assignStockForItem(item, order) {
+  const totalCards   = item.totalCards ?? item.quantity ?? 1;
+  const alreadyCount = await prisma.nFCCard.count({ where: { orderItemId: item.id } });
+  if (alreadyCount >= totalCards) {
+    return prisma.nFCCard.findMany({ where: { orderItemId: item.id } });
+  }
+
+  const toAssign = totalCards - alreadyCount;
+
+  const templateId = item.design?.cardTemplateId ?? null;
+
+  const stockCards = await prisma.nFCCard.findMany({
+    where: {
+      companyId:      null,
+      orderItemId:    null,
+      status:         'NOT_PROGRAMMED',
+      cardTemplateId: templateId ?? undefined,
+    },
+    take: toAssign,
+  });
+
+  if (stockCards.length < toAssign) {
+    console.error(
+      `[nfc] ⚠️ STOCK INSUFFISANT — commande #${order.orderNumber} orderItem #${item.id}` +
+      ` : besoin ${toAssign}, stock dispo ${stockCards.length}.` +
+      ` Lancez un nouveau batch bulk pour compenser les ${toAssign - stockCards.length} carte(s) manquante(s).`
+    );
+  }
+
+  const now   = new Date();
+  const cards = [];
+
+  for (const stockCard of stockCards) {
+    const updated = await prisma.nFCCard.update({
+      where: { id: stockCard.id },
+      data:  {
+        companyId:       order.companyId,
+        userId:          order.userId,
+        designId:        item.designId,
+        orderItemId:     item.id,
+        status:          'ASSIGNED',
+        assignedAt:      now,
+        googlePlaceId:   item.design?.googlePlaceId   ?? null,
+        googleReviewUrl: item.design?.googleReviewUrl ?? null,
+        generatedAt:     now,
+      },
+    });
+    if (item.design?.googlePlaceId) {
+      await linkCardToLocation(updated, order.companyId, item.design.googlePlaceId);
+    }
+    cards.push(updated);
+  }
+
+  console.log(`[nfc] orderItem #${item.id} → ${cards.length}/${toAssign} carte(s) assignée(s) depuis le stock`);
+  return cards;
+}
+
 // ─── Régénérer le QR Code d'une carte existante ──────────────
 // Utile si l'upload a échoué lors de la création (qrCodeUrl === null)
 // Endpoint superadmin : PATCH /api/superadmin/nfc/cards/:uid/regenerate-qr
