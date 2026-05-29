@@ -371,7 +371,8 @@
       "member_activated": "Membre activé.",
       "member_deactivated": "Membre désactivé.",
       "cannot_remove_owner": "Impossible de retirer le propriétaire.",
-      "member_removed": "Membre retiré de la company."
+      "member_removed": "Membre retiré de la company.",
+      "limit_reached": "Limite de membres atteinte : votre plan autorise {{max}} utilisateur(s). Passez au plan supérieur."
     },
     "review_request": {
       "customer_name_required": "Le nom du client est requis.",

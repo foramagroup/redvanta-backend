@@ -4,6 +4,8 @@
 // ═══════════════════════════════════════════════════════════
 
 import prisma from "../../config/database.js";
+import { invalidateLimitsCache }  from "../../services/limits.service.js";
+import { invalidateFeatureCache } from "../../middleware/requireFeature.js";
 
 const VALID_STATUSES = ["Active", "inactive", "archived"];
 
@@ -302,6 +304,16 @@ export const updatePlan = async (req, res, next) => {
 
       return tx.planSetting.findUnique({ where: { id }, include: PLAN_INCLUDE });
     });
+
+    // Invalider les caches de toutes les companies utilisant ce plan
+    const affected = await prisma.company.findMany({
+      where:  { planId: id },
+      select: { id: true },
+    });
+    for (const c of affected) {
+      invalidateLimitsCache(c.id);
+      invalidateFeatureCache(c.id);
+    }
 
     res.json({
       success: true,

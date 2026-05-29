@@ -371,7 +371,8 @@
       "member_activated": "Membru activat.",
       "member_deactivated": "Membru dezactivat.",
       "cannot_remove_owner": "Nu se poate elimina proprietarul.",
-      "member_removed": "Membru eliminat din companie."
+      "member_removed": "Membru eliminat din companie.",
+      "limit_reached": "Limită de membri atinsă: planul dvs. permite {{max}} utilizator(i). Faceți upgrade la plan."
     },
     "review_request": {
       "customer_name_required": "Numele clientului este obligatoriu.",

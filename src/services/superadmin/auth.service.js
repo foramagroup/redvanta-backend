@@ -31,7 +31,13 @@ const ADMIN_INCLUDE = {
     include: {
       company: {
         include: {
-          package:        true,
+          package: {
+            include: {
+              translations: {
+                select: { featureSlugs: true, trialFeatureSlugs: true, name: true, languageId: true },
+              },
+            },
+          },
           defaulLanguage: true,
           settings:       true,
         },
@@ -117,7 +123,26 @@ export function formatAdmin(user, activeCompanyId = null) {
           ? { id: uc.company.defaulLanguage.id, code: uc.company.defaulLanguage.code }
           : null,
         plan: uc.company.package
-          ? { id: uc.company.package.id, name: uc.company.package.name, locationLimit: uc.company.package.locationLimit }
+          ? (() => {
+              const trs = uc.company.package.translations ?? [];
+              // Prendre la première traduction qui a featureSlugs configuré (peu importe la langue)
+              const trWithFeatures = trs.find((t) => Array.isArray(t.featureSlugs) && t.featureSlugs.length > 0)
+                ?? trs.find((t) => t.featureSlugs !== null)
+                ?? trs[0]
+                ?? null;
+              return {
+                id:                uc.company.package.id,
+                slug:              uc.company.package.slug,
+                name:              trWithFeatures?.name ?? uc.company.package.slug,
+                locationLimit:     uc.company.package.locationLimit,
+                userLimit:         uc.company.package.userLimit,
+                smsLimit:          uc.company.package.smsLimit,
+                apiLimit:          uc.company.package.apiLimit,
+                trialDays:         uc.company.package.trialDays,
+                featureSlugs:      Array.isArray(trWithFeatures?.featureSlugs) ? trWithFeatures.featureSlugs : null,
+                trialFeatureSlugs: Array.isArray(trWithFeatures?.trialFeatureSlugs) ? trWithFeatures.trialFeatureSlugs : null,
+              };
+            })()
           : null,
         settings: uc.company.settings
           ? {

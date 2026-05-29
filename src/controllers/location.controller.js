@@ -9,6 +9,7 @@
 
 import prisma from "../config/database.js";
 import { getPlaceDetails } from "../services/Googleplaces.service.js";
+import { checkLocationLimit } from "../services/limits.service.js";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -134,14 +135,14 @@ export const createLocation = async (req, res, next) => {
       return res.status(422).json({ success: false, error: req.t("admin.location.name_required") });
     }
 
-    // Vérifier la limite du plan
-    const settings = await prisma.companySettings.findUnique({ where: { companyId } });
-    const currentCount = await prisma.location.count({ where: { companyId } });
-    if (settings && currentCount >= settings.maxLocations) {
+    // Vérifier la limite du plan (source de vérité = PlanSetting, pas CompanySettings)
+    const { allowed, current, max } = await checkLocationLimit(companyId);
+    if (!allowed) {
       return res.status(403).json({
         success: false,
-        error:   req.t("admin.location.limit_reached", { max: settings.maxLocations }),
+        error:   req.t("admin.location.limit_reached", { max }),
         code:    "LOCATION_LIMIT_REACHED",
+        limit:   { type: "locations", current, max },
       });
     }
 

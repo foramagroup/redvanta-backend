@@ -371,7 +371,8 @@
       "member_activated": "Member activated.",
       "member_deactivated": "Member deactivated.",
       "cannot_remove_owner": "Cannot remove the owner.",
-      "member_removed": "Member removed from the company."
+      "member_removed": "Member removed from the company.",
+      "limit_reached": "Team member limit reached: your plan allows {{max}} user(s). Please upgrade your plan."
     },
     "review_request": {
       "customer_name_required": "Customer name is required.",

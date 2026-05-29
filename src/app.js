@@ -110,6 +110,8 @@ import { requireAuth } from "./middleware/auth.js";
 import { requireAdmin } from "./middleware/requireAdmin.js";
 import { requireSuperadmin } from "./middleware/requireSuperadmin.js";
 import { languageMiddleware } from "./i18n/middleware.js";
+import { authenticateAdmin } from "./middleware/auth.middleware.js";
+import { requireFeature } from "./middleware/requireFeature.js";
 
 
 //----jobs----
@@ -276,40 +278,40 @@ app.use("/api/customization", customizationRoutes);
   //auth admin
   app.use("/api/admin/auth", authAdminRoutes);
   app.use("/api/admin/orders", orderAdminRoutes);
-  app.use("/api/admin/locations", locationRoutes);
+  app.use("/api/admin/locations",       authenticateAdmin, requireFeature("locations"),          locationRoutes);
   app.use('/api/admin/general-settings', adminSettingsRoutes);
   //Mydesgn
-  app.use('/api/admin/my-design', myDesignAdminRoutes);
+  app.use('/api/admin/my-design',       authenticateAdmin, requireFeature("card-designs"),       myDesignAdminRoutes);
   //ges Review
-  app.use('/api/admin/reviews', reviewAdminRoutes);
+  app.use('/api/admin/reviews',         authenticateAdmin, requireFeature("reviews"),            reviewAdminRoutes);
 
-  //ges analytics event
-  app.use('/api/admin/analytics/events', analyticsEventsRoutes);
-  
+  //ges analytics event (doit être avant /analytics pour éviter les conflits)
+  app.use('/api/admin/analytics/events', authenticateAdmin, requireFeature("event-tracking"),   analyticsEventsRoutes);
+
   //ges order Tracking
   app.use('/api/admin/order-tracking', orderTrackAdminRoutes);
-  
-  //ges billing 
+
+  //ges billing
   app.use('/api/admin/billing', billingAdminRoutes)
 
   //ges NFCcard
-  app.use("/api/admin/nfc-cards", nfcCardsRoutes);
+  app.use("/api/admin/nfc-cards",       authenticateAdmin, requireFeature("nfc-cards"),         nfcCardsRoutes);
 
   //ges Review Request + Contacts/Groups/Templates/Campaigns/Analytics
-  app.use("/api/admin/requests", requestRoutes);       // monté EN PREMIER (évite conflit /:id)
-  app.use("/api/admin/requests", reviewRequestRoutes);
+  app.use("/api/admin/requests",        authenticateAdmin, requireFeature("review-requests"),   requestRoutes);       // monté EN PREMIER (évite conflit /:id)
+  app.use("/api/admin/requests",        authenticateAdmin, requireFeature("review-requests"),   reviewRequestRoutes);
   //ges Automation Workflows
-  app.use("/api/admin/automation", automationRoutes);
+  app.use("/api/admin/automation",      authenticateAdmin, requireFeature("auto-responses"),    automationRoutes);
   //ges Alerts
-  app.use("/api/admin/alerts", alertsRoutes);
+  app.use("/api/admin/alerts",          authenticateAdmin, requireFeature("alerts"),            alertsRoutes);
   //ges Marketplace
-  app.use("/api/admin/marketplace", marketplaceRoutes);
+  app.use("/api/admin/marketplace",     authenticateAdmin, requireFeature("marketplace"),       marketplaceRoutes);
   //ges Analytics
-  app.use("/api/admin/analytics", analyticsRoutes);
+  app.use("/api/admin/analytics",       authenticateAdmin, requireFeature("basic-analytics"),   analyticsRoutes);
   //ges team
-  app.use("/api/admin/team", teamRoutes);
+  app.use("/api/admin/team",            authenticateAdmin, requireFeature("team-members"),      teamRoutes);
   //ges filtering
-  app.use("/api/admin/filtering", filteringRoutes);
+  app.use("/api/admin/filtering",       authenticateAdmin, requireFeature("advanced-filtering"), filteringRoutes);
   //ges planBuilder
   app.use("/api/admin/plan-builder", planBuilderRoutes);
 

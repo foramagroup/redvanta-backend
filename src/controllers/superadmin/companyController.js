@@ -4,7 +4,9 @@ import { processLogo, deleteLogo }                              from "../../serv
 import { generatePassword, hashPassword, generateWelcomeToken } from "../../services/superadmin/password.service.js";
 import { sendMail }                                             from "../../services/superadmin/mail.service.js";
 import { buildWelcomeEmailFromTemplate }     from "../../services/superadmin/emailTemplate.service.js";
-import  SettingService  from '../../services/superadmin/settingService.js';  
+import  SettingService  from '../../services/superadmin/settingService.js';
+import { invalidateLimitsCache }  from "../../services/limits.service.js";
+import { invalidateFeatureCache } from "../../middleware/requireFeature.js";  
 // import { buildWelcomeEmail }                                    from "../../templates/superadmin/welcome.email.js";
 
 
@@ -384,6 +386,12 @@ export const updateCompany = async (req, res, next) => {
       },
       include: COMPANY_INCLUDE,
     });
+
+    // Invalider les caches feature + limites si le plan a changé
+    if (body.planId !== undefined) {
+      invalidateLimitsCache(id);
+      invalidateFeatureCache(id);
+    }
 
     res.json({ success: true, message: req.t("superadmin.company.updated"), data: formatCompany(updated) });
   } catch (e) {

@@ -14,6 +14,7 @@
 import prisma    from "../config/database.js";
 import crypto    from "crypto";
 import { sendTemplatedMail, resolveCompanyLangId } from "../services/client/mail.service.js";
+import { checkUserLimit } from "../services/limits.service.js";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 
@@ -159,6 +160,17 @@ export const inviteTeamMember = async (req, res, next) => {
     }
     if (!name?.trim()) {
       return res.status(422).json({ success: false, error: req.t("admin.team.name_required") });
+    }
+
+    // Vérifier la limite du plan (membres de l'équipe)
+    const { allowed: userAllowed, current: userCurrent, max: userMax } = await checkUserLimit(companyId);
+    if (!userAllowed) {
+      return res.status(403).json({
+        success: false,
+        error:   req.t("admin.team.limit_reached", { max: userMax }),
+        code:    "USER_LIMIT_REACHED",
+        limit:   { type: "users", current: userCurrent, max: userMax },
+      });
     }
 
     // Récupérer l'id du rôle depuis la DB (Role.name = roleName)
