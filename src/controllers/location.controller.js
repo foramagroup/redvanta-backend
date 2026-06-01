@@ -11,6 +11,19 @@ import prisma from "../config/database.js";
 import { getPlaceDetails } from "../services/Googleplaces.service.js";
 import { checkLocationLimit } from "../services/limits.service.js";
 
+function generateUniqueSlug(name) {
+  const base = name.toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "")
+    .substring(0, 80) || "location";
+
+  // Suffixe hex aléatoire 6 chars → unicité globale garantie sans requête DB
+  const suffix = Math.random().toString(16).slice(2, 8);
+  return `${base}-${suffix}`;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────
 
 function getCompanyId(req) {
@@ -165,11 +178,14 @@ export const createLocation = async (req, res, next) => {
       }
     }
 
+    const slug = generateUniqueSlug(name.trim());
+
     const location = await prisma.location.create({
       data: {
         companyId,
         ownerId,
         name:      name.trim(),
+        slug,
         address:   googleData.address ?? address ?? null,
         ...googleData,
         cardCount: parseInt(cards) || 0,

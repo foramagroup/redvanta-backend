@@ -185,11 +185,13 @@ export async function createSubscriptionInvoice({
     },
   });
 
+  const _planName = subscription.plan?.translations?.[0]?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`;
+
   // Ligne principale
   await prisma.invoiceItem.create({
     data: {
       invoiceId: invoice.id,
-      service: `${subscription.plan.name} - ${subscription.interval === "monthly" ? "Monthly" : "Yearly"}`,
+      service: `${_planName} - ${subscription.interval === "monthly" ? "Monthly" : "Yearly"}`,
       description: `Period: ${billingHistory.periodStart.toLocaleDateString("en-US")} - ${billingHistory.periodEnd.toLocaleDateString("en-US")}`,
       quantity: 1,
       unit: subscription.interval === "monthly" ? "month" : "year",
@@ -235,7 +237,7 @@ export async function createSubscriptionInvoice({
 
 export async function sendSubscriptionWelcomeEmail(subscription, user, company, invoice) {
   const langId = await resolveCompanyLangId(company?.id);
-  const planName = subscription.plan?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`;
+  const planName = subscription.plan?.translations?.[0]?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`;
   const vars = {
     customer_name: user?.name || user?.email || "",
     company_name: company?.name || "",
@@ -322,7 +324,7 @@ export async function sendSubscriptionPaymentFailedEmail(subscription, user, com
   const vars = {
     customer_name: user.name || user.email,
     company_name: company.name,
-    plan_name: subscription.plan.name,
+    plan_name: subscription.plan?.translations?.[0]?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`,
     total: String(Number(subscription.totalAmount).toFixed(2)),
     currency: "EUR",
     reason: reason || "Carte refusée",
@@ -358,6 +360,121 @@ export async function sendSubscriptionPaymentFailedEmail(subscription, user, com
 
   console.log(`[Subscription] Email payment failed envoyé à ${user.email}`);
 }
+
+// ─── Email rappel d'expiration (J-7, J-3, J-1) ───────────────
+
+export async function sendSubscriptionExpiryReminderEmail(subscription, user, company, daysLeft) {
+  const langId  = await resolveCompanyLangId(company?.id);
+  const planName = subscription.plan?.translations?.[0]?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`;
+  const renewDate = subscription.nextBillingDate?.toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  }) ?? '';
+  const isTrialing = subscription.status === 'trialing';
+
+  const vars = {
+    customer_name:  user?.name  || user?.email || '',
+    company_name:   company?.name || '',
+    plan_name:      planName,
+    days_left:      String(daysLeft),
+    renew_date:     renewDate,
+    total:          String(Number(subscription.totalAmount).toFixed(2)),
+    billing_cycle:  subscription.interval === 'monthly' ? 'Monthly' : 'Yearly',
+    billing_url:    `${process.env.APP_URL || process.env.FRONT_URL}/dashboard/billing`,
+    year:           String(new Date().getFullYear()),
+  };
+
+  const urgencyColor = daysLeft === 1 ? '#E10600' : daysLeft === 3 ? '#f59e0b' : '#3b82f6';
+  const subject = isTrialing
+    ? `Your free trial ends in ${daysLeft} day${daysLeft > 1 ? 's' : ''} — ${planName}`
+    : `Your subscription renews in ${daysLeft} day${daysLeft > 1 ? 's' : ''} — ${planName}`;
+
+  await sendTemplatedMail({
+    slug: 'subscription_expiry_reminder',
+    to:   user.email,
+    variables: vars,
+    langId,
+    fallbackFn: () => ({
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
+          <!-- Header -->
+          <div style="background: #0B0D0F; padding: 28px 32px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #E10600; margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.5px;">
+              RedVanta
+            </h1>
+          </div>
+
+          <!-- Body -->
+          <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+
+            <!-- Countdown badge -->
+            <div style="display: inline-block; background: ${urgencyColor}; color: #fff; padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 700; margin-bottom: 24px;">
+              ${daysLeft === 1 ? '⚠️ ' : '🔔 '}${daysLeft} day${daysLeft > 1 ? 's' : ''} remaining
+            </div>
+
+            <h2 style="margin: 0 0 12px; font-size: 22px; font-weight: 700;">
+              ${isTrialing ? 'Your trial is ending soon' : 'Your subscription renews soon'}
+            </h2>
+            <p style="color: #6b7280; margin: 0 0 24px; font-size: 15px; line-height: 1.6;">
+              Hi ${vars.customer_name}, your ${isTrialing ? 'free trial for' : ''} <strong>${planName}</strong>
+              ${isTrialing ? 'ends' : 'renews'} on <strong>${renewDate}</strong>.
+              ${isTrialing
+                ? 'Subscribe now to keep full access to all features.'
+                : 'Your card on file will be automatically charged.'}
+            </p>
+
+            <!-- Plan summary card -->
+            <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 28px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Plan</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right; font-size: 14px;">${planName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Billing</td>
+                  <td style="padding: 6px 0; font-weight: 600; text-align: right; font-size: 14px;">${vars.billing_cycle}</td>
+                </tr>
+                <tr style="border-top: 1px solid #e5e7eb;">
+                  <td style="padding: 10px 0 4px; font-weight: 700; font-size: 15px;">
+                    ${isTrialing ? 'Amount due' : 'Renewal amount'}
+                  </td>
+                  <td style="padding: 10px 0 4px; font-weight: 700; text-align: right; font-size: 18px; color: #E10600;">
+                    €${vars.total}
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- CTA -->
+            <div style="text-align: center; margin-bottom: 24px;">
+              <a href="${vars.billing_url}"
+                style="display: inline-block; background: #E10600; color: #ffffff; padding: 14px 32px;
+                       text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 15px;">
+                ${isTrialing ? 'Subscribe now' : 'Manage subscription'}
+              </a>
+            </div>
+
+            <p style="font-size: 13px; color: #9ca3af; text-align: center; margin: 0;">
+              ${isTrialing
+                ? 'No action needed if you don\'t want to continue — your account will revert to the free tier.'
+                : 'No action needed if everything looks good — your subscription renews automatically.'}
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <div style="padding: 20px 32px; text-align: center;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+              © ${vars.year} RedVanta · <a href="${vars.billing_url}" style="color: #6b7280;">Manage billing</a>
+            </p>
+          </div>
+        </div>
+      `,
+      text: `${subject}\n\nHi ${vars.customer_name},\n\nYour ${planName} plan ${isTrialing ? 'trial ends' : 'renews'} on ${renewDate} (${daysLeft} day${daysLeft > 1 ? 's' : ''} left).\nAmount: €${vars.total}\n\nManage your subscription: ${vars.billing_url}`,
+    }),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 
 export function formatSubscription(sub) {
   return {

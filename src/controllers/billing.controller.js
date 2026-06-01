@@ -158,45 +158,91 @@ export const getUsageHistory = async (req, res, next) => {
 export const getInvoices = async (req, res, next) => {
   try {
     const companyId = req.user.companyId;
-    
-    const subscription = await prisma.subscription.findUnique({
-      where: { companyId },
-      select: { id: true }
-    });
-    
+
+    const [subscription, settings, company, platform] = await Promise.all([
+      prisma.subscription.findUnique({
+        where:  { companyId },
+        select: { id: true },
+      }),
+      prisma.companySettings.findUnique({
+        where:  { companyId },
+        select: { currency: true, currencySymbol: true },
+      }),
+      prisma.company.findUnique({
+        where:  { id: companyId },
+        select: { name: true, email: true },
+      }),
+      prisma.platformSetting.findFirst({
+        select: { companyName: true, companyEmail: true, companyPhone: true, companyAddress: true },
+      }),
+    ]);
+
     if (!subscription) {
       return res.json({ success: true, data: [] });
     }
-    
+
+    const currency       = settings?.currency       ?? "USD";
+    const currencySymbol = settings?.currencySymbol ?? "$";
+
     const invoices = await prisma.billingHistory.findMany({
-      where: { subscriptionId: subscription.id },
+      where:   { subscriptionId: subscription.id },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take:    50,
       include: {
         subscription: {
-          include: { plan: true }
-        }
-      }
+          include: {
+            plan: {
+              include: {
+                // Prend la première traduction disponible pour le nom du plan
+                translations: { take: 1, orderBy: { languageId: 'asc' } },
+              },
+            },
+          },
+        },
+      },
     });
-    
+
+    const fmt = (date) => date?.toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+    }) ?? null;
+
     res.json({
       success: true,
-      data: invoices.map(inv => ({
-        id: inv.id,
-        date: inv.createdAt.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
-        }),
-        description: `${inv.subscription.plan?.name || 'Plan'} + Add-ons`,
-        amount: `$${inv.totalAmount.toFixed(2)}`,
-        status: inv.status === 'paid' ? 'Paid' : inv.status,
-        downloadUrl: inv.stripeInvoiceId 
-          ? `https://invoice.stripe.com/i/${inv.stripeInvoiceId}` 
-          : null
-      }))
+      data: invoices.map(inv => {
+        const plan     = inv.subscription.plan;
+        const planName = plan?.translations?.[0]?.name ?? plan?.slug ?? 'Subscription';
+        return {
+          id:            inv.id,
+          invoiceNumber: `INV-${inv.id.toString().padStart(6, '0')}`,
+          date:          fmt(inv.createdAt),
+          periodStart:   fmt(inv.periodStart),
+          periodEnd:     fmt(inv.periodEnd),
+          planName,
+          description:   `${planName} — subscription`,
+          baseAmount:    inv.baseAmount,
+          addonsAmount:  inv.addonsAmount,
+          taxAmount:     inv.taxAmount,
+          totalAmount:   inv.totalAmount,
+          currency,
+          currencySymbol,
+          status:        inv.status === 'paid' ? 'Paid' : inv.status,
+          paidAt:        fmt(inv.paidAt),
+          paymentMethod: inv.paymentMethod ?? null,
+          // Émetteur de la facture (côté plateforme)
+          platformName:    platform?.companyName  ?? 'RedVanta',
+          platformEmail:   platform?.companyEmail ?? '',
+          platformPhone:   platform?.companyPhone ?? '',
+          platformAddress: platform?.companyAddress ?? '',
+          // Destinataire (company de l'admin)
+          companyName:   company?.name  ?? '',
+          companyEmail:  company?.email ?? '',
+          stripeUrl:     inv.stripeInvoiceId
+            ? `https://invoice.stripe.com/i/${inv.stripeInvoiceId}`
+            : null,
+        };
+      }),
     });
-    
+
   } catch (e) {
     next(e);
   }

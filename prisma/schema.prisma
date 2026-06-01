@@ -234,10 +234,11 @@ model FrontPageSeoTranslation {
 
 model Location {
   id          Int      @id @default(autoincrement())
-  companyId   Int              
-  ownerId     Int      @db.UnsignedInt 
-  name        String   @db.VarChar(255) // "Downtown Flagship"
-  address     String?  @db.VarChar(500) // "123 Main St, New York, NY 10001"
+  companyId   Int
+  ownerId     Int      @db.UnsignedInt
+  name        String   @db.VarChar(255)
+  slug        String?  @db.VarChar(191)
+  address     String?  @db.VarChar(500)
   googlePlaceId   String?  @db.VarChar(255)
   googleReviewUrl String?  @db.VarChar(500)
   googleMapsUrl   String?  @db.VarChar(500)
@@ -253,8 +254,6 @@ model Location {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-
-
   company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   owner       User     @relation("OwnerLocations", fields: [ownerId], references: [id], onDelete: Cascade)
   nfcCards NFCCard[]
@@ -264,6 +263,7 @@ model Location {
   userAssignments     UserLocation[]
 
   @@index([companyId])
+  @@index([slug])
   @@index([googlePlaceId])
   @@index([active])
   @@map("locations")
