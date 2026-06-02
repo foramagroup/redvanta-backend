@@ -6,11 +6,12 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 
 // NFC card physical dimensions in mm (ISO/IEC 7810 ID-1)
+// ISO/IEC 7810 ID-1 exact standard
 const CARD_DIMS_MM = {
-  landscape: { w: 85.6, h: 54   },
-  portrait:  { w: 54,   h: 85.6 },
-  square:    { w: 54,   h: 54   },
-  circle:    { w: 54,   h: 54   },
+  landscape: { w: 85.60, h: 53.98 },
+  portrait:  { w: 53.98, h: 85.60 },
+  square:    { w: 54,    h: 54    },
+  circle:    { w: 54,    h: 54    },
 };
 const MM_TO_PT = 72 / 25.4; // 1 mm = 2.8346 PDF points
 

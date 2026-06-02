@@ -3,7 +3,7 @@ import prisma from "../../config/database.js";
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
 function randomUID() {
-  let s = 'CRD-';
+  let s = 'OPI-';
   for (let i = 0; i < 6; i++) s += CHARS[Math.floor(Math.random() * CHARS.length)];
   return s;
 }
@@ -48,10 +48,16 @@ export async function batchGenerateCards(req, res) {
     const appBase = (process.env.NEXT_PUBLIC_API_URL || process.env.URL_PROD_BACKEND || process.env.URL_DEV_BACKEND).replace(/\/$/, '');
     const now = new Date();
 
+    // Generate batch ID before cards so we can store the reference
+    const d = now;
+    const ds = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    const batchId = `BCH-${ds}-${Math.floor(Math.random() * 9000 + 1000)}`;
+
     const cardsData = uids.map((uid) => ({
       uid,
       payload: `${appBase}/c/${uid}`,
       cardTemplateId: template?.id ?? null,
+      batchId,
       status: 'NOT_PROGRAMMED',
       generatedAt: now,
     }));
@@ -61,11 +67,6 @@ export async function batchGenerateCards(req, res) {
     if (cardsCreatedCount === 0) {
       return res.status(500).json({ success: false, error: `0 cards inserted — check DB migration (companyId/userId must be nullable)` });
     }
-
-    // Generate batch ID matching frontend format
-    const d = now;
-    const ds = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-    const batchId = `BCH-${ds}-${Math.floor(Math.random() * 9000 + 1000)}`;
 
     const batch = await prisma.bulkBatch.create({
       data: {

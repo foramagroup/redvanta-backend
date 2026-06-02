@@ -91,6 +91,7 @@ import faqCategoriesRoutes from "./routes/superadmin/faqCategories.routes.js";
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
 import subscriptionsRoutes from "./routes/client/subscriptions.routes.js";
+import addonAdminRoutes    from "./routes/addonRoutes.js";
 import shopRoutes from "./routes/client/Shop.routes.js";
 import settingClientRoutes from "./routes/client/settingClientRoutes.js";
 import clientAuthRoutes from "./routes/client/clientAuthRoutes.js";
@@ -269,6 +270,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/r",        scanRouter);
   app.use("/api/review",   reviewRouter);
   app.use("/api/client/subscriptions", subscriptionsRoutes);
+
   app.use("/api/client/faqs", clientFAQsRoutes);
   app.use("/api/client/all-pages", clientStaticPageRoutes);
   app.use("/api/client/contact", contactRoutes);
@@ -294,6 +296,8 @@ app.use("/api/customization", customizationRoutes);
 
   //ges billing
   app.use('/api/admin/billing', billingAdminRoutes)
+
+    app.use("/api/admin/addons",        addonAdminRoutes);
 
   //ges NFCcard
   app.use("/api/admin/nfc-cards",       authenticateAdmin, requireFeature("nfc-cards"),         nfcCardsRoutes);

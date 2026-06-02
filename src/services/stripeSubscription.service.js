@@ -475,6 +475,82 @@ export async function sendSubscriptionExpiryReminderEmail(subscription, user, co
 }
 
 // ─────────────────────────────────────────────────────────────
+// Relance POST-expiration : J+0, J+3, J+7
+// daysOverdue = 0 → jour même, 3 → 3 jours après, 7 → 7 jours après
+// ─────────────────────────────────────────────────────────────
+export async function sendSubscriptionOverdueEmail(subscription, user, company, daysOverdue) {
+  const langId   = await resolveCompanyLangId(company?.id);
+  const planName = subscription.plan?.translations?.[0]?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`;
+  const expiredOn = subscription.nextBillingDate?.toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  }) ?? '';
+
+  const urgencyColor = daysOverdue === 0 ? '#f59e0b' : daysOverdue <= 3 ? '#E10600' : '#991b1b';
+  const label = daysOverdue === 0
+    ? 'expired today'
+    : `expired ${daysOverdue} day${daysOverdue > 1 ? 's' : ''} ago`;
+  const subject = `Action required: Your ${planName} subscription has ${label}`;
+
+  const vars = {
+    customer_name:  user?.name || user?.email || '',
+    company_name:   company?.name || '',
+    plan_name:      planName,
+    days_overdue:   String(daysOverdue),
+    expired_on:     expiredOn,
+    total:          String(Number(subscription.totalAmount).toFixed(2)),
+    billing_cycle:  subscription.interval === 'monthly' ? 'Monthly' : 'Yearly',
+    billing_url:    `${process.env.APP_URL || process.env.FRONT_URL}/dashboard/billing`,
+    year:           String(new Date().getFullYear()),
+  };
+
+  await sendTemplatedMail({
+    slug: 'subscription_overdue_reminder',
+    to:   user.email,
+    variables: vars,
+    langId,
+    fallbackFn: () => ({
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
+          <div style="background: #0B0D0F; padding: 28px 32px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #E10600; margin: 0; font-size: 20px; font-weight: 700;">RedVanta</h1>
+          </div>
+          <div style="background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+            <div style="display: inline-block; background: ${urgencyColor}; color: #fff; padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 700; margin-bottom: 24px;">
+              ⚠️ Subscription ${label}
+            </div>
+            <h2 style="margin: 0 0 12px; font-size: 22px; font-weight: 700;">Your subscription has expired</h2>
+            <p style="color: #6b7280; margin: 0 0 24px; line-height: 1.6;">
+              Hi ${vars.customer_name},<br><br>
+              Your <strong>${planName}</strong> subscription for <strong>${vars.company_name}</strong>
+              ${daysOverdue === 0 ? 'expired today' : `expired on <strong>${expiredOn}</strong> (${daysOverdue} days ago)`}.
+              Your access to premium features may be restricted.
+            </p>
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+              <p style="margin: 0; font-size: 14px; color: #991b1b;">
+                <strong>Plan:</strong> ${planName} · <strong>Amount:</strong> €${vars.total}/${vars.billing_cycle === 'Monthly' ? 'mo' : 'yr'}
+              </p>
+            </div>
+            <a href="${vars.billing_url}" style="display: inline-block; background: #E10600; color: #fff; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 15px;">
+              Renew Subscription
+            </a>
+            <p style="color: #9ca3af; font-size: 13px; margin-top: 24px;">
+              If you have already renewed, please ignore this email.
+            </p>
+          </div>
+          <div style="padding: 20px 32px; text-align: center;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+              © ${vars.year} RedVanta · <a href="${vars.billing_url}" style="color: #6b7280;">Manage billing</a>
+            </p>
+          </div>
+        </div>
+      `,
+      text: `${subject}\n\nHi ${vars.customer_name},\n\nYour ${planName} subscription ${label}.\nRenew now: ${vars.billing_url}`,
+    }),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 
 export function formatSubscription(sub) {
   return {

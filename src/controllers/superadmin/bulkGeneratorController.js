@@ -299,6 +299,13 @@ export const updateBulkBatch = async (req, res) => {
 export const deleteBulkBatch = async (req, res) => {
   try {
     const { id } = req.params;
+    const { deleteCards } = req.query;
+
+    if (deleteCards === 'true') {
+      const { count } = await prisma.nFCCard.deleteMany({ where: { batchId: id } });
+      console.log(`[deleteBulkBatch] Deleted ${count} NFC cards for batch ${id}`);
+    }
+
     await prisma.bulkBatch.delete({ where: { id } });
     res.json({ success: true, message: 'Batch deleted' });
   } catch (err) {

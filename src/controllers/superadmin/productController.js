@@ -95,10 +95,10 @@ const INCLUDE = {
   cardTypePrices: { include: { cardType: true } },
 };
 
-// Valeurs par défaut pour cardSettings
+// Valeurs par défaut pour cardSettings (ISO/IEC 7810 ID-1: 85.60 × 53.98 mm)
 const DEFAULT_CARD_SETTINGS = {
-  width: 85,
-  height: 54,
+  width: 85.60,
+  height: 53.98,
   cornerRadiusEnabled: true,
   cornerRadius: 8,
   layouts: ["landscape"],

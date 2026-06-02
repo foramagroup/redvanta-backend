@@ -823,6 +823,8 @@ model NFCCard {
   generatedAt  DateTime?   // = date paiement
   activatedAt  DateTime?   // = date livraison
 
+  batchId     String?     @db.VarChar(50)   // batch bulk qui a généré cette carte
+
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -833,12 +835,14 @@ model NFCCard {
   design        Design?       @relation(fields: [designId],       references: [id], onDelete: SetNull)
   orderItem     OrderItem?    @relation(fields: [orderItemId],    references: [id], onDelete: SetNull)
   cardTemplate  CardTemplate? @relation("NfcCardTemplate", fields: [cardTemplateId], references: [id], onDelete: SetNull)
+  bulkBatch     BulkBatch?    @relation(fields: [batchId],        references: [id], onDelete: SetNull)
   scans       NfcScan[]
   events      AnalyticsEvent[]
 
   @@index([companyId])
   @@index([customerId])
   @@index([locationId])
+  @@index([batchId])
   @@index([status])
   @@index([active])
   @@map("nfc_cards")
@@ -1216,7 +1220,8 @@ model BulkBatch {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  template CardTemplate? @relation(fields: [designId], references: [id], onDelete: SetNull)
+  template  CardTemplate? @relation(fields: [designId], references: [id], onDelete: SetNull)
+  nfcCards  NFCCard[]
 
   @@index([designId])
   @@index([jobStatus])
@@ -1312,12 +1317,15 @@ model TokenBlacklist {
 model AddonSetting {
   id          Int      @id @default(autoincrement())
   name        String
-  type        String
+  type        String   // "Fixed" | "Quantity"
   price       String
   description String?
   active      Boolean  @default(true)
+  addonId     Int?     @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now())
+
+  addon       Addon?   @relation(fields: [addonId], references: [id], onDelete: SetNull)
 
   @@map("addonsetting")
 }
@@ -1356,7 +1364,8 @@ model Addon {
   
   // Relations
   subscriptionAddons SubscriptionAddon[]
-  
+  addonSetting       AddonSetting?
+
   @@map("addons")
 }
 
@@ -1367,7 +1376,8 @@ model SubscriptionAddon {
   
   // Montant (peut différer du prix de base si promo)
   amount         Float
-  
+  quantity       Int         @default(1)
+
   // Statut
   status         AddonStatus @default(active)
   
