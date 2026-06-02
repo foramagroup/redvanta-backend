@@ -45,7 +45,7 @@ export async function batchGenerateCards(req, res) {
     }
 
     const uids = await generateUniqueUIDs(qty);
-    const appBase = (process.env.NEXT_PUBLIC_API_URL || process.env.URL_PROD_BACKEND || process.env.URL_DEV_BACKEND).replace(/\/$/, '');
+    const appBase = (process.env.URL_PROD_BACKEND || process.env.URL_DEV_BACKEND).replace(/\/$/, '');
     const now = new Date();
 
     // Generate batch ID before cards so we can store the reference
@@ -53,21 +53,7 @@ export async function batchGenerateCards(req, res) {
     const ds = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
     const batchId = `BCH-${ds}-${Math.floor(Math.random() * 9000 + 1000)}`;
 
-    const cardsData = uids.map((uid) => ({
-      uid,
-      payload: `${appBase}/c/${uid}`,
-      cardTemplateId: template?.id ?? null,
-      batchId,
-      status: 'NOT_PROGRAMMED',
-      generatedAt: now,
-    }));
-
-    const { count: cardsCreatedCount } = await prisma.nFCCard.createMany({ data: cardsData, skipDuplicates: true });
-    console.log(`[cardsBatch] nfc_cards inserted: ${cardsCreatedCount}/${qty}`);
-    if (cardsCreatedCount === 0) {
-      return res.status(500).json({ success: false, error: `0 cards inserted — check DB migration (companyId/userId must be nullable)` });
-    }
-
+    // Create batch record FIRST so the FK constraint on nfc_cards.batchId is satisfied
     const batch = await prisma.bulkBatch.create({
       data: {
         id: batchId,
@@ -82,6 +68,22 @@ export async function batchGenerateCards(req, res) {
         settings: { batchName: batchName || batchId, quantity: qty, templateId: template?.id ?? null },
       },
     });
+
+    const cardsData = uids.map((uid) => ({
+      uid,
+      payload: `${appBase}/c/${uid}`,
+      cardTemplateId: template?.id ?? null,
+      batchId,
+      status: 'NOT_PROGRAMMED',
+      generatedAt: now,
+    }));
+
+    const { count: cardsCreatedCount } = await prisma.nFCCard.createMany({ data: cardsData, skipDuplicates: true });
+    console.log(`[cardsBatch] nfc_cards inserted: ${cardsCreatedCount}/${qty}`);
+    if (cardsCreatedCount === 0) {
+      await prisma.bulkBatch.delete({ where: { id: batchId } }).catch(() => {});
+      return res.status(500).json({ success: false, error: `0 cards inserted — all ${qty} UIDs already exist (skipDuplicates)` });
+    }
 
     const cards = cardsData.map((c) => ({
       uid: c.uid,
