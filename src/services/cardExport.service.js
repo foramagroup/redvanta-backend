@@ -231,7 +231,55 @@ function normalizeDesign(design, card) {
     showNfcIcon: d.showNfcIcon !== false,
     showGoogleIcon: d.showGoogleIcon !== false,
     nfcIconSize: d.nfcIconSize ?? 24,
-    googleIconSize: d.googleLogoSize ?? 16,
+    googleIconSize: d.googleLogoSize ?? d.googleIconSize ?? 16,
+
+    // Back-specific icon & instruction settings
+    backShowGoogleIcon:        d.backShowGoogleIcon        ?? true,
+    backGoogleIconSize:        d.backGoogleIconSize        ?? d.googleLogoSize ?? d.googleIconSize ?? 16,
+    backPlatformIconBgEnabled: d.backPlatformIconBgEnabled ?? false,
+    backPlatformIconBgColor:   d.backPlatformIconBgColor   ?? "#FFFFFF",
+    backPlatformIconBgPadding: d.backPlatformIconBgPadding ?? 4,
+    backPlatformIconBgRadius:  d.backPlatformIconBgRadius  ?? 999,
+    backPlatformIconBgShadow:  d.backPlatformIconBgShadow  ?? false,
+    backInstructionTextAlign:  d.backInstructionTextAlign  ?? d.instrAlign ?? "left",
+
+    // Back-specific Serial Number (null = inherit from front in SharedCardPreview)
+    backShowSerialNumber:      d.backShowSerialNumber      ?? null,
+    backSerialNumberTextColor: d.backSerialNumberTextColor ?? null,
+    backSerialNumberBgColor:   d.backSerialNumberBgColor   ?? null,
+    backSerialNumberFontSize:  d.backSerialNumberFontSize  ?? null,
+    backSerialNumberPaddingX:  d.backSerialNumberPaddingX  ?? null,
+    backSerialNumberPaddingY:  d.backSerialNumberPaddingY  ?? null,
+    backSerialNumberRadius:    d.backSerialNumberRadius    ?? null,
+
+    // Back-specific Typography (null = inherit from front)
+    backNameFont:          d.backNameFont          ?? null,
+    backNameFontSize:      d.backNameFontSize      ?? null,
+    backNameFontWeight:    d.backNameFontWeight    ?? null,
+    backNameLetterSpacing: d.backNameLetterSpacing ?? null,
+    backNameTextTransform: d.backNameTextTransform ?? null,
+    backNameLineHeight:    d.backNameLineHeight    ?? null,
+    backSloganFont:          d.backSloganFont          ?? null,
+    backSloganFontSize:      d.backSloganFontSize      ?? null,
+    backSloganFontWeight:    d.backSloganFontWeight    ?? null,
+    backSloganLetterSpacing: d.backSloganLetterSpacing ?? null,
+    backSloganTextTransform: d.backSloganTextTransform ?? null,
+    backSloganLineHeight:    d.backSloganLineHeight    ?? null,
+    backTextShadow:          d.backTextShadow          ?? null,
+
+    // Back-specific Instructions (null = inherit from front)
+    backInstructionFont:          d.backInstructionFont          ?? null,
+    backInstructionFontSize:      d.backInstructionFontSize      ?? null,
+    backInstructionFontWeight:    d.backInstructionFontWeight    ?? null,
+    backInstructionLetterSpacing: d.backInstructionLetterSpacing ?? null,
+    backInstructionLineHeight:    d.backInstructionLineHeight    ?? null,
+    backCheckStrokeWidth:         d.backCheckStrokeWidth != null ? d.backCheckStrokeWidth / 10 : null,
+    backCtaPaddingTop:            d.backCtaPaddingTop            ?? null,
+
+    // Back-specific Platform Icon type (null = inherit from front)
+    backUseLogo:        d.backUseLogo        ?? null,
+    backSelectedIconId: d.backSelectedIconId ?? null,
+    backIconColor:      d.backIconColor      ?? null,
 
     businessName: esc(d.businessName ?? card?.locationName ?? "Business Name"),
     sloganText: d.slogan ? esc(d.slogan) : null,

@@ -1162,12 +1162,64 @@ model CardTemplate {
   serialNumberPaddingY  Int     @default(3)
   serialNumberRadius    Int     @default(999)
 
-  // Platform Icon Background
+  // Platform Icon Background — FRONT
   platformIconBgEnabled Boolean @default(false)
   platformIconBgColor   String  @default("#FFFFFF") @db.VarChar(30)
   platformIconBgPadding Int     @default(4)
   platformIconBgRadius  Int     @default(999)
   platformIconBgShadow  Boolean @default(false)
+
+  // Back-specific icon & instruction settings (independent from front)
+  backShowGoogleIcon        Boolean @default(true)
+  backGoogleIconSize        Int     @default(20)
+  backPlatformIconBgEnabled Boolean @default(false)
+  backPlatformIconBgColor   String  @default("#FFFFFF") @db.VarChar(30)
+  backPlatformIconBgPadding Int     @default(4)
+  backPlatformIconBgRadius  Int     @default(999)
+  backPlatformIconBgShadow  Boolean @default(false)
+  backInstructionTextAlign  String  @default("left") @db.VarChar(20)
+
+  // ── Back-specific Serial Number (null = inherit from front) ────────────────
+  backShowSerialNumber      Boolean?
+  backSerialNumberTextColor String?  @db.VarChar(20)
+  backSerialNumberBgColor   String?  @db.VarChar(30)
+  backSerialNumberFontSize  Int?
+  backSerialNumberPaddingX  Int?
+  backSerialNumberPaddingY  Int?
+  backSerialNumberRadius    Int?
+
+  // ── Back-specific Typography — Business (null = inherit from front) ─────────
+  backNameFont          String? @db.VarChar(150)
+  backNameFontSize      Int?
+  backNameFontWeight    String? @db.VarChar(10)
+  backNameLetterSpacing String? @db.VarChar(20)
+  backNameTextTransform String? @db.VarChar(20)
+  backNameLineHeight    String? @db.VarChar(10)
+
+  // ── Back-specific Typography — Slogan (null = inherit from front) ──────────
+  backSloganFont          String? @db.VarChar(150)
+  backSloganFontSize      Int?
+  backSloganFontWeight    String? @db.VarChar(10)
+  backSloganLetterSpacing String? @db.VarChar(20)
+  backSloganTextTransform String? @db.VarChar(20)
+  backSloganLineHeight    String? @db.VarChar(10)
+
+  // ── Back-specific Typography — Visual (null = inherit from front) ──────────
+  backTextShadow String? @db.VarChar(20)
+
+  // ── Back-specific Instructions (null = inherit from front) ─────────────────
+  backInstructionFont          String? @db.VarChar(150)
+  backInstructionFontSize      Int?
+  backInstructionFontWeight    String? @db.VarChar(10)
+  backInstructionLetterSpacing String? @db.VarChar(20)
+  backInstructionLineHeight    String? @db.VarChar(10)
+  backCheckStrokeWidth         Int?    // stored *10 like front (35 = 3.5)
+  backCtaPaddingTop            Int?
+
+  // ── Back-specific Platform Icon type (null = inherit from front) ───────────
+  backUseLogo       Boolean? // true = official SVG, false = custom icon
+  backSelectedIconId String? @db.VarChar(50)
+  backIconColor      String? @db.VarChar(20)
 
   // Gradient colors (stored as JSON array)
   gradient    Json     // ["#FFFFFF", "#F1F5F9"]

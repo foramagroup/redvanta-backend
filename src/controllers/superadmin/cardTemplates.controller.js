@@ -95,12 +95,64 @@ function formatTemplate(template) {
     serialNumberPaddingY:  template.serialNumberPaddingY ?? 3,
     serialNumberRadius:    template.serialNumberRadius ?? 999,
 
-    // Platform Icon Background
+    // Platform Icon Background — FRONT
     platformIconBgEnabled: template.platformIconBgEnabled ?? false,
     platformIconBgColor:   template.platformIconBgColor   ?? "#FFFFFF",
     platformIconBgPadding: template.platformIconBgPadding ?? 4,
     platformIconBgRadius:  template.platformIconBgRadius  ?? 999,
     platformIconBgShadow:  template.platformIconBgShadow  ?? false,
+
+    // Back-specific icon & instruction settings
+    backShowGoogleIcon:        template.backShowGoogleIcon        ?? true,
+    backGoogleIconSize:        template.backGoogleIconSize        ?? 20,
+    backPlatformIconBgEnabled: template.backPlatformIconBgEnabled ?? false,
+    backPlatformIconBgColor:   template.backPlatformIconBgColor   ?? "#FFFFFF",
+    backPlatformIconBgPadding: template.backPlatformIconBgPadding ?? 4,
+    backPlatformIconBgRadius:  template.backPlatformIconBgRadius  ?? 999,
+    backPlatformIconBgShadow:  template.backPlatformIconBgShadow  ?? false,
+    backInstructionTextAlign:  template.backInstructionTextAlign  ?? "left",
+
+    // Back-specific Serial Number (null = inherit from front)
+    backShowSerialNumber:      template.backShowSerialNumber      ?? null,
+    backSerialNumberTextColor: template.backSerialNumberTextColor ?? null,
+    backSerialNumberBgColor:   template.backSerialNumberBgColor   ?? null,
+    backSerialNumberFontSize:  template.backSerialNumberFontSize  ?? null,
+    backSerialNumberPaddingX:  template.backSerialNumberPaddingX  ?? null,
+    backSerialNumberPaddingY:  template.backSerialNumberPaddingY  ?? null,
+    backSerialNumberRadius:    template.backSerialNumberRadius    ?? null,
+
+    // Back-specific Typography — Business (null = inherit from front)
+    backNameFont:          template.backNameFont          ?? null,
+    backNameFontSize:      template.backNameFontSize      ?? null,
+    backNameFontWeight:    template.backNameFontWeight    ?? null,
+    backNameLetterSpacing: template.backNameLetterSpacing ?? null,
+    backNameTextTransform: template.backNameTextTransform ?? null,
+    backNameLineHeight:    template.backNameLineHeight    ?? null,
+
+    // Back-specific Typography — Slogan (null = inherit from front)
+    backSloganFont:          template.backSloganFont          ?? null,
+    backSloganFontSize:      template.backSloganFontSize      ?? null,
+    backSloganFontWeight:    template.backSloganFontWeight    ?? null,
+    backSloganLetterSpacing: template.backSloganLetterSpacing ?? null,
+    backSloganTextTransform: template.backSloganTextTransform ?? null,
+    backSloganLineHeight:    template.backSloganLineHeight    ?? null,
+
+    // Back-specific Typography — Visual (null = inherit from front)
+    backTextShadow: template.backTextShadow ?? null,
+
+    // Back-specific Instructions (null = inherit from front)
+    backInstructionFont:          template.backInstructionFont          ?? null,
+    backInstructionFontSize:      template.backInstructionFontSize      ?? null,
+    backInstructionFontWeight:    template.backInstructionFontWeight    ?? null,
+    backInstructionLetterSpacing: template.backInstructionLetterSpacing ?? null,
+    backInstructionLineHeight:    template.backInstructionLineHeight    ?? null,
+    backCheckStrokeWidth:         template.backCheckStrokeWidth != null ? template.backCheckStrokeWidth / 10 : null,
+    backCtaPaddingTop:            template.backCtaPaddingTop            ?? null,
+
+    // Back-specific Platform Icon type (null = inherit from front)
+    backUseLogo:        template.backUseLogo        ?? null,
+    backSelectedIconId: template.backSelectedIconId ?? null,
+    backIconColor:      template.backIconColor      ?? null,
 
     // ✅ Platform logo/icon settings - NOUVEAU
     useLogo: template.useLogo ?? true,
@@ -347,12 +399,64 @@ export const createTemplate = async (req, res) => {
         serialNumberPaddingY:  data.serialNumberPaddingY ?? 3,
         serialNumberRadius:    data.serialNumberRadius ?? 999,
 
-        // Platform Icon Background
+        // Platform Icon Background — FRONT
         platformIconBgEnabled: data.platformIconBgEnabled ?? false,
         platformIconBgColor:   data.platformIconBgColor   ?? "#FFFFFF",
         platformIconBgPadding: data.platformIconBgPadding ?? 4,
         platformIconBgRadius:  data.platformIconBgRadius  ?? 999,
         platformIconBgShadow:  data.platformIconBgShadow  ?? false,
+
+        // Back-specific icon & instruction settings
+        backShowGoogleIcon:        data.backShowGoogleIcon        ?? true,
+        backGoogleIconSize:        data.backGoogleIconSize        ?? 20,
+        backPlatformIconBgEnabled: data.backPlatformIconBgEnabled ?? false,
+        backPlatformIconBgColor:   data.backPlatformIconBgColor   ?? "#FFFFFF",
+        backPlatformIconBgPadding: data.backPlatformIconBgPadding ?? 4,
+        backPlatformIconBgRadius:  data.backPlatformIconBgRadius  ?? 999,
+        backPlatformIconBgShadow:  data.backPlatformIconBgShadow  ?? false,
+        backInstructionTextAlign:  data.backInstructionTextAlign  ?? 'left',
+
+        // Back-specific Serial Number (null = inherit from front)
+        backShowSerialNumber:      data.backShowSerialNumber      ?? null,
+        backSerialNumberTextColor: data.backSerialNumberTextColor ?? null,
+        backSerialNumberBgColor:   data.backSerialNumberBgColor   ?? null,
+        backSerialNumberFontSize:  data.backSerialNumberFontSize  ?? null,
+        backSerialNumberPaddingX:  data.backSerialNumberPaddingX  ?? null,
+        backSerialNumberPaddingY:  data.backSerialNumberPaddingY  ?? null,
+        backSerialNumberRadius:    data.backSerialNumberRadius    ?? null,
+
+        // Back-specific Typography — Business
+        backNameFont:          data.backNameFont          ?? null,
+        backNameFontSize:      data.backNameFontSize      ?? null,
+        backNameFontWeight:    data.backNameFontWeight    ?? null,
+        backNameLetterSpacing: data.backNameLetterSpacing ?? null,
+        backNameTextTransform: data.backNameTextTransform ?? null,
+        backNameLineHeight:    data.backNameLineHeight    ?? null,
+
+        // Back-specific Typography — Slogan
+        backSloganFont:          data.backSloganFont          ?? null,
+        backSloganFontSize:      data.backSloganFontSize      ?? null,
+        backSloganFontWeight:    data.backSloganFontWeight    ?? null,
+        backSloganLetterSpacing: data.backSloganLetterSpacing ?? null,
+        backSloganTextTransform: data.backSloganTextTransform ?? null,
+        backSloganLineHeight:    data.backSloganLineHeight    ?? null,
+
+        // Back-specific Typography — Visual
+        backTextShadow: data.backTextShadow ?? null,
+
+        // Back-specific Instructions
+        backInstructionFont:          data.backInstructionFont          ?? null,
+        backInstructionFontSize:      data.backInstructionFontSize      ?? null,
+        backInstructionFontWeight:    data.backInstructionFontWeight    ?? null,
+        backInstructionLetterSpacing: data.backInstructionLetterSpacing ?? null,
+        backInstructionLineHeight:    data.backInstructionLineHeight    ?? null,
+        backCheckStrokeWidth:         data.backCheckStrokeWidth != null ? Math.round(data.backCheckStrokeWidth * 10) : null,
+        backCtaPaddingTop:            data.backCtaPaddingTop            ?? null,
+
+        // Back-specific Platform Icon type
+        backUseLogo:        data.backUseLogo        ?? null,
+        backSelectedIconId: data.backSelectedIconId ?? null,
+        backIconColor:      data.backIconColor      ?? null,
 
         // ✅ Platform logo/icon settings - NOUVEAU
         useLogo: data.useLogo ?? true,
@@ -514,12 +618,64 @@ export const updateTemplate = async (req, res) => {
     if (data.serialNumberPaddingY !== undefined)  updateData.serialNumberPaddingY  = data.serialNumberPaddingY;
     if (data.serialNumberRadius !== undefined)    updateData.serialNumberRadius    = data.serialNumberRadius;
 
-    // Platform Icon Background
+    // Platform Icon Background — FRONT
     if (data.platformIconBgEnabled !== undefined) updateData.platformIconBgEnabled = data.platformIconBgEnabled;
     if (data.platformIconBgColor !== undefined)   updateData.platformIconBgColor   = data.platformIconBgColor;
     if (data.platformIconBgPadding !== undefined) updateData.platformIconBgPadding = data.platformIconBgPadding;
     if (data.platformIconBgRadius !== undefined)  updateData.platformIconBgRadius  = data.platformIconBgRadius;
     if (data.platformIconBgShadow !== undefined)  updateData.platformIconBgShadow  = data.platformIconBgShadow;
+
+    // Back-specific icon & instruction settings
+    if (data.backShowGoogleIcon        !== undefined) updateData.backShowGoogleIcon        = data.backShowGoogleIcon;
+    if (data.backGoogleIconSize        !== undefined) updateData.backGoogleIconSize        = data.backGoogleIconSize;
+    if (data.backPlatformIconBgEnabled !== undefined) updateData.backPlatformIconBgEnabled = data.backPlatformIconBgEnabled;
+    if (data.backPlatformIconBgColor   !== undefined) updateData.backPlatformIconBgColor   = data.backPlatformIconBgColor;
+    if (data.backPlatformIconBgPadding !== undefined) updateData.backPlatformIconBgPadding = data.backPlatformIconBgPadding;
+    if (data.backPlatformIconBgRadius  !== undefined) updateData.backPlatformIconBgRadius  = data.backPlatformIconBgRadius;
+    if (data.backPlatformIconBgShadow  !== undefined) updateData.backPlatformIconBgShadow  = data.backPlatformIconBgShadow;
+    if (data.backInstructionTextAlign  !== undefined) updateData.backInstructionTextAlign  = data.backInstructionTextAlign;
+
+    // Back-specific Serial Number
+    if (data.backShowSerialNumber      !== undefined) updateData.backShowSerialNumber      = data.backShowSerialNumber;
+    if (data.backSerialNumberTextColor !== undefined) updateData.backSerialNumberTextColor = data.backSerialNumberTextColor;
+    if (data.backSerialNumberBgColor   !== undefined) updateData.backSerialNumberBgColor   = data.backSerialNumberBgColor;
+    if (data.backSerialNumberFontSize  !== undefined) updateData.backSerialNumberFontSize  = data.backSerialNumberFontSize;
+    if (data.backSerialNumberPaddingX  !== undefined) updateData.backSerialNumberPaddingX  = data.backSerialNumberPaddingX;
+    if (data.backSerialNumberPaddingY  !== undefined) updateData.backSerialNumberPaddingY  = data.backSerialNumberPaddingY;
+    if (data.backSerialNumberRadius    !== undefined) updateData.backSerialNumberRadius    = data.backSerialNumberRadius;
+
+    // Back-specific Typography — Business
+    if (data.backNameFont          !== undefined) updateData.backNameFont          = data.backNameFont;
+    if (data.backNameFontSize      !== undefined) updateData.backNameFontSize      = data.backNameFontSize;
+    if (data.backNameFontWeight    !== undefined) updateData.backNameFontWeight    = data.backNameFontWeight;
+    if (data.backNameLetterSpacing !== undefined) updateData.backNameLetterSpacing = data.backNameLetterSpacing;
+    if (data.backNameTextTransform !== undefined) updateData.backNameTextTransform = data.backNameTextTransform;
+    if (data.backNameLineHeight    !== undefined) updateData.backNameLineHeight    = data.backNameLineHeight;
+
+    // Back-specific Typography — Slogan
+    if (data.backSloganFont          !== undefined) updateData.backSloganFont          = data.backSloganFont;
+    if (data.backSloganFontSize      !== undefined) updateData.backSloganFontSize      = data.backSloganFontSize;
+    if (data.backSloganFontWeight    !== undefined) updateData.backSloganFontWeight    = data.backSloganFontWeight;
+    if (data.backSloganLetterSpacing !== undefined) updateData.backSloganLetterSpacing = data.backSloganLetterSpacing;
+    if (data.backSloganTextTransform !== undefined) updateData.backSloganTextTransform = data.backSloganTextTransform;
+    if (data.backSloganLineHeight    !== undefined) updateData.backSloganLineHeight    = data.backSloganLineHeight;
+
+    // Back-specific Typography — Visual
+    if (data.backTextShadow !== undefined) updateData.backTextShadow = data.backTextShadow;
+
+    // Back-specific Instructions
+    if (data.backInstructionFont          !== undefined) updateData.backInstructionFont          = data.backInstructionFont;
+    if (data.backInstructionFontSize      !== undefined) updateData.backInstructionFontSize      = data.backInstructionFontSize;
+    if (data.backInstructionFontWeight    !== undefined) updateData.backInstructionFontWeight    = data.backInstructionFontWeight;
+    if (data.backInstructionLetterSpacing !== undefined) updateData.backInstructionLetterSpacing = data.backInstructionLetterSpacing;
+    if (data.backInstructionLineHeight    !== undefined) updateData.backInstructionLineHeight    = data.backInstructionLineHeight;
+    if (data.backCheckStrokeWidth         !== undefined) updateData.backCheckStrokeWidth         = data.backCheckStrokeWidth != null ? Math.round(data.backCheckStrokeWidth * 10) : null;
+    if (data.backCtaPaddingTop            !== undefined) updateData.backCtaPaddingTop            = data.backCtaPaddingTop;
+
+    // Back-specific Platform Icon type
+    if (data.backUseLogo        !== undefined) updateData.backUseLogo        = data.backUseLogo;
+    if (data.backSelectedIconId !== undefined) updateData.backSelectedIconId = data.backSelectedIconId;
+    if (data.backIconColor      !== undefined) updateData.backIconColor      = data.backIconColor;
 
     // ✅ Platform logo/icon settings - NOUVEAU
     if (data.useLogo !== undefined) updateData.useLogo = data.useLogo;

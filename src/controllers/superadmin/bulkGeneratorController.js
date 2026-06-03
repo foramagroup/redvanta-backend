@@ -99,12 +99,60 @@ function formatTemplate(t) {
     serialNumberPaddingY:  t.serialNumberPaddingY ?? 3,
     serialNumberRadius:    t.serialNumberRadius ?? 999,
 
-    // Platform icon background
+    // Platform icon background — FRONT
     platformIconBgEnabled: t.platformIconBgEnabled ?? false,
     platformIconBgColor:   t.platformIconBgColor ?? '#FFFFFF',
     platformIconBgPadding: t.platformIconBgPadding ?? 4,
     platformIconBgRadius:  t.platformIconBgRadius ?? 999,
     platformIconBgShadow:  t.platformIconBgShadow ?? false,
+
+    // Back-specific icon & instruction settings
+    backShowGoogleIcon:        t.backShowGoogleIcon        ?? true,
+    backGoogleIconSize:        t.backGoogleIconSize        ?? 20,
+    backPlatformIconBgEnabled: t.backPlatformIconBgEnabled ?? false,
+    backPlatformIconBgColor:   t.backPlatformIconBgColor   ?? '#FFFFFF',
+    backPlatformIconBgPadding: t.backPlatformIconBgPadding ?? 4,
+    backPlatformIconBgRadius:  t.backPlatformIconBgRadius  ?? 999,
+    backPlatformIconBgShadow:  t.backPlatformIconBgShadow  ?? false,
+    backInstructionTextAlign:  t.backInstructionTextAlign  ?? 'left',
+
+    // Back-specific Serial Number (null = inherit from front)
+    backShowSerialNumber:      t.backShowSerialNumber      ?? null,
+    backSerialNumberTextColor: t.backSerialNumberTextColor ?? null,
+    backSerialNumberBgColor:   t.backSerialNumberBgColor   ?? null,
+    backSerialNumberFontSize:  t.backSerialNumberFontSize  ?? null,
+    backSerialNumberPaddingX:  t.backSerialNumberPaddingX  ?? null,
+    backSerialNumberPaddingY:  t.backSerialNumberPaddingY  ?? null,
+    backSerialNumberRadius:    t.backSerialNumberRadius    ?? null,
+
+    // Back-specific Typography (null = inherit from front)
+    backNameFont:          t.backNameFont          ?? null,
+    backNameFontSize:      t.backNameFontSize      ?? null,
+    backNameFontWeight:    t.backNameFontWeight    ?? null,
+    backNameLetterSpacing: t.backNameLetterSpacing ?? null,
+    backNameTextTransform: t.backNameTextTransform ?? null,
+    backNameLineHeight:    t.backNameLineHeight    ?? null,
+    backSloganFont:          t.backSloganFont          ?? null,
+    backSloganFontSize:      t.backSloganFontSize      ?? null,
+    backSloganFontWeight:    t.backSloganFontWeight    ?? null,
+    backSloganLetterSpacing: t.backSloganLetterSpacing ?? null,
+    backSloganTextTransform: t.backSloganTextTransform ?? null,
+    backSloganLineHeight:    t.backSloganLineHeight    ?? null,
+    backTextShadow:          t.backTextShadow          ?? null,
+
+    // Back-specific Instructions (null = inherit from front)
+    backInstructionFont:          t.backInstructionFont          ?? null,
+    backInstructionFontSize:      t.backInstructionFontSize      ?? null,
+    backInstructionFontWeight:    t.backInstructionFontWeight    ?? null,
+    backInstructionLetterSpacing: t.backInstructionLetterSpacing ?? null,
+    backInstructionLineHeight:    t.backInstructionLineHeight    ?? null,
+    backCheckStrokeWidth:         t.backCheckStrokeWidth != null ? t.backCheckStrokeWidth / 10 : null,
+    backCtaPaddingTop:            t.backCtaPaddingTop            ?? null,
+
+    // Back-specific Platform Icon type (null = inherit from front)
+    backUseLogo:        t.backUseLogo        ?? null,
+    backSelectedIconId: t.backSelectedIconId ?? null,
+    backIconColor:      t.backIconColor      ?? null,
 
     // Platform logo / icon
     useLogo: t.useLogo ?? true,
