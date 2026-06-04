@@ -128,6 +128,7 @@ function formatTemplate(template) {
     backNameLetterSpacing: template.backNameLetterSpacing ?? null,
     backNameTextTransform: template.backNameTextTransform ?? null,
     backNameLineHeight:    template.backNameLineHeight    ?? null,
+    backNameTextAlign:     template.backNameTextAlign     ?? null,
 
     // Back-specific Typography — Slogan (null = inherit from front)
     backSloganFont:          template.backSloganFont          ?? null,
@@ -136,6 +137,7 @@ function formatTemplate(template) {
     backSloganLetterSpacing: template.backSloganLetterSpacing ?? null,
     backSloganTextTransform: template.backSloganTextTransform ?? null,
     backSloganLineHeight:    template.backSloganLineHeight    ?? null,
+    backSloganTextAlign:     template.backSloganTextAlign     ?? null,
 
     // Back-specific Typography — Visual (null = inherit from front)
     backTextShadow: template.backTextShadow ?? null,
@@ -148,6 +150,14 @@ function formatTemplate(template) {
     backInstructionLineHeight:    template.backInstructionLineHeight    ?? null,
     backCheckStrokeWidth:         template.backCheckStrokeWidth != null ? template.backCheckStrokeWidth / 10 : null,
     backCtaPaddingTop:            template.backCtaPaddingTop            ?? null,
+
+    // CTA Styling per-side
+    ctaFontSize:      template.ctaFontSize   ?? 12,
+    ctaFontWeight:    template.ctaFontWeight ?? "500",
+    ctaTextColor:     template.ctaTextColor  ?? null,
+    backCtaFontSize:  template.backCtaFontSize  ?? null,
+    backCtaFontWeight:template.backCtaFontWeight ?? null,
+    backCtaTextColor: template.backCtaTextColor  ?? null,
 
     // Back-specific Platform Icon type (null = inherit from front)
     backUseLogo:        template.backUseLogo        ?? null,
@@ -432,6 +442,7 @@ export const createTemplate = async (req, res) => {
         backNameLetterSpacing: data.backNameLetterSpacing ?? null,
         backNameTextTransform: data.backNameTextTransform ?? null,
         backNameLineHeight:    data.backNameLineHeight    ?? null,
+        backNameTextAlign:     data.backNameTextAlign     ?? null,
 
         // Back-specific Typography — Slogan
         backSloganFont:          data.backSloganFont          ?? null,
@@ -440,6 +451,7 @@ export const createTemplate = async (req, res) => {
         backSloganLetterSpacing: data.backSloganLetterSpacing ?? null,
         backSloganTextTransform: data.backSloganTextTransform ?? null,
         backSloganLineHeight:    data.backSloganLineHeight    ?? null,
+        backSloganTextAlign:     data.backSloganTextAlign     ?? null,
 
         // Back-specific Typography — Visual
         backTextShadow: data.backTextShadow ?? null,
@@ -452,6 +464,14 @@ export const createTemplate = async (req, res) => {
         backInstructionLineHeight:    data.backInstructionLineHeight    ?? null,
         backCheckStrokeWidth:         data.backCheckStrokeWidth != null ? Math.round(data.backCheckStrokeWidth * 10) : null,
         backCtaPaddingTop:            data.backCtaPaddingTop            ?? null,
+
+        // CTA Styling per-side
+        ctaFontSize:      data.ctaFontSize   ?? 12,
+        ctaFontWeight:    data.ctaFontWeight ?? "500",
+        ctaTextColor:     data.ctaTextColor  ?? null,
+        backCtaFontSize:  data.backCtaFontSize  ?? null,
+        backCtaFontWeight:data.backCtaFontWeight ?? null,
+        backCtaTextColor: data.backCtaTextColor  ?? null,
 
         // Back-specific Platform Icon type
         backUseLogo:        data.backUseLogo        ?? null,
@@ -651,6 +671,7 @@ export const updateTemplate = async (req, res) => {
     if (data.backNameLetterSpacing !== undefined) updateData.backNameLetterSpacing = data.backNameLetterSpacing;
     if (data.backNameTextTransform !== undefined) updateData.backNameTextTransform = data.backNameTextTransform;
     if (data.backNameLineHeight    !== undefined) updateData.backNameLineHeight    = data.backNameLineHeight;
+    if (data.backNameTextAlign     !== undefined) updateData.backNameTextAlign     = data.backNameTextAlign;
 
     // Back-specific Typography — Slogan
     if (data.backSloganFont          !== undefined) updateData.backSloganFont          = data.backSloganFont;
@@ -659,6 +680,7 @@ export const updateTemplate = async (req, res) => {
     if (data.backSloganLetterSpacing !== undefined) updateData.backSloganLetterSpacing = data.backSloganLetterSpacing;
     if (data.backSloganTextTransform !== undefined) updateData.backSloganTextTransform = data.backSloganTextTransform;
     if (data.backSloganLineHeight    !== undefined) updateData.backSloganLineHeight    = data.backSloganLineHeight;
+    if (data.backSloganTextAlign     !== undefined) updateData.backSloganTextAlign     = data.backSloganTextAlign;
 
     // Back-specific Typography — Visual
     if (data.backTextShadow !== undefined) updateData.backTextShadow = data.backTextShadow;
@@ -671,6 +693,14 @@ export const updateTemplate = async (req, res) => {
     if (data.backInstructionLineHeight    !== undefined) updateData.backInstructionLineHeight    = data.backInstructionLineHeight;
     if (data.backCheckStrokeWidth         !== undefined) updateData.backCheckStrokeWidth         = data.backCheckStrokeWidth != null ? Math.round(data.backCheckStrokeWidth * 10) : null;
     if (data.backCtaPaddingTop            !== undefined) updateData.backCtaPaddingTop            = data.backCtaPaddingTop;
+
+    // CTA Styling per-side
+    if (data.ctaFontSize      !== undefined) updateData.ctaFontSize      = data.ctaFontSize;
+    if (data.ctaFontWeight    !== undefined) updateData.ctaFontWeight    = data.ctaFontWeight;
+    if (data.ctaTextColor     !== undefined) updateData.ctaTextColor     = data.ctaTextColor;
+    if (data.backCtaFontSize  !== undefined) updateData.backCtaFontSize  = data.backCtaFontSize;
+    if (data.backCtaFontWeight!== undefined) updateData.backCtaFontWeight= data.backCtaFontWeight;
+    if (data.backCtaTextColor !== undefined) updateData.backCtaTextColor = data.backCtaTextColor;
 
     // Back-specific Platform Icon type
     if (data.backUseLogo        !== undefined) updateData.backUseLogo        = data.backUseLogo;
@@ -884,7 +914,7 @@ export const duplicateTemplate = async (req, res) => {
         serialNumberPaddingY:  original.serialNumberPaddingY ?? 3,
         serialNumberRadius:    original.serialNumberRadius ?? 999,
 
-        // Platform Icon Background
+        // Platform Icon Background — FRONT
         platformIconBgEnabled: original.platformIconBgEnabled ?? false,
         platformIconBgColor:   original.platformIconBgColor   ?? "#FFFFFF",
         platformIconBgPadding: original.platformIconBgPadding ?? 4,
@@ -894,7 +924,69 @@ export const duplicateTemplate = async (req, res) => {
         useLogo: original.useLogo ?? true,
         selectedIconId: original.selectedIconId || null,
         iconColor: original.iconColor || original.accentColor || '#4285F4',
-        
+
+        // Back-specific icon & instruction settings
+        backShowGoogleIcon:        original.backShowGoogleIcon        ?? true,
+        backGoogleIconSize:        original.backGoogleIconSize        ?? 20,
+        backPlatformIconBgEnabled: original.backPlatformIconBgEnabled ?? false,
+        backPlatformIconBgColor:   original.backPlatformIconBgColor   ?? "#FFFFFF",
+        backPlatformIconBgPadding: original.backPlatformIconBgPadding ?? 4,
+        backPlatformIconBgRadius:  original.backPlatformIconBgRadius  ?? 999,
+        backPlatformIconBgShadow:  original.backPlatformIconBgShadow  ?? false,
+        backInstructionTextAlign:  original.backInstructionTextAlign  ?? 'left',
+
+        // Back-specific Serial Number
+        backShowSerialNumber:      original.backShowSerialNumber      ?? null,
+        backSerialNumberTextColor: original.backSerialNumberTextColor ?? null,
+        backSerialNumberBgColor:   original.backSerialNumberBgColor   ?? null,
+        backSerialNumberFontSize:  original.backSerialNumberFontSize  ?? null,
+        backSerialNumberPaddingX:  original.backSerialNumberPaddingX  ?? null,
+        backSerialNumberPaddingY:  original.backSerialNumberPaddingY  ?? null,
+        backSerialNumberRadius:    original.backSerialNumberRadius    ?? null,
+
+        // Back-specific Typography — Business
+        backNameFont:          original.backNameFont          ?? null,
+        backNameFontSize:      original.backNameFontSize      ?? null,
+        backNameFontWeight:    original.backNameFontWeight    ?? null,
+        backNameLetterSpacing: original.backNameLetterSpacing ?? null,
+        backNameTextTransform: original.backNameTextTransform ?? null,
+        backNameLineHeight:    original.backNameLineHeight    ?? null,
+        backNameTextAlign:     original.backNameTextAlign     ?? null,
+
+        // Back-specific Typography — Slogan
+        backSloganFont:          original.backSloganFont          ?? null,
+        backSloganFontSize:      original.backSloganFontSize      ?? null,
+        backSloganFontWeight:    original.backSloganFontWeight    ?? null,
+        backSloganLetterSpacing: original.backSloganLetterSpacing ?? null,
+        backSloganTextTransform: original.backSloganTextTransform ?? null,
+        backSloganLineHeight:    original.backSloganLineHeight    ?? null,
+        backSloganTextAlign:     original.backSloganTextAlign     ?? null,
+
+        // Back-specific Typography — Visual
+        backTextShadow: original.backTextShadow ?? null,
+
+        // Back-specific Instructions
+        backInstructionFont:          original.backInstructionFont          ?? null,
+        backInstructionFontSize:      original.backInstructionFontSize      ?? null,
+        backInstructionFontWeight:    original.backInstructionFontWeight    ?? null,
+        backInstructionLetterSpacing: original.backInstructionLetterSpacing ?? null,
+        backInstructionLineHeight:    original.backInstructionLineHeight    ?? null,
+        backCheckStrokeWidth:         original.backCheckStrokeWidth         ?? null,
+        backCtaPaddingTop:            original.backCtaPaddingTop            ?? null,
+
+        // CTA Styling per-side
+        ctaFontSize:      original.ctaFontSize   ?? 12,
+        ctaFontWeight:    original.ctaFontWeight ?? "500",
+        ctaTextColor:     original.ctaTextColor  ?? null,
+        backCtaFontSize:  original.backCtaFontSize  ?? null,
+        backCtaFontWeight:original.backCtaFontWeight ?? null,
+        backCtaTextColor: original.backCtaTextColor  ?? null,
+
+        // Back-specific Platform Icon type
+        backUseLogo:        original.backUseLogo        ?? null,
+        backSelectedIconId: original.backSelectedIconId ?? null,
+        backIconColor:      original.backIconColor      ?? null,
+
         // Colors
         gradient: JSON.stringify(original.gradient),
         accentColor: original.accentColor || '#4285F4',

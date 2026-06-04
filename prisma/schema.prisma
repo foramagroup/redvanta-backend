@@ -1195,6 +1195,7 @@ model CardTemplate {
   backNameLetterSpacing String? @db.VarChar(20)
   backNameTextTransform String? @db.VarChar(20)
   backNameLineHeight    String? @db.VarChar(10)
+  backNameTextAlign     String? @db.VarChar(20)
 
   // ── Back-specific Typography — Slogan (null = inherit from front) ──────────
   backSloganFont          String? @db.VarChar(150)
@@ -1203,6 +1204,7 @@ model CardTemplate {
   backSloganLetterSpacing String? @db.VarChar(20)
   backSloganTextTransform String? @db.VarChar(20)
   backSloganLineHeight    String? @db.VarChar(10)
+  backSloganTextAlign     String? @db.VarChar(20)
 
   // ── Back-specific Typography — Visual (null = inherit from front) ──────────
   backTextShadow String? @db.VarChar(20)
@@ -1215,6 +1217,14 @@ model CardTemplate {
   backInstructionLineHeight    String? @db.VarChar(10)
   backCheckStrokeWidth         Int?    // stored *10 like front (35 = 3.5)
   backCtaPaddingTop            Int?
+
+  // ── CTA Styling per-side ───────────────────────────────────────────────────
+  ctaFontSize    Int     @default(12)
+  ctaFontWeight  String  @default("500") @db.VarChar(10)
+  ctaTextColor   String? @db.VarChar(20)
+  backCtaFontSize   Int?
+  backCtaFontWeight String? @db.VarChar(10)
+  backCtaTextColor  String? @db.VarChar(20)
 
   // ── Back-specific Platform Icon type (null = inherit from front) ───────────
   backUseLogo       Boolean? // true = official SVG, false = custom icon
