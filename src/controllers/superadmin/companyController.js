@@ -12,7 +12,13 @@ import { invalidateFeatureCache } from "../../middleware/requireFeature.js";
 
 // Chargement des membres (admins) via UserCompany
 const COMPANY_INCLUDE = {
-  package:        true,
+  package: {
+    include: {
+      translations: {
+        include: { language: { select: { id: true, code: true } } },
+      },
+    },
+  },
   defaulLanguage: true,
   settings:       true,
   // Tous les admins liés à cette company
@@ -59,7 +65,7 @@ function formatCompany(c) {
     type:            c.type,
     status:          c.status,
     primaryColor:    c.primaryColor,
-    plan:            c.package ? { id: c.package.id, name: c.package.name, price: c.package.price } : null,
+    plan:            c.package ? { id: c.package.id, name: (c.package.translations?.find(t => t.language?.code === "en")?.name ?? c.package.translations?.[0]?.name ?? c.package.slug), price: c.package.price } : null,
     defaultLanguage: c.defaulLanguage ? { id: c.defaulLanguage.id, code: c.defaulLanguage.code } : null,
     billingDate:     c.billingDate,
     billingNextDate: c.billingNextDate,

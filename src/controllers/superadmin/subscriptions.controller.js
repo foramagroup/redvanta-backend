@@ -8,6 +8,7 @@ import {
   sendSubscriptionWelcomeEmail,
   formatSubscription,
 } from "../../services/stripeSubscription.service.js";
+import { sendTemplatedMail } from "../../services/client/mail.service.js";
 
 // ═══════════════════════════════════════════════════════════
 // GET /api/superadmin/subscriptions
@@ -42,6 +43,11 @@ export const listAllSubscriptions = async (req, res, next) => {
           },
           company: { select: { id: true, name: true, email: true } },
           addons: { include: { addon: true } },
+          billingHistory: {
+            include: { invoice: { select: { id: true, invoiceNumber: true, total: true, status: true } } },
+            orderBy: { createdAt: "desc" },
+            take: 3,
+          },
         },
         orderBy: { createdAt: "desc" },
         skip: (parseInt(page) - 1) * parseInt(limit),
@@ -60,6 +66,25 @@ export const listAllSubscriptions = async (req, res, next) => {
       }),
     ]);
 
+    // Batch-fetch recurring invoices for all companies (fallback when billingHistory has no invoiceId)
+    const companyIds = [...new Set(subscriptions.map((s) => s.companyId))];
+    const recurringInvoices = companyIds.length
+      ? await prisma.invoice.findMany({
+          where: { companyId: { in: companyIds }, isRecurring: true },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, invoiceNumber: true, total: true, status: true, companyId: true },
+        })
+      : [];
+
+    // Map companyId → { latestAny, latestUnpaid }
+    const invByCompany = {};
+    for (const inv of recurringInvoices) {
+      if (!invByCompany[inv.companyId]) invByCompany[inv.companyId] = { latestAny: null, latestUnpaid: null };
+      const e = invByCompany[inv.companyId];
+      if (!e.latestAny) e.latestAny = inv;
+      if (!e.latestUnpaid && inv.status !== "paid") e.latestUnpaid = inv;
+    }
+
     const lang = req.locale || "en";
 
     res.json({
@@ -72,6 +97,23 @@ export const listAllSubscriptions = async (req, res, next) => {
           trs[0];
         const planName = tr?.name ?? sub.plan?.name ?? sub.plan?.slug ?? null;
 
+        // via billingHistory (linked invoiceId)
+        const unpaidBh = (sub.billingHistory ?? []).find((bh) => bh.status !== "paid" && bh.invoice);
+        const latestBh = (sub.billingHistory ?? []).find((bh) => bh.invoice);
+
+        // fallback: recurring invoices by companyId
+        const cInv = invByCompany[sub.companyId] ?? {};
+
+        const rawUnpaid = unpaidBh?.invoice ?? cInv.latestUnpaid ?? null;
+        const rawLatest = latestBh?.invoice ?? cInv.latestAny ?? null;
+
+        const latestUnpaidInvoice = rawUnpaid
+          ? { id: rawUnpaid.id, invoiceNumber: rawUnpaid.invoiceNumber, total: Number(rawUnpaid.total) }
+          : null;
+        const latestInvoice = rawLatest
+          ? { id: rawLatest.id, invoiceNumber: rawLatest.invoiceNumber, total: Number(rawLatest.total), status: rawLatest.status }
+          : null;
+
         return {
           ...formatSubscription(sub),
           planName,
@@ -81,6 +123,8 @@ export const listAllSubscriptions = async (req, res, next) => {
             name: a.addon?.name ?? null,
             amount: Number(a.amount ?? 0),
           })),
+          latestUnpaidInvoice,
+          latestInvoice,
         };
       }),
       stats: {
@@ -471,4 +515,161 @@ export const getPendingSubscriptionInvoices = async (req, res, next) => {
   } catch (e) {
     next(e);
   }
+};
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/superadmin/subscription/:id/cancel
+// ═══════════════════════════════════════════════════════════
+export const cancelSubscription = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { reason } = req.body;
+    const sub = await prisma.subscription.findUnique({ where: { id } });
+    if (!sub) return res.status(404).json({ success: false, error: req.t("superadmin.subscription.not_found") });
+    if (sub.status === "canceled") return res.status(422).json({ success: false, error: "Subscription is already canceled." });
+    await prisma.subscription.update({
+      where: { id },
+      data: { status: "canceled", canceledAt: new Date(), ...(reason ? { cancelReason: reason } : {}) },
+    });
+    res.json({ success: true, message: `Subscription #${id} has been canceled.` });
+  } catch (e) { next(e); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/superadmin/subscription/:id/activate
+// ═══════════════════════════════════════════════════════════
+export const activateSubscription = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const sub = await prisma.subscription.findUnique({ where: { id } });
+    if (!sub) return res.status(404).json({ success: false, error: req.t("superadmin.subscription.not_found") });
+    await prisma.subscription.update({ where: { id }, data: { status: "active" } });
+    res.json({ success: true, message: `Subscription #${id} activated.` });
+  } catch (e) { next(e); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/superadmin/subscription/:id/pause
+// ═══════════════════════════════════════════════════════════
+export const pauseSubscription = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const sub = await prisma.subscription.findUnique({ where: { id } });
+    if (!sub) return res.status(404).json({ success: false, error: req.t("superadmin.subscription.not_found") });
+    await prisma.subscription.update({ where: { id }, data: { status: "paused" } });
+    res.json({ success: true, message: `Subscription #${id} paused.` });
+  } catch (e) { next(e); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// POST /api/superadmin/subscription/:id/send-invoice
+// Envoie la dernière facture impayée de l'abonnement par email
+// ═══════════════════════════════════════════════════════════
+export const sendSubscriptionInvoiceEmail = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { to } = req.body;
+
+    const billingHistory = await prisma.billingHistory.findFirst({
+      where: {
+        subscriptionId: id,
+        status: { not: "paid" },
+        invoiceId: { not: null },
+      },
+      include: {
+        invoice: { include: { items: true, company: true, user: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!billingHistory?.invoice) {
+      return res.status(404).json({ success: false, error: "No pending invoice found for this subscription." });
+    }
+
+    const inv = billingHistory.invoice;
+    const recipientEmail = (to || "").trim() || inv.billingEmail || inv.user?.email;
+    if (!recipientEmail) return res.status(422).json({ success: false, error: "No recipient email available." });
+
+    const currency = inv.currency || "EUR";
+    const total = Number(inv.displayTotal ?? inv.total ?? 0);
+
+    const vars = {
+      invoice_number: inv.invoiceNumber,
+      company_name:   inv.company?.name ?? inv.billingName ?? "Client",
+      billing_name:   inv.billingName   ?? inv.company?.name ?? "Client",
+      billing_email:  recipientEmail,
+      invoice_date:   inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString("fr-FR") : "-",
+      due_date:       inv.dueDate     ? new Date(inv.dueDate).toLocaleDateString("fr-FR")     : "-",
+      total:          total.toFixed(2),
+      currency,
+      status:         inv.status,
+      year:           String(new Date().getFullYear()),
+      items_html:     (inv.items ?? []).map((i) =>
+        `<tr>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee">${i.service}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center">${i.quantity}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(i.unitPrice).toFixed(2)} ${currency}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(i.total).toFixed(2)} ${currency}</td>
+        </tr>`
+      ).join(""),
+    };
+
+    const buildFallback = () => ({
+      subject: `Invoice ${inv.invoiceNumber} — ${vars.company_name}`,
+      html: `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        body{font-family:sans-serif;color:#222;margin:0;padding:0;background:#f6f6f6}
+        .wrap{max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+        .header{background:#e11d48;padding:28px 32px;color:#fff}.header h1{margin:0;font-size:22px}.header p{margin:4px 0 0;font-size:13px;opacity:.85}
+        .body{padding:28px 32px}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}
+        th{background:#f1f5f9;padding:8px;text-align:left;font-size:13px}th:last-child,td:last-child{text-align:right}
+        .total-row td{padding:10px 8px;font-weight:700;border-top:2px solid #e11d48;font-size:15px}
+        .footer{padding:16px 32px;background:#f9f9f9;font-size:12px;color:#888;text-align:center}
+      </style></head><body><div class="wrap">
+        <div class="header"><h1>Invoice ${inv.invoiceNumber}</h1>
+          <p>Date: ${vars.invoice_date}${vars.due_date !== "-" ? ` &nbsp;·&nbsp; Due: ${vars.due_date}` : ""}</p></div>
+        <div class="body">
+          <p>Hello <strong>${vars.billing_name}</strong>,</p>
+          <p>Please find your subscription invoice details below.</p>
+          <table><thead><tr><th>Service</th><th style="text-align:center">Qty</th><th style="text-align:right">Unit price</th><th style="text-align:right">Total</th></tr></thead>
+            <tbody>${vars.items_html}</tbody>
+            <tfoot><tr class="total-row"><td colspan="3">Total</td><td>${vars.total} ${vars.currency}</td></tr></tfoot>
+          </table>
+          <p style="font-size:13px;color:#555">Status: <strong>${vars.status}</strong></p>
+          <p>Thank you for your business.</p>
+        </div>
+        <div class="footer">&copy; ${vars.year} ${vars.company_name}. All rights reserved.</div>
+      </div></body></html>`,
+      text: `Invoice ${inv.invoiceNumber}\nDate: ${vars.invoice_date}\nTotal: ${vars.total} ${vars.currency}\nStatus: ${vars.status}`,
+    });
+
+    let emailStatus = "Sent";
+    let emailSentAt = new Date();
+    let emailError  = null;
+
+    try {
+      await sendTemplatedMail({
+        slug:       "invoice_email",
+        to:         recipientEmail,
+        variables:  vars,
+        fallbackFn: buildFallback,
+      });
+    } catch (err) {
+      emailStatus = "Failed";
+      emailError  = err.message?.slice(0, 495) ?? "Send failed";
+    }
+
+    await prisma.invoice.update({
+      where: { id: inv.id },
+      data:  { emailStatus, emailSentAt, emailError, ...(to?.trim() && { billingEmail: to.trim() }) },
+    });
+
+    res.json({
+      success: emailStatus === "Sent",
+      message: emailStatus === "Sent"
+        ? `Invoice ${inv.invoiceNumber} sent to ${recipientEmail}.`
+        : `Email delivery failed: ${emailError}`,
+      invoiceNumber: inv.invoiceNumber,
+      emailStatus,
+    });
+  } catch (e) { next(e); }
 };

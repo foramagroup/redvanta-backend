@@ -1,6 +1,15 @@
 import prisma from "../config/database.js";
 import path from 'path';
 import fs from 'fs/promises';
+import { getStripe } from "../services/Stripe.service.js";
+import {
+  getOrCreateStripeCustomer,
+  getDefaultPaymentMethod,
+  calculatePeriodDates,
+  generateSubscriptionOrderNumber,
+  createSubscriptionInvoice,
+  sendSubscriptionPendingEmail,
+} from "../services/stripeSubscription.service.js";
 
 
 function getCompanyId(req) {
@@ -788,19 +797,11 @@ export const getSubscription = async (req, res) => {
       where: { companyId: parseInt(companyId) },
       include: {
         plan: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-            price: true,
-            annual: true,
-            apiLimit: true,
-            smsLimit: true,
-            webhookLimit: true,
-            locationLimit: true,
-            userLimit: true,
-            features: true,
-          }
+          include: {
+            translations: {
+              include: { language: { select: { id: true, code: true } } },
+            },
+          },
         },
         addons: {
           where: { status: 'active' },
@@ -822,34 +823,88 @@ export const getSubscription = async (req, res) => {
         }
       }
     });
-    
+
+    const lang = req.locale || 'en';
+
+    // Fallback: si pas de Subscription, utiliser le plan assigné à la company (package)
     if (!subscription) {
-      return res.status(404).json({
-        success: false,
-        error: 'No active subscription found'
+      const company = await prisma.company.findUnique({
+        where: { id: parseInt(companyId) },
+        include: {
+          package: {
+            include: {
+              translations: { include: { language: { select: { id: true, code: true } } } },
+            },
+          },
+        },
+      });
+
+      if (!company?.package) {
+        return res.status(404).json({ success: false, error: 'No active subscription found' });
+      }
+
+      const pkgTrs = company.package.translations ?? [];
+      const pkgTr  =
+        pkgTrs.find((t) => t.language?.code === lang) ??
+        pkgTrs.find((t) => t.language?.code === 'en') ??
+        pkgTrs[0];
+      const locationCount = await prisma.location.count({ where: { companyId: parseInt(companyId) } });
+
+      return res.json({
+        success: true,
+        data: {
+          id: null,
+          planName:     pkgTr?.name ?? company.package.slug,
+          planSlug:     company.package.slug,
+          status:       'active',
+          interval:     'monthly',
+          amount:       company.package.price,
+          addonsAmount: 0,
+          totalAmount:  company.package.price,
+          nextBilling:  company.billingNextDate ?? null,
+          currentPeriodStart: null,
+          currentPeriodEnd:   null,
+          trialStart: null,
+          trialEnd:   null,
+          locationCount,
+          locationLimit: company.package.locationLimit,
+          apiLimit:      company.package.apiLimit,
+          smsLimit:      company.package.smsLimit,
+          webhookLimit:  company.package.webhookLimit,
+          activeAddons:  [],
+          features:      pkgTr?.featureSlugs || [],
+        },
       });
     }
-    
+
+    // Résoudre le nom du plan depuis les traductions
+    const planTrs = subscription.plan?.translations ?? [];
+    const planTr  =
+      planTrs.find((t) => t.language?.code === lang) ??
+      planTrs.find((t) => t.language?.code === 'en') ??
+      planTrs[0];
+    const planName = planTr?.name ?? subscription.plan?.slug ?? 'Plan';
+
     // Compter les locations utilisées
     const locationCount = await prisma.location.count({
       where: { companyId: parseInt(companyId) }
     });
-    
+
     // Calculer les limites totales (plan + addons)
-    const totalLocationLimit = subscription.plan.locationLimit + 
+    const totalLocationLimit = (subscription.plan.locationLimit || 0) +
       subscription.addons.reduce((sum, a) => sum + (a.addon.locationBonus || 0), 0);
-    
-    const totalApiLimit = subscription.plan.apiLimit + 
+
+    const totalApiLimit = (subscription.plan.apiLimit || 0) +
       subscription.addons.reduce((sum, a) => sum + (a.addon.apiBonus || 0), 0);
-    
-    const totalSmsLimit = subscription.plan.smsLimit + 
+
+    const totalSmsLimit = (subscription.plan.smsLimit || 0) +
       subscription.addons.reduce((sum, a) => sum + (a.addon.smsBonus || 0), 0);
-    
+
     res.json({
       success: true,
       data: {
         id: subscription.id,
-        planName: subscription.plan.name,
+        planName,
         planSlug: subscription.plan.slug,
         status: subscription.status,
         interval: subscription.interval,
@@ -865,7 +920,7 @@ export const getSubscription = async (req, res) => {
         locationLimit: totalLocationLimit,
         apiLimit: totalApiLimit,
         smsLimit: totalSmsLimit,
-        webhookLimit: subscription.plan.webhookLimit,
+        webhookLimit: subscription.plan.webhookLimit || 0,
         activeAddons: subscription.addons.map(a => ({
           id: a.addon.id,
           name: a.addon.name,
@@ -873,7 +928,7 @@ export const getSubscription = async (req, res) => {
           price: a.amount,
           type: a.addon.type,
         })),
-        features: subscription.plan.features || [],
+        features: planTr?.featureSlugs || [],
       }
     });
     
@@ -909,45 +964,72 @@ export const getInvoices = async (req, res) => {
       });
     }
     
-    // Récupérer les factures depuis billing_history
+    // Récupérer les factures depuis billing_history (avec la vraie Invoice si liée)
     const billingHistory = await prisma.billingHistory.findMany({
       where: { subscriptionId: subscription.id },
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
+        invoice: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            total: true,
+            currency: true,
+            status: true,
+            invoiceDate: true,
+            dueDate: true,
+          },
+        },
         subscription: {
-          include: { plan: true }
-        }
-      }
+          include: {
+            plan: {
+              include: {
+                translations: { include: { language: { select: { code: true } } } },
+              },
+            },
+          },
+        },
+      },
     });
-    
-    // Formater les données
-    const invoices = billingHistory.map(bh => ({
-      id: bh.id,
-      invoiceNumber: `INV-${bh.id.toString().padStart(6, '0')}`,
-      invoiceDate: bh.createdAt,
-      dueDate: bh.periodEnd,
-      periodStart: bh.periodStart,
-      periodEnd: bh.periodEnd,
-      baseAmount: bh.baseAmount,
-      addonsAmount: bh.addonsAmount,
-      taxAmount: bh.taxAmount,
-      total: bh.totalAmount,
-      currency: 'USD',
-      status: bh.status,
-      paidAt: bh.paidAt,
-      paymentMethod: bh.paymentMethod,
-      stripeInvoiceId: bh.stripeInvoiceId,
-      items: [
-        {
-          service: `${bh.subscription.plan?.name || 'Plan'} Subscription`,
-          description: `Billing period: ${bh.periodStart.toLocaleDateString()} - ${bh.periodEnd.toLocaleDateString()}`,
-          quantity: 1,
-          unitPrice: bh.baseAmount,
-          total: bh.baseAmount,
-        }
-      ]
-    }));
+
+    const lang = req.locale || 'en';
+
+    // Formater les données — priorité à la vraie Invoice si elle existe
+    const invoices = billingHistory.map(bh => {
+      const inv = bh.invoice;
+      const planTrs = bh.subscription?.plan?.translations ?? [];
+      const planTr  =
+        planTrs.find((t) => t.language?.code === lang) ??
+        planTrs.find((t) => t.language?.code === 'en') ??
+        planTrs[0];
+      const planLabel = planTr?.name ?? bh.subscription?.plan?.slug ?? 'Plan';
+
+      return {
+        id:            inv?.id ?? bh.id,
+        invoiceNumber: inv?.invoiceNumber ?? `INV-${bh.id.toString().padStart(6, '0')}`,
+        invoiceDate:   inv?.invoiceDate ?? bh.createdAt,
+        dueDate:       inv?.dueDate ?? bh.periodEnd,
+        periodStart:   bh.periodStart,
+        periodEnd:     bh.periodEnd,
+        baseAmount:    bh.baseAmount,
+        addonsAmount:  bh.addonsAmount,
+        taxAmount:     bh.taxAmount,
+        total:         inv ? Number(inv.total) : bh.totalAmount,
+        currency:      inv?.currency ?? 'EUR',
+        status:        inv?.status ?? bh.status,
+        paidAt:        bh.paidAt,
+        paymentMethod: bh.paymentMethod,
+        stripeInvoiceId: bh.stripeInvoiceId,
+        items: [{
+          service:     `${planLabel} Subscription`,
+          description: `Billing period: ${new Date(bh.periodStart).toLocaleDateString()} - ${new Date(bh.periodEnd).toLocaleDateString()}`,
+          quantity:    1,
+          unitPrice:   bh.baseAmount,
+          total:       bh.baseAmount,
+        }],
+      };
+    });
     
     res.json({
       success: true,
@@ -979,28 +1061,41 @@ export const getAvailablePlans = async (req, res) => {
       select: { planId: true }
     });
     
-    // Récupérer tous les plans actifs
+    // Récupérer tous les plans actifs avec leurs traductions
     const plans = await prisma.planSetting.findMany({
       where: { status: "Active" },
-      orderBy: { displayOrder: 'asc' }
+      orderBy: { displayOrder: 'asc' },
+      include: {
+        translations: {
+          include: { language: { select: { id: true, code: true } } },
+        },
+      },
     });
-    
-    
-    const formattedPlans = plans.map(plan => ({
-      id: plan.id,
-      name: plan.name,
-      slug: plan.slug,
-      price: plan.price,
-      annual: plan.annual,
-      features: plan.features,
-      apiLimit: plan.apiLimit,
-      smsLimit: plan.smsLimit,
-      webhookLimit: plan.webhookLimit,
-      locationLimit: plan.locationLimit,
-      userLimit: plan.userLimit,
-      isPopular: plan.isPopular,
-      isCurrent: currentSubscription?.planId === plan.id,
-    }));
+
+    const lang = req.locale || 'en';
+
+    const formattedPlans = plans.map(plan => {
+      const trs = plan.translations ?? [];
+      const tr  =
+        trs.find((t) => t.language?.code === lang) ??
+        trs.find((t) => t.language?.code === 'en') ??
+        trs[0];
+      return {
+        id: plan.id,
+        name: tr?.name ?? plan.slug,
+        slug: plan.slug,
+        price: plan.price,
+        annual: plan.annual,
+        features: tr?.featureSlugs || [],
+        apiLimit: plan.apiLimit,
+        smsLimit: plan.smsLimit,
+        webhookLimit: plan.webhookLimit,
+        locationLimit: plan.locationLimit,
+        userLimit: plan.userLimit,
+        isPopular: plan.isPopular,
+        isCurrent: currentSubscription?.planId === plan.id,
+      };
+    });
     
     res.json({
       success: true,
@@ -1018,77 +1113,99 @@ export const getAvailablePlans = async (req, res) => {
 };
 
 /**
+ * GET /api/admin/general-settings/payment-methods
+ * Méthodes de paiement disponibles (Stripe + manuelles)
+ */
+export const getSettingsPaymentMethods = async (req, res) => {
+  try {
+    const manualMethods = await prisma.manualPaymentMethod.findMany({
+      where: { status: 'Active' },
+      orderBy: { name: 'asc' },
+    });
+
+    const methods = manualMethods.map((m) => ({
+      id: m.id,
+      type: 'manual',
+      name: m.name,
+      description: m.instructions ?? null,
+      instructions: m.instructions ?? null,
+      verificationRequired: m.verificationRequired ?? false,
+    }));
+
+    return res.json({ success: true, data: methods });
+  } catch (error) {
+    console.error('❌ Error fetching payment methods:', error);
+    return res.status(500).json({ success: false, error: 'Error fetching payment methods' });
+  }
+};
+
+/**
  * POST /api/admin/general-settings/change-plan
- * Changer de plan (upgrade/downgrade)
+ * Changer de plan (upgrade/downgrade) avec sélection du mode de paiement
+ * Body: { planId, interval?, paymentMethod: 'stripe'|'manual', paymentMethodId? }
  */
 export const changePlan = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId    = req.user.userId;
     const companyId = getCompanyId(req);
-    const { planId, interval = 'monthly' } = req.body;
-    
+    const { planId, interval = 'monthly', paymentMethod, paymentMethodId } = req.body;
+
     if (!planId) {
-      return res.status(400).json({
-        success: false,
-        error: 'planId is required'
-      });
+      return res.status(400).json({ success: false, error: 'planId is required' });
     }
-    
+
+    const isStripe = paymentMethod === 'stripe';
+    const isManual = paymentMethod === 'manual';
+    if (!isStripe && !isManual) {
+      return res.status(422).json({ success: false, error: "paymentMethod must be 'stripe' or 'manual'" });
+    }
+
     // Vérifier les permissions
-    const { hasPermission } = await checkPermissions(
-      userId,
-      parseInt(companyId),
-      req.user.isSuperadmin
-    );
-    
+    const { hasPermission } = await checkPermissions(userId, parseInt(companyId), req.user.isSuperadmin);
     if (!hasPermission) {
-      return res.status(403).json({
-        success: false,
-        error: 'Only company owner can change plan'
-      });
+      return res.status(403).json({ success: false, error: 'Only company owner can change plan' });
     }
-    
+
+    // Valider méthode manuelle
+    let manualMethod = null;
+    if (isManual) {
+      if (!paymentMethodId) {
+        return res.status(422).json({ success: false, error: 'paymentMethodId required for manual payment' });
+      }
+      manualMethod = await prisma.manualPaymentMethod.findFirst({
+        where: { id: parseInt(paymentMethodId), status: 'Active' },
+      });
+      if (!manualMethod) {
+        return res.status(422).json({ success: false, error: 'Invalid manual payment method' });
+      }
+    }
+
     // Récupérer le nouveau plan
-    const newPlan = await prisma.planSetting.findUnique({
-      where: { id: parseInt(planId) }
-    });
-    
+    const newPlan = await prisma.planSetting.findUnique({ where: { id: parseInt(planId) } });
     if (!newPlan || newPlan.status !== 'Active') {
-      return res.status(404).json({
-        success: false,
-        error: 'Plan not found or inactive'
-      });
+      return res.status(404).json({ success: false, error: 'Plan not found or inactive' });
     }
-    
+
     // Récupérer la subscription actuelle
     const currentSubscription = await prisma.subscription.findUnique({
-      where: { companyId: parseInt(companyId) }
+      where: { companyId: parseInt(companyId) },
     });
-    
     if (!currentSubscription) {
-      return res.status(404).json({
-        success: false,
-        error: 'No active subscription found'
-      });
+      return res.status(404).json({ success: false, error: 'No active subscription found' });
     }
-    
-    // Calculer le nouveau montant
-    const newBaseAmount = interval === 'yearly' ? newPlan.annual : newPlan.price;
-    const newTotalAmount = newBaseAmount + currentSubscription.addonsAmount;
-    
-    // Calculer les nouvelles dates de période
-    const now = new Date();
-    const newPeriodEnd = new Date(now);
-    if (interval === 'yearly') {
-      newPeriodEnd.setFullYear(newPeriodEnd.getFullYear() + 1);
-    } else {
-      newPeriodEnd.setMonth(newPeriodEnd.getMonth() + 1);
-    }
-    
-    // Mettre à jour la subscription dans une transaction
-    const result = await prisma.$transaction(async (tx) => {
-      // Mettre à jour subscription
-      const updatedSubscription = await tx.subscription.update({
+
+    const newBaseAmount  = interval === 'yearly' ? (newPlan.annual || newPlan.price) : newPlan.price;
+    const newTotalAmount = Math.round((newBaseAmount + currentSubscription.addonsAmount) * 100) / 100;
+    const now            = new Date();
+    const periods        = calculatePeriodDates(interval, now);
+
+    const user       = await prisma.user.findUnique({ where: { id: userId } });
+    const company    = await prisma.company.findUnique({ where: { id: parseInt(companyId) } });
+    const orderNumber = await generateSubscriptionOrderNumber();
+
+    // ── Appliquer le changement de plan immédiatement ──
+    const applyPlanChange = async (tx) => {
+      await tx.subscription.update({
         where: { id: currentSubscription.id },
         data: {
           planId: newPlan.id,
@@ -1096,68 +1213,151 @@ export const changePlan = async (req, res) => {
           baseAmount: newBaseAmount,
           totalAmount: newTotalAmount,
           currentPeriodStart: now,
-          currentPeriodEnd: newPeriodEnd,
-          nextBillingDate: newPeriodEnd,
-        }
+          currentPeriodEnd: periods.currentPeriodEnd,
+          nextBillingDate: periods.nextBillingDate,
+        },
       });
-      
-      // Mettre à jour les settings de la company
-      await tx.companySettings.update({
+      await tx.companySettings.updateMany({
         where: { companyId: parseInt(companyId) },
         data: {
           maxLocations: newPlan.locationLimit,
           maxApiCalls: newPlan.apiLimit,
           maxSmsCalls: newPlan.smsLimit,
-        }
+        },
       });
-      
-      // Mettre à jour la company
       await tx.company.update({
         where: { id: parseInt(companyId) },
-        data: {
-          planId: newPlan.id,
-          billingAmount: `$${newTotalAmount}`,
-          mrr: newBaseAmount,
-        }
+        data: { planId: newPlan.id, mrr: newBaseAmount },
       });
-      
-      // Créer un enregistrement de billing history
-      await tx.billingHistory.create({
-        data: {
-          subscriptionId: updatedSubscription.id,
-          baseAmount: newBaseAmount,
-          addonsAmount: currentSubscription.addonsAmount,
-          taxAmount: 0,
-          totalAmount: newTotalAmount,
-          periodStart: now,
-          periodEnd: newPeriodEnd,
-          status: 'pending',
-        }
-      });
-      
-      return updatedSubscription;
-    });
-    
-    res.json({
-      success: true,
-      message: `Plan changed to ${newPlan.name} successfully`,
-      data: {
-        subscription: result,
-        newPlan: {
-          name: newPlan.name,
-          price: newBaseAmount,
+    };
+
+    // ═══════════════════════════════════════════════════════════
+    // STRIPE
+    // ═══════════════════════════════════════════════════════════
+    if (isStripe) {
+      const stripe    = await getStripe();
+      const customer  = await getOrCreateStripeCustomer(user, company);
+      const savedCard = await getDefaultPaymentMethod(customer.id);
+
+      const piData = {
+        amount:   Math.round(newTotalAmount * 100),
+        currency: 'eur',
+        customer: customer.id,
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          type:        'plan_change',
+          companyId:   String(companyId),
+          userId:      String(userId),
+          planId:      String(newPlan.id),
           interval,
-        }
-      }
-    });
-    
+          orderNumber,
+          newBaseAmount:  String(newBaseAmount),
+          newTotalAmount: String(newTotalAmount),
+        },
+      };
+      if (!savedCard) piData.setup_future_usage = 'off_session';
+      else piData.payment_method = savedCard.id;
+
+      const paymentIntent = await stripe.paymentIntents.create(piData);
+
+      await prisma.$transaction(async (tx) => {
+        await applyPlanChange(tx);
+        await tx.billingHistory.create({
+          data: {
+            subscriptionId: currentSubscription.id,
+            baseAmount: newBaseAmount,
+            addonsAmount: currentSubscription.addonsAmount,
+            taxAmount: 0,
+            totalAmount: newTotalAmount,
+            periodStart: now,
+            periodEnd: periods.currentPeriodEnd,
+            status: 'pending',
+            paymentMethod: 'Stripe',
+            stripePaymentIntentId: paymentIntent.id,
+          },
+        });
+      });
+
+      return res.json({
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        message: 'Confirm your payment to activate the plan.',
+        data: { orderNumber, totalAmount: newTotalAmount, status: 'pending' },
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MANUEL
+    // ═══════════════════════════════════════════════════════════
+    if (isManual) {
+      const { order, billingHistory: bh } = await prisma.$transaction(async (tx) => {
+        await applyPlanChange(tx);
+
+        const order = await tx.order.create({
+          data: {
+            userId,
+            companyId: parseInt(companyId),
+            orderNumber,
+            status: 'unpaid',
+            subtotal: newTotalAmount,
+            shippingCost: 0,
+            total: newTotalAmount,
+            currency: 'EUR',
+            exchangeRate: 1,
+            methodPayment: manualMethod.name,
+            manualPaymentMethodId: manualMethod.id,
+          },
+        });
+
+        const billingHistory = await tx.billingHistory.create({
+          data: {
+            subscriptionId: currentSubscription.id,
+            baseAmount: newBaseAmount,
+            addonsAmount: currentSubscription.addonsAmount,
+            taxAmount: 0,
+            totalAmount: newTotalAmount,
+            periodStart: now,
+            periodEnd: periods.currentPeriodEnd,
+            status: 'pending',
+            paymentMethod: manualMethod.name,
+          },
+        });
+
+        return { order, billingHistory };
+      });
+
+      const invoice = await createSubscriptionInvoice({
+        subscription: { ...currentSubscription, planId: newPlan.id, plan: newPlan },
+        billingHistory: bh,
+        user,
+        company,
+        paymentMethod: manualMethod.name,
+        orderId: order.id,
+      });
+
+      await sendSubscriptionPendingEmail(
+        { ...currentSubscription, planId: newPlan.id, plan: newPlan },
+        user,
+        company,
+        invoice,
+        manualMethod
+      );
+
+      return res.json({
+        success: true,
+        message: `Order ${orderNumber} created. Invoice ${invoice.invoiceNumber} sent.`,
+        data: {
+          orderNumber,
+          invoiceNumber: invoice.invoiceNumber,
+          totalAmount: newTotalAmount,
+          status: 'unpaid',
+          manualInstructions: manualMethod.instructions,
+        },
+      });
+    }
   } catch (error) {
     console.error('❌ Error changing plan:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Error changing plan',
-      details: error.message
-    });
+    res.status(500).json({ success: false, error: 'Error changing plan', details: error.message });
   }
 };
 

@@ -143,9 +143,45 @@ export async function stripeWebhookHandler(req, res) {
         break;
       }
 
-      case "payment_intent.succeeded":
-        // you can handle more
+      case "payment_intent.succeeded": {
+        const pi = event.data.object;
+        const piType = pi.metadata?.type;
+
+        if (piType === "plan_change") {
+          await prisma.billingHistory.updateMany({
+            where: { stripePaymentIntentId: pi.id, status: "pending" },
+            data:  { status: "paid", paidAt: new Date() },
+          });
+          await prisma.order.updateMany({
+            where: { stripePaymentIntentId: pi.id, status: "pending" },
+            data:  { status: "paid" },
+          });
+        } else if (piType === "addon_purchase") {
+          const addonIds   = JSON.parse(pi.metadata?.addonIds || "[]");
+          const companyId  = parseInt(pi.metadata?.companyId);
+          const subscription = await prisma.subscription.findUnique({ where: { companyId } });
+          if (subscription && addonIds.length) {
+            await prisma.$transaction([
+              prisma.subscriptionAddon.updateMany({
+                where: { subscriptionId: subscription.id, addonId: { in: addonIds }, status: "inactive" },
+                data:  { status: "active", activatedAt: new Date() },
+              }),
+              prisma.billingHistory.updateMany({
+                where: { stripePaymentIntentId: pi.id, status: "pending" },
+                data:  { status: "paid", paidAt: new Date() },
+              }),
+              prisma.subscription.update({
+                where: { id: subscription.id },
+                data: {
+                  addonsAmount: { increment: parseFloat(pi.amount_received) / 100 },
+                  totalAmount:  { increment: parseFloat(pi.amount_received) / 100 },
+                },
+              }),
+            ]);
+          }
+        }
         break;
+      }
 
       case "invoice.payment_failed":
         // ... handle failed payments

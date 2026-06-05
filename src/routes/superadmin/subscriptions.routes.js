@@ -9,6 +9,10 @@ import {
   markSubscriptionInvoicePaid,
   updateSubscriptionStatus,
   getPendingSubscriptionInvoices,
+  cancelSubscription,
+  activateSubscription,
+  pauseSubscription,
+  sendSubscriptionInvoiceEmail,
 } from "../../controllers/superadmin/subscriptions.controller.js";
 import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
 
@@ -22,8 +26,12 @@ router.get("/invoices/pending", getPendingSubscriptionInvoices);
 router.post("/invoices/:invoiceId/mark-paid", markSubscriptionInvoicePaid);
 
 // ─── Subscriptions Management ─────────────────────────────────
-router.get("/", listAllSubscriptions);
+router.get("/",    listAllSubscriptions);
 router.get("/:id", getSubscriptionDetails);
-router.put("/:id/status", updateSubscriptionStatus);
+router.put("/:id/status",       updateSubscriptionStatus);
+router.post("/:id/cancel",      cancelSubscription);
+router.post("/:id/activate",    activateSubscription);
+router.post("/:id/pause",       pauseSubscription);
+router.post("/:id/send-invoice", sendSubscriptionInvoiceEmail);
 
 export default router;

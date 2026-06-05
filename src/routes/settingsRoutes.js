@@ -12,9 +12,10 @@ import {
   updatePlatformsSettings,
   updateSecuritySettings,
   updateAdvancedSettings,
-   getSubscription,
+  getSubscription,
   getInvoices,
   getAvailablePlans,
+  getSettingsPaymentMethods,
   changePlan,
   cancelSubscription,
   reactivateSubscription,
@@ -78,6 +79,9 @@ router.get('/invoices', getInvoices);
 
 // GET - Liste des plans disponibles
 router.get('/available-plans', getAvailablePlans);
+
+// GET - Méthodes de paiement disponibles
+router.get('/payment-methods', getSettingsPaymentMethods);
 
 // POST - Changer de plan
 router.post('/change-plan', requireAdmin, changePlan);
