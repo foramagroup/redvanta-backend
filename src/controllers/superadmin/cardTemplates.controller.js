@@ -170,9 +170,13 @@ function formatTemplate(template) {
     iconColor: template.iconColor,
     
     // Colors
-    gradient: Array.isArray(template.gradient) 
-      ? template.gradient 
-      : JSON.parse(template.gradient),
+    gradient: (() => {
+      if (Array.isArray(template.gradient)) return template.gradient;
+      try {
+        const parsed = JSON.parse(template.gradient);
+        return Array.isArray(parsed) ? parsed : JSON.parse(parsed);
+      } catch { return ["#FFFFFF", "#F1F5F9"]; }
+    })(),
     accentColor: template.accentColor,
     textColor: template.textColor,
     bandColor1: template.bandColor1,
@@ -988,7 +992,7 @@ export const duplicateTemplate = async (req, res) => {
         backIconColor:      original.backIconColor      ?? null,
 
         // Colors
-        gradient: JSON.stringify(original.gradient),
+        gradient: original.gradient,
         accentColor: original.accentColor || '#4285F4',
         textColor: original.textColor || '#1a1a1a',
         bandColor1: original.bandColor1 || original.accentColor || '#4285F4',

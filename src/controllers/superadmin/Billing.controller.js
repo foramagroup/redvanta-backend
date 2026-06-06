@@ -152,12 +152,21 @@ export const listInvoices = async (req, res, next) => {
 export const getInvoice = async (req, res, next) => {
   try {
     const id  = parseInt(req.params.id);
-    const inv = await prisma.invoice.findUnique({
-      where:   { id },
-      include: { items: true, company: true, refunds: true },
-    });
+    const [inv, platform] = await Promise.all([
+      prisma.invoice.findUnique({
+        where:   { id },
+        include: { items: true, company: true, refunds: true },
+      }),
+      prisma.platformSetting.findFirst({
+        select: { companyName: true, companyEmail: true, companyAddress: true },
+      }),
+    ]);
     if (!inv) return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
-    res.json({ success: true, data: formatInvoice(inv) });
+    const data = formatInvoice(inv);
+    data.platformName    = platform?.companyName    ?? "RedVanta";
+    data.platformEmail   = platform?.companyEmail   ?? "";
+    data.platformAddress = platform?.companyAddress ?? "";
+    res.json({ success: true, data });
   } catch (e) { next(e); }
 };
 
