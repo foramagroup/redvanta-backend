@@ -267,7 +267,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/auth", clientAuthRoutes);
   app.use("/api/client/places", placesRoutes);
   app.use("/api/client/orders", orderClientRoutes);
-  app.use("/api/r",        scanRouter);
+  app.use("/api/c",        scanRouter);
   app.use("/api/review",   reviewRouter);
   app.use("/api/client/subscriptions", subscriptionsRoutes);
 

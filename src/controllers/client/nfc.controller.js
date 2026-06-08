@@ -139,11 +139,15 @@ export const handleScan = async (req, res, next) => {
     }
 
     if (!card.active) {
-      return res.status(403).json({
-        success: false,
-        error: req.t("nfc.card_not_active"),
-        status: card.status
+      const platform = await prisma.platformSetting.findFirst({
+        select: { companyName: true, companyEmail: true, companyPhone: true, countryCode: true },
       });
+      const phone = [platform?.countryCode, platform?.companyPhone].filter(Boolean).join(" ").trim();
+      const email = platform?.companyEmail || "";
+      const name  = platform?.companyName  || "Opinoor";
+      const frontUrl = process.env.URL_PROD_FRONTEND || process.env.URL_DEV_FRONTEND || "http://localhost:3000";
+      const qs = new URLSearchParams({ name, ...(phone && { phone }), ...(email && { email }) });
+      return res.redirect(302, `${frontUrl}/r/card-not-active?${qs}`);
     }
 
     // ✅ Tracker le scan (async)
