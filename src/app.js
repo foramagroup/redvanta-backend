@@ -87,6 +87,7 @@ import startSubscriptionReminderCron from './cron/subscriptionReminder.cron.js';
 import superadminFAQsRoutes from "./routes/superadmin/faqs.routes.js";
 import superadminStaticPageRoutes from "./routes/superadmin/staticPages.routes.js";
 import faqCategoriesRoutes from "./routes/superadmin/faqCategories.routes.js";
+import blogRoutes from "./routes/superadmin/blog.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -101,6 +102,7 @@ import { scanRouter, reviewRouter } from "./routes/client/nfc.routes.js";
 import clientFAQsRoutes from "./routes/client/faqs.routes.js";
 import clientStaticPageRoutes from "./routes/client/staticPages.routes.js";
 import contactRoutes from "./routes/client/contact.routes.js";
+import clientBlogRoutes from "./routes/client/blog.routes.js";
 
 // --- Controllers ---
 import redirectRouter from "./controllers/redirectController.js";
@@ -274,6 +276,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/faqs", clientFAQsRoutes);
   app.use("/api/client/all-pages", clientStaticPageRoutes);
   app.use("/api/client/contact", contactRoutes);
+  app.use("/api/client/blog",    clientBlogRoutes);
   suspendUnverifiedAccounts();
 
 
@@ -359,6 +362,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/superadmin/faqs", superadminFAQsRoutes);
   app.use("/api/superadmin/all-pages", superadminStaticPageRoutes);
   app.use("/api/superadmin/faq-categories", faqCategoriesRoutes);
+  app.use("/api/superadmin/blog", blogRoutes);
   startBillingCron();
   startWeeklyAlertsCron();
   startSubscriptionReminderCron();

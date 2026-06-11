@@ -3015,3 +3015,151 @@ model CompanyWebhook {
 
   @@map("company_webhooks")
 }
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║                        B L O G                              ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+model BlogCategory {
+  id           String   @id @default(cuid())
+  slug         String   @unique @db.VarChar(255)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  translations BlogCategoryTranslation[]
+  articles     BlogArticle[]
+
+  @@index([slug])
+  @@index([displayOrder])
+  @@map("blog_categories")
+}
+
+model BlogCategoryTranslation {
+  id          Int     @id @default(autoincrement())
+  categoryId  String
+  lang        String  @db.VarChar(10)
+  name        String  @db.VarChar(255)
+  description String? @db.Text
+  slug        String  @db.VarChar(255)
+  metaTitle   String? @db.VarChar(255)
+  metaDesc    String? @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category BlogCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, lang])
+  @@unique([lang, slug])
+  @@index([slug])
+  @@map("blog_category_translations")
+}
+
+model BlogTag {
+  id        String   @id @default(cuid())
+  slug      String   @unique @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  translations BlogTagTranslation[]
+  articles     BlogArticleTag[]
+
+  @@index([slug])
+  @@map("blog_tags")
+}
+
+model BlogTagTranslation {
+  id      Int    @id @default(autoincrement())
+  tagId   String
+  lang    String @db.VarChar(10)
+  name    String @db.VarChar(255)
+  slug    String @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tag BlogTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, lang])
+  @@unique([lang, slug])
+  @@index([slug])
+  @@map("blog_tag_translations")
+}
+
+model BlogArticle {
+  id          String    @id @default(cuid())
+  slug        String    @unique @db.VarChar(255)
+  image       String?   @db.VarChar(500)
+  author      String?   @db.VarChar(255)
+  date        String?   @db.VarChar(50)
+  readTime    String?   @db.VarChar(50)
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+  categoryId  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  category      BlogCategory?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  translations  BlogArticleTranslation[]
+  tags          BlogArticleTag[]
+  previousSlugs BlogArticlePreviousSlug[]
+
+  @@index([categoryId])
+  @@index([published])
+  @@index([slug])
+  @@index([updatedAt])
+  @@map("blog_articles")
+}
+
+model BlogArticleTranslation {
+  id              Int     @id @default(autoincrement())
+  articleId       String
+  lang            String  @db.VarChar(10)
+  slug            String  @db.VarChar(255)
+  title           String  @db.VarChar(255)
+  excerpt         String? @db.Text
+  content         String? @db.LongText
+  metaTitle       String? @db.VarChar(255)
+  metaDescription String? @db.VarChar(500)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  article BlogArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, lang])
+  @@unique([lang, slug])
+  @@index([slug])
+  @@map("blog_article_translations")
+}
+
+model BlogArticleTag {
+  articleId String
+  tagId     String
+
+  article BlogArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag     BlogTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+  @@map("blog_article_tags")
+}
+
+model BlogArticlePreviousSlug {
+  id        Int      @id @default(autoincrement())
+  articleId String
+  slug      String   @db.VarChar(255)
+  lang      String   @default("") @db.VarChar(10)
+  createdAt DateTime @default(now())
+
+  article BlogArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([slug, lang])
+  @@index([slug])
+  @@map("blog_article_previous_slugs")
+}
+
+model BlogSetting {
+  key       String   @id @db.VarChar(100)
+  value     String?  @db.LongText
+  updatedAt DateTime @updatedAt
+
+  @@map("blog_settings")
+}
