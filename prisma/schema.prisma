@@ -2233,6 +2233,11 @@ model Company {
   alertNotifications    AlertNotification[]
   companyIntegrations   CompanyIntegration[]
   companyWebhook        CompanyWebhook?
+  aiSetting             AiSetting?
+  aiUsageMonths         AiUsageMonth[]
+  aiCreditBalance       AiCreditBalance?
+  aiCreditTransactions  AiCreditTransaction[]
+  aiRequestLogs         AiRequestLog[]
   @@map("companies")
 }
 
@@ -3162,4 +3167,166 @@ model BlogSetting {
   updatedAt DateTime @updatedAt
 
   @@map("blog_settings")
+}
+
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║                     A I   M O D U L E                       ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ── AI Providers (superadmin-managed) ─────────────────────────
+
+model AiProvider {
+  id            Int            @id @default(autoincrement())
+  name          AiProviderName @unique
+  displayName   String         @db.VarChar(100)
+  model         String         @db.VarChar(100)   // e.g. gpt-4o-mini, claude-sonnet-4, gemini-2.5-flash
+  apiKey        String?        @db.VarChar(500)
+  active        Boolean        @default(false)
+  isDefault     Boolean        @default(false)
+  totalRequests Int            @default(0)
+  totalTokens   Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  costs         AiProviderCost[]
+  requestLogs   AiRequestLog[]
+
+  @@map("ai_providers")
+}
+
+model AiProviderCost {
+  id          Int        @id @default(autoincrement())
+  providerId  Int
+  inputPer1M  Float      // USD per 1M input tokens
+  outputPer1M Float      // USD per 1M output tokens
+  effectiveAt DateTime   @default(now())
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+
+  provider    AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@map("ai_provider_costs")
+}
+
+// ── Per-company AI settings ────────────────────────────────────
+
+model AiSetting {
+  id               Int      @id @default(autoincrement())
+  companyId        Int      @unique
+  language         String   @default("auto") @db.VarChar(10)
+  tone             String   @default("professional") @db.VarChar(30)
+  businessContext  String?  @db.Text
+  signature        String?  @db.VarChar(255)
+  autoReplyEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("ai_settings")
+}
+
+// ── Monthly usage counter per company ─────────────────────────
+
+model AiUsageMonth {
+  id             Int      @id @default(autoincrement())
+  companyId      Int
+  year           Int
+  month          Int      // 1–12
+  generatedCount Int      @default(0)
+  totalTokens    Int      @default(0)
+  totalCostUsd   Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, year, month])
+  @@index([companyId])
+  @@map("ai_usage_months")
+}
+
+// ── Credit balance (1:1 per company) ──────────────────────────
+
+model AiCreditBalance {
+  id           Int       @id @default(autoincrement())
+  companyId    Int       @unique
+  planIncluded Int       @default(0)  // credits allocated by the current plan cycle
+  purchased    Int       @default(0)  // extra credits bought
+  used         Int       @default(0)
+  resetAt      DateTime?              // last plan-cycle reset
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("ai_credit_balances")
+}
+
+// ── Credit ledger ──────────────────────────────────────────────
+
+model AiCreditTransaction {
+  id         Int          @id @default(autoincrement())
+  companyId  Int
+  kind       AiCreditKind // spend | purchase | refund | plan_reset
+  amount     Int          // credits (positive = gain, negative = spend)
+  costUsd    Float?       // actual AI cost (spend transactions)
+  revenueUsd Float?       // amount charged to company (purchase transactions)
+  reviewId   String?      @db.VarChar(36)
+  meta       Json?
+  createdAt  DateTime     @default(now())
+
+  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@map("ai_credit_transactions")
+}
+
+// ── Full audit log per generation ─────────────────────────────
+
+model AiRequestLog {
+  id           Int             @id @default(autoincrement())
+  companyId    Int?            // null = test système superadmin
+  reviewId     String?         @db.VarChar(36)
+  providerId   Int?
+  model        String?         @db.VarChar(100)
+  inputTokens  Int             @default(0)
+  outputTokens Int             @default(0)
+  costUsd      Float           @default(0)
+  status       AiRequestStatus @default(pending)
+  errorMessage String?         @db.Text
+  durationMs   Int?
+  createdAt    DateTime        @default(now())
+
+  company      Company?        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  provider     AiProvider?     @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([providerId])
+  @@map("ai_request_logs")
+}
+
+// ── AI enums ───────────────────────────────────────────────────
+
+enum AiProviderName {
+  openai
+  anthropic
+  google
+}
+
+enum AiCreditKind {
+  spend
+  purchase
+  refund
+  plan_reset
+}
+
+enum AiRequestStatus {
+  pending
+  success
+  failed
 }

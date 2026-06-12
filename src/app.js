@@ -88,6 +88,10 @@ import superadminFAQsRoutes from "./routes/superadmin/faqs.routes.js";
 import superadminStaticPageRoutes from "./routes/superadmin/staticPages.routes.js";
 import faqCategoriesRoutes from "./routes/superadmin/faqCategories.routes.js";
 import blogRoutes from "./routes/superadmin/blog.routes.js";
+import aiProvidersRoutes from "./routes/superadmin/aiProviders.routes.js";
+import aiProviderCostsRoutes from "./routes/superadmin/aiProviderCosts.routes.js";
+import aiAnalyticsRoutes from "./routes/superadmin/aiAnalytics.routes.js";
+import aiAdminRoutes from "./routes/admin/aiSettings.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -322,6 +326,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/admin/filtering",       authenticateAdmin, requireFeature("advanced-filtering"), filteringRoutes);
   //ges planBuilder
   app.use("/api/admin/plan-builder", planBuilderRoutes);
+  //ges AI settings + credits + usage
+  app.use("/api/admin/ai", aiAdminRoutes);
 
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);
@@ -362,7 +368,10 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/superadmin/faqs", superadminFAQsRoutes);
   app.use("/api/superadmin/all-pages", superadminStaticPageRoutes);
   app.use("/api/superadmin/faq-categories", faqCategoriesRoutes);
-  app.use("/api/superadmin/blog", blogRoutes);
+  app.use("/api/superadmin/blog",           blogRoutes);
+  app.use("/api/superadmin/ai/providers",      aiProvidersRoutes);
+  app.use("/api/superadmin/ai/provider-costs", aiProviderCostsRoutes);
+  app.use("/api/superadmin/ai",                aiAnalyticsRoutes);
   startBillingCron();
   startWeeklyAlertsCron();
   startSubscriptionReminderCron();
