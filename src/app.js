@@ -91,7 +91,8 @@ import blogRoutes from "./routes/superadmin/blog.routes.js";
 import aiProvidersRoutes from "./routes/superadmin/aiProviders.routes.js";
 import aiProviderCostsRoutes from "./routes/superadmin/aiProviderCosts.routes.js";
 import aiAnalyticsRoutes from "./routes/superadmin/aiAnalytics.routes.js";
-import aiAdminRoutes from "./routes/admin/aiSettings.routes.js";
+import aiAdminRoutes from "./routes/aiSettings.routes.js";
+import googleAdminRoutes from "./routes/google.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -328,6 +329,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/admin/plan-builder", planBuilderRoutes);
   //ges AI settings + credits + usage
   app.use("/api/admin/ai", aiAdminRoutes);
+  // Google OAuth + Business Profile
+  app.use("/api/admin/google", googleAdminRoutes);
 
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);

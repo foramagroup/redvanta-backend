@@ -336,7 +336,9 @@ model Review {
   phone         String?
   locationSlug  String?
   contact       String?
-  source        String?
+  source          String?
+  googleReviewId  String?   @unique
+  authorName      String?
   notifiedOwner Boolean      @default(false)
   postedAt      DateTime?
   createdAt     DateTime     @default(now())
@@ -2238,6 +2240,11 @@ model Company {
   aiCreditBalance       AiCreditBalance?
   aiCreditTransactions  AiCreditTransaction[]
   aiRequestLogs         AiRequestLog[]
+  googleConnection      GoogleConnection?
+  googleLocations       GoogleBusinessLocation[]
+  autoReplySetting      AutoReplySetting?
+  reviewBoosterEvents   ReviewBoosterEvent[]
+  aiAutoReplyLogs       AiAutoReplyLog[]
   @@map("companies")
 }
 
@@ -3328,5 +3335,106 @@ enum AiCreditKind {
 enum AiRequestStatus {
   pending
   success
+  failed
+}
+
+// ─── Google Business Profile ──────────────────────────────────────────────────
+
+model GoogleConnection {
+  id               Int       @id @default(autoincrement())
+  companyId        Int       @unique
+  company          Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  googleAccountId  String?
+  email            String?
+  accessToken      String    @db.Text
+  refreshToken     String?   @db.Text
+  expiresAt        DateTime?
+  needsReauth      Boolean   @default(false)
+  reviewsSynced    Int       @default(0)
+  averageRating    Float?
+  lastSyncAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  locations        GoogleBusinessLocation[]
+  @@map("google_connections")
+}
+
+model GoogleBusinessLocation {
+  id           Int              @id @default(autoincrement())
+  companyId    Int
+  company      Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  connectionId Int?
+  connection   GoogleConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  locationId   String
+  locationName String
+  address      String?
+  rating       Float?
+  reviewCount  Int              @default(0)
+  connected    Boolean          @default(false)
+  primary      Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  @@unique([companyId, locationId])
+  @@map("google_business_locations")
+}
+
+// ─── Auto Reply ───────────────────────────────────────────────────────────────
+
+model AutoReplySetting {
+  id               Int            @id @default(autoincrement())
+  companyId        Int            @unique
+  company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  mode             AutoReplyMode  @default(off)
+  minRating        Int            @default(3)
+  tone             String         @default("professional")
+  language         String         @default("en")
+  safetyThreshold  Int            @default(80)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  @@map("auto_reply_settings")
+}
+
+model AiAutoReplyLog {
+  id             Int                @id @default(autoincrement())
+  companyId      Int
+  company        Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reviewId       String?
+  googleReviewId String?
+  reviewText     String?            @db.Text
+  reply          String             @db.Text
+  safetyScore    Int                @default(0)
+  status         AutoReplyLogStatus @default(pending)
+  errorMessage   String?
+  publishedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  @@map("ai_auto_reply_logs")
+}
+
+// ─── Review Booster ───────────────────────────────────────────────────────────
+
+model ReviewBoosterEvent {
+  id               Int      @id @default(autoincrement())
+  companyId        Int
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  nfcCardId        Int?
+  locationId       Int?
+  rating           Int
+  suggestionUsed   Boolean  @default(false)
+  reviewSubmitted  Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  @@map("review_booster_events")
+}
+
+enum AutoReplyMode {
+  off
+  suggest
+  publish
+}
+
+enum AutoReplyLogStatus {
+  pending
+  suggested
+  published
+  blocked
   failed
 }

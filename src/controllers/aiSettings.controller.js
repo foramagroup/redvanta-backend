@@ -3,7 +3,7 @@
 // Paramètres IA, usage mensuel et crédits — côté admin company
 // ═══════════════════════════════════════════════════════════
 
-import prisma from "../../config/database.js";
+import prisma from "../config/database.js";
 
 // ── Limites IA par plan (à migrer dans PlanSetting quand le schéma sera étendu) ─
 const AI_PLAN_LIMITS = {
