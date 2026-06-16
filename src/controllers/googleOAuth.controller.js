@@ -1,9 +1,6 @@
 import prisma from "../config/database.js";
 import jwt from "jsonwebtoken";
-
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI ?? `${process.env.URL_DEV_FRONTEND ?? ""}/api/admin/google/callback`;
+import { encrypt, decrypt } from "../utils/tokenEncryption.js";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/business.manage",
@@ -11,23 +8,39 @@ const SCOPES = [
   "https://www.googleapis.com/auth/userinfo.profile",
 ].join(" ");
 
+export async function getGoogleCredentials() {
+  const ps = await prisma.platformSetting.findFirst({
+    select: { googleClientId: true, googleClientSecret: true, googleRedirectUri: true },
+  });
+  const clientId     = ps?.googleClientId     || process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = ps?.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri  = ps?.googleRedirectUri  || process.env.GOOGLE_REDIRECT_URI
+    || `${process.env.URL_DEV_BACKEND || "http://localhost:4000"}/api/admin/google/callback`;
+
+  if (!clientId || !clientSecret) {
+    throw Object.assign(new Error("Google OAuth credentials not configured. Ask your superadmin to set them in Platform Settings."), { status: 503 });
+  }
+  return { clientId, clientSecret, redirectUri };
+}
+
 // GET /api/admin/google/auth-url
 export async function getAuthUrl(req, res) {
   try {
     const companyId = req.user.companyId;
+    const { clientId, redirectUri } = await getGoogleCredentials();
     const state = jwt.sign({ companyId }, process.env.JWT_SECRET, { expiresIn: "10m" });
     const params = new URLSearchParams({
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
+      client_id:     clientId,
+      redirect_uri:  redirectUri,
       response_type: "code",
-      scope: SCOPES,
-      access_type: "offline",
-      prompt: "consent",
+      scope:         SCOPES,
+      access_type:   "offline",
+      prompt:        "consent",
       state,
     });
     res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
   } catch (err) {
-    res.status(500).json({ error: "Failed to generate auth URL" });
+    res.status(err.status || 500).json({ error: err.message || "Failed to generate auth URL" });
   }
 }
 
@@ -55,10 +68,11 @@ export async function handleCallback(req, res) {
   // Exchange code for tokens
   let tokens;
   try {
+    const { clientId, clientSecret, redirectUri } = await getGoogleCredentials();
     const resp = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ code, client_id: CLIENT_ID, client_secret: CLIENT_SECRET, redirect_uri: REDIRECT_URI, grant_type: "authorization_code" }),
+      body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: "authorization_code" }),
     });
     tokens = await resp.json();
     if (!tokens.access_token) throw new Error(tokens.error ?? "No access_token");
@@ -88,16 +102,17 @@ export async function handleCallback(req, res) {
       companyId,
       googleAccountId,
       email,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token ?? null,
+      accessToken:  encrypt(tokens.access_token),
+      refreshToken: tokens.refresh_token ? encrypt(tokens.refresh_token) : null,
       expiresAt,
       needsReauth: false,
     },
     update: {
       googleAccountId,
       email,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token ?? null,
+      accessToken:  encrypt(tokens.access_token),
+      // Ne mettre à jour le refreshToken que si Google en envoie un nouveau
+      ...(tokens.refresh_token ? { refreshToken: encrypt(tokens.refresh_token) } : {}),
       expiresAt,
       needsReauth: false,
     },
@@ -140,7 +155,8 @@ export async function disconnect(req, res) {
     const companyId = req.user.companyId;
     const conn = await prisma.googleConnection.findUnique({ where: { companyId } });
     if (conn?.accessToken) {
-      fetch(`https://oauth2.googleapis.com/revoke?token=${conn.accessToken}`, { method: "POST" }).catch(() => {});
+      const plainToken = decrypt(conn.accessToken);
+      fetch(`https://oauth2.googleapis.com/revoke?token=${plainToken}`, { method: "POST" }).catch(() => {});
     }
     await prisma.googleConnection.deleteMany({ where: { companyId } });
     await prisma.googleBusinessLocation.deleteMany({ where: { companyId } });

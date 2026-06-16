@@ -1,5 +1,6 @@
 import prisma from "../config/database.js";
 import { getValidToken } from "./googleLocations.controller.js";
+import { processReplyInternal } from "./autoReply.controller.js";
 
 // Shared sync logic (also used by cron)
 export async function runSync(companyId) {
@@ -30,7 +31,7 @@ export async function runSync(companyId) {
           where: { companyId, googleReviewId: r.reviewId },
         });
         if (!existing) {
-          await prisma.review.create({
+          const newReview = await prisma.review.create({
             data: {
               companyId,
               locationId: loc.id,
@@ -43,6 +44,10 @@ export async function runSync(companyId) {
             },
           });
           totalNew++;
+          // Fire-and-forget: trigger auto-reply pipeline for the new review
+          processReplyInternal(companyId, newReview).catch((e) =>
+            console.warn(`[autoReply] failed for review ${newReview.id}:`, e.message)
+          );
         }
         totalSynced++;
       }

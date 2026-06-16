@@ -345,4 +345,34 @@ export default {
     `),
     text: `Vous avez maintenant accès à ${v.company_name} en tant que ${v.role}.\n\nConnectez-vous : ${v.invite_url}`,
   }),
+
+  // ── IA Auto-Reply ────────────────────────────────────────────
+
+  ai_reply_suggestion: (v) => ({
+    subject: `Suggestion de réponse IA — ${v.reviewer_name} a laissé ${v.review_rating}⭐`,
+    html: wrap(`
+      <h2 style="color:#111827;margin:0 0 8px">Nouvelle suggestion de réponse IA</h2>
+      <p style="color:#374151;margin:0 0 20px">Bonjour <strong>${v.admin_name}</strong>,</p>
+      <p style="color:#374151;margin:0 0 8px">L'IA a généré une réponse pour un nouvel avis reçu par <strong>${v.company_name}</strong>. Elle attend votre validation avant publication.</p>
+      ${info([
+        ["Client", v.reviewer_name],
+        ["Note", `${v.review_rating} / 5 ⭐`],
+      ])}
+      <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin:16px 0">
+        <p style="color:#6b7280;font-size:12px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em">Avis du client</p>
+        <p style="color:#374151;font-style:italic;margin:0">"${v.review_text}"</p>
+      </div>
+      <div style="background:#eff6ff;border-left:4px solid #3b82f6;border-radius:6px;padding:16px;margin:16px 0">
+        <p style="color:#1e40af;font-size:12px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em">Réponse IA (brouillon)</p>
+        <p style="color:#1e3a8a;margin:0;line-height:1.6">${v.reply_draft}</p>
+      </div>
+      <p style="margin:24px 0">
+        <a href="${v.dashboard_url}" style="background:#E10600;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block">
+          Valider &amp; Publier
+        </a>
+      </p>
+      <p style="color:#6b7280;font-size:13px">Rendez-vous sur votre tableau de bord pour approuver, modifier ou rejeter cette réponse.</p>
+    `),
+    text: `Suggestion de réponse IA\n\nBonjour ${v.admin_name},\n\nUn nouvel avis attend votre validation sur ${v.company_name}.\n\nClient : ${v.reviewer_name}\nNote : ${v.review_rating}/5\n\nAvis :\n"${v.review_text}"\n\nBrouillon IA :\n${v.reply_draft}\n\nValider ou modifier : ${v.dashboard_url}`,
+  }),
 };

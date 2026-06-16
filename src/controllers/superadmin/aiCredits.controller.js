@@ -6,12 +6,6 @@
 import prisma from "../../config/database.js";
 import { invalidateLimitsCache } from "../../services/limits.service.js";
 
-const CREDIT_PACKS = {
-  small:  { credits: 100,  priceUsd: 5.00  },
-  medium: { credits: 500,  priceUsd: 20.00 },
-  large:  { credits: 2000, priceUsd: 70.00 },
-};
-
 // ── GET /api/superadmin/ai-credits ────────────────────────────
 // Liste toutes les demandes d'achat de crédits
 export async function listAllCreditPurchases(req, res) {
@@ -22,10 +16,9 @@ export async function listAllCreditPurchases(req, res) {
     if (status && status !== "all") where.status = status;
     if (search) {
       where.OR = [
-        { company: { name: { contains: search } } },
+        { company: { name:  { contains: search } } },
         { company: { email: { contains: search } } },
         { invoice: { invoiceNumber: { contains: search } } },
-        { packId: { contains: search } },
       ];
     }
 
@@ -34,6 +27,7 @@ export async function listAllCreditPurchases(req, res) {
       take: parseInt(limit),
       orderBy: { createdAt: "desc" },
       include: {
+        pack:    { select: { id: true, slug: true, credits: true, priceUsd: true } },
         company: { select: { id: true, name: true, email: true } },
         user:    { select: { id: true, name: true, email: true } },
         invoice: {
@@ -67,6 +61,7 @@ export async function listAllCreditPurchases(req, res) {
         company:      p.company,
         user:         p.user,
         packId:       p.packId,
+        pack:         p.pack,
         credits:      p.credits,
         amount:       p.amountUsd,
         status:       p.status,
@@ -96,8 +91,8 @@ export async function markCreditPurchasePaid(req, res) {
     const { paymentMethod = "Manual Payment", transactionId, notes, paidAmount } = req.body;
 
     const purchase = await prisma.aiCreditPurchase.findUnique({
-      where: { id: parseInt(id) },
-      include: { invoice: true },
+      where:   { id: parseInt(id) },
+      include: { invoice: true, pack: { select: { slug: true } } },
     });
 
     if (!purchase) {
@@ -108,8 +103,7 @@ export async function markCreditPurchasePaid(req, res) {
       return res.status(422).json({ success: false, error: "Cette purchase est déjà payée." });
     }
 
-    const packData  = CREDIT_PACKS[purchase.packId];
-    const amount    = paidAmount ? Number(paidAmount) : purchase.amountUsd;
+    const amount = paidAmount ? Number(paidAmount) : purchase.amountUsd;
     const now       = new Date();
     const methodLabel = paymentMethod || purchase.paymentMethod || "Manual Payment";
 
@@ -155,6 +149,7 @@ export async function markCreditPurchasePaid(req, res) {
           revenueUsd: amount,
           meta: {
             packId:        purchase.packId,
+            packSlug:      purchase.pack?.slug || null,
             source:        "manual_superadmin",
             purchaseId:    purchase.id,
             transactionId: transactionId || null,

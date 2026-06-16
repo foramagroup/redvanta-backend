@@ -84,6 +84,7 @@ import superadminSubscriptionsRoutes from "./routes/superadmin/subscriptions.rou
 import startBillingCron from './cron/billing.cron.js';
 import { startWeeklyAlertsCron } from './cron/weeklyAlerts.cron.js';
 import startSubscriptionReminderCron from './cron/subscriptionReminder.cron.js';
+import startGoogleSyncCron from './cron/googleSync.cron.js';
 import superadminFAQsRoutes from "./routes/superadmin/faqs.routes.js";
 import superadminStaticPageRoutes from "./routes/superadmin/staticPages.routes.js";
 import faqCategoriesRoutes from "./routes/superadmin/faqCategories.routes.js";
@@ -92,6 +93,7 @@ import aiProvidersRoutes from "./routes/superadmin/aiProviders.routes.js";
 import aiProviderCostsRoutes from "./routes/superadmin/aiProviderCosts.routes.js";
 import aiAnalyticsRoutes from "./routes/superadmin/aiAnalytics.routes.js";
 import aiCreditsRoutes from "./routes/superadmin/aiCredits.routes.js";
+import aiCreditPacksRoutes from "./routes/superadmin/aiCreditPacks.routes.js";
 import aiAdminRoutes from "./routes/aiSettings.routes.js";
 import googleAdminRoutes from "./routes/google.routes.js";
 
@@ -376,10 +378,12 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/superadmin/ai/providers",      aiProvidersRoutes);
   app.use("/api/superadmin/ai/provider-costs", aiProviderCostsRoutes);
   app.use("/api/superadmin/ai/credits",        aiCreditsRoutes);
+  app.use("/api/superadmin/ai/credit-packs",  aiCreditPacksRoutes);
   app.use("/api/superadmin/ai",                aiAnalyticsRoutes);
   startBillingCron();
   startWeeklyAlertsCron();
   startSubscriptionReminderCron();
+  startGoogleSyncCron();
 
     // const uploadDir = path.resolve(process.env.UPLOAD_DIR || "uploads");
     // app.use("/uploads", express.static(uploadDir));

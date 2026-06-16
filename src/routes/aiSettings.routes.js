@@ -17,6 +17,7 @@ import {
   saveSettings as saveAutoReplySettings,
   getHistory as getAutoReplyHistory,
   processReply,
+  publishReply,
 } from "../controllers/autoReply.controller.js";
 import {
   getBoosterAnalytics,
@@ -49,6 +50,8 @@ router.get("/auto-reply/settings",        getAutoReplySettings);
 router.put("/auto-reply/settings",        saveAutoReplySettings);
 router.get("/auto-reply/history",         getAutoReplyHistory);
 router.post("/auto-reply/process",        processReply);
+router.post("/auto-reply/:id/publish",    publishReply);
+router.post("/auto-reply/:id/retry",      publishReply);
 
 // Review Booster analytics
 router.get("/review-booster/analytics",   getBoosterAnalytics);

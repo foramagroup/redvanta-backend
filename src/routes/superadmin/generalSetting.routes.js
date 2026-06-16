@@ -9,7 +9,8 @@ import {
   updateRecaptchaSettings,
   updateMapsSettings,
   updatePlatformsSettings,
-  updateSecuritySettings
+  updateSecuritySettings,
+  updateGoogleOAuthSettings,
 } from '../../controllers/superadmin/generalSetting.controller.js';
 import { authenticateSuperAdmin, requireSuperAdmin } from "../../middleware/auth.middleware.js";
 
@@ -53,6 +54,7 @@ router.put('/recaptcha', updateRecaptchaSettings);
 router.put('/maps', updateMapsSettings);
 router.put('/platforms', updatePlatformsSettings);
 router.put('/security', updateSecuritySettings);
+router.put('/google-oauth', updateGoogleOAuthSettings);
 
 // POST - Upload logo
 router.post('/logo', upload.single('logo'), uploadLogo);

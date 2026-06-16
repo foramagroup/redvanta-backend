@@ -345,4 +345,34 @@ export default {
     `),
     text: `Aveți acum acces la ${v.company_name} ca ${v.role}.\n\nAutentificați-vă: ${v.invite_url}`,
   }),
+
+  // ── IA Auto-Reply ────────────────────────────────────────────
+
+  ai_reply_suggestion: (v) => ({
+    subject: `Sugestie răspuns IA — ${v.reviewer_name} a lăsat ${v.review_rating}⭐`,
+    html: wrap(`
+      <h2 style="color:#111827;margin:0 0 8px">Nouă sugestie de răspuns IA</h2>
+      <p style="color:#374151;margin:0 0 20px">Bună ziua, <strong>${v.admin_name}</strong>,</p>
+      <p style="color:#374151;margin:0 0 8px">IA a generat un răspuns pentru o nouă recenzie primită de <strong>${v.company_name}</strong>. Acesta așteaptă aprobarea dvs. înainte de publicare.</p>
+      ${info([
+        ["Client", v.reviewer_name],
+        ["Notă", `${v.review_rating} / 5 ⭐`],
+      ])}
+      <div style="background:#f3f4f6;border-radius:8px;padding:16px;margin:16px 0">
+        <p style="color:#6b7280;font-size:12px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em">Recenzia clientului</p>
+        <p style="color:#374151;font-style:italic;margin:0">"${v.review_text}"</p>
+      </div>
+      <div style="background:#eff6ff;border-left:4px solid #3b82f6;border-radius:6px;padding:16px;margin:16px 0">
+        <p style="color:#1e40af;font-size:12px;font-weight:600;margin:0 0 8px;text-transform:uppercase;letter-spacing:.05em">Răspuns IA (ciornă)</p>
+        <p style="color:#1e3a8a;margin:0;line-height:1.6">${v.reply_draft}</p>
+      </div>
+      <p style="margin:24px 0">
+        <a href="${v.dashboard_url}" style="background:#E10600;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;display:inline-block">
+          Validați &amp; Publicați
+        </a>
+      </p>
+      <p style="color:#6b7280;font-size:13px">Accesați tabloul de bord pentru a aproba, edita sau respinge acest răspuns.</p>
+    `),
+    text: `Sugestie răspuns IA\n\nBună ziua, ${v.admin_name},\n\nO nouă recenzie așteaptă validarea pe ${v.company_name}.\n\nClient: ${v.reviewer_name}\nNotă: ${v.review_rating}/5\n\nRecenzie:\n"${v.review_text}"\n\nCiornă IA:\n${v.reply_draft}\n\nValidați sau editați: ${v.dashboard_url}`,
+  }),
 };

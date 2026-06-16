@@ -2,6 +2,7 @@
 // src/controllers/aiCreditPurchase.controller.js
 // Achat de crédits IA — côté company admin
 // Flux Stripe OU manuel, identique au pattern addon
+// Les packs sont désormais gérés en DB (AiCreditPack)
 // ═══════════════════════════════════════════════════════════
 
 import prisma from "../config/database.js";
@@ -12,17 +13,36 @@ import {
 } from "../services/stripeSubscription.service.js";
 import { invalidateLimitsCache } from "../services/limits.service.js";
 
-const CREDIT_PACKS = {
-  small:  { credits: 100,  priceUsd: 5.00  },
-  medium: { credits: 500,  priceUsd: 20.00 },
-  large:  { credits: 2000, priceUsd: 70.00 },
-};
-
 function userId(req)    { return req.user.userId; }
 function companyId(req) {
   const id = req.user?.companyId;
   if (!id) throw Object.assign(new Error("Forbidden"), { status: 403 });
   return parseInt(id);
+}
+
+// ── Helpers ───────────────────────────────────────────────
+
+async function findPackById(packId) {
+  const pack = await prisma.aiCreditPack.findFirst({
+    where: { id: parseInt(packId), isActive: true },
+    include: { translations: { include: { language: true } } },
+  });
+  return pack || null;
+}
+
+async function getCompanyLanguageCode(companyId) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { language: { select: { code: true } } },
+  });
+  return company?.language?.code || "en";
+}
+
+function resolvePackName(pack, langCode) {
+  const t = pack.translations.find((t) => t.language.code === langCode)
+         || pack.translations.find((t) => t.language.code === "en")
+         || pack.translations[0];
+  return t?.name || pack.slug;
 }
 
 async function generateCreditInvoiceNumber() {
@@ -33,14 +53,15 @@ async function generateCreditInvoiceNumber() {
   return `AIC-${year}-${String(count + 1).padStart(6, "0")}`;
 }
 
-async function createCreditInvoice({ purchase, user, company, packData, paymentMethod }) {
+async function createCreditInvoice({ purchase, user, company, pack, packName, paymentMethod }) {
   const invoiceNumber = await generateCreditInvoiceNumber();
 
   const companySettings = await prisma.companySettings.findUnique({
     where: { companyId: company.id },
     select: { currency: true },
   });
-  const currency = companySettings?.currency || "EUR";
+  const currency   = companySettings?.currency || "EUR";
+  const priceUsd   = Number(pack.priceUsd);
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -48,11 +69,11 @@ async function createCreditInvoice({ purchase, user, company, packData, paymentM
       companyId:    company.id,
       userId:       user.id,
       status:       purchase.status === "paid" ? "paid" : "unpaid",
-      subtotal:     packData.priceUsd,
+      subtotal:     priceUsd,
       taxAmount:    0,
       shippingCost: 0,
-      total:        packData.priceUsd,
-      paidAmount:   purchase.status === "paid" ? packData.priceUsd : 0,
+      total:        priceUsd,
+      paidAmount:   purchase.status === "paid" ? priceUsd : 0,
       currency,
       exchangeRate: 1,
       paymentMethod,
@@ -72,16 +93,16 @@ async function createCreditInvoice({ purchase, user, company, packData, paymentM
   await prisma.invoiceItem.create({
     data: {
       invoiceId:   invoice.id,
-      service:     `AI Credit Pack — ${packData.credits} credits`,
-      description: `Pack: ${purchase.packId}`,
+      service:     packName ? `${packName} — ${pack.credits} credits` : `AI Credit Pack — ${pack.credits} credits`,
+      description: `Pack slug: ${pack.slug}`,
       quantity:    1,
       unit:        "pack",
-      unitPrice:   packData.priceUsd,
+      unitPrice:   priceUsd,
       discount:    0,
       taxRate:     0,
       taxAmount:   0,
-      subtotal:    packData.priceUsd,
-      total:       packData.priceUsd,
+      subtotal:    priceUsd,
+      total:       priceUsd,
     },
   });
 
@@ -91,14 +112,25 @@ async function createCreditInvoice({ purchase, user, company, packData, paymentM
 // ── GET /api/admin/ai/credits/packs ──────────────────────────
 export async function getCreditPacks(req, res) {
   try {
-    const packs = Object.entries(CREDIT_PACKS).map(([key, p]) => ({
-      id:        key,
+    const cid      = companyId(req);
+    const langCode = await getCompanyLanguageCode(cid);
+
+    const packs = await prisma.aiCreditPack.findMany({
+      where:   { isActive: true },
+      orderBy: { sortOrder: "asc" },
+      include: { translations: { include: { language: { select: { code: true } } } } },
+    });
+
+    const data = packs.map((p) => ({
+      id:        p.id,
+      slug:      p.slug,
       credits:   p.credits,
-      priceUsd:  p.priceUsd,
-      label:     `${p.credits} crédits`,
-      perCredit: (p.priceUsd / p.credits).toFixed(4),
+      priceUsd:  Number(p.priceUsd),
+      name:      resolvePackName(p, langCode),
+      perCredit: (Number(p.priceUsd) / p.credits).toFixed(4),
     }));
-    res.json({ success: true, data: packs });
+
+    res.json({ success: true, data });
   } catch (err) {
     console.error("[getCreditPacks]", err);
     res.status(500).json({ success: false, error: "Erreur serveur" });
@@ -109,7 +141,7 @@ export async function getCreditPacks(req, res) {
 export async function getCreditPaymentMethods(req, res) {
   try {
     const manualMethods = await prisma.manualPaymentMethod.findMany({
-      where: { status: "Active" },
+      where:   { status: "Active" },
       orderBy: { name: "asc" },
     });
 
@@ -129,15 +161,17 @@ export async function getCreditPaymentMethods(req, res) {
 }
 
 // ── POST /api/admin/ai/credits/request ────────────────────────
-// Body: { packId, paymentMethod: "stripe" | "manual", paymentMethodId? }
+// Body: { packId (INT), paymentMethod: "stripe" | "manual", paymentMethodId? }
 export async function requestCreditPurchase(req, res) {
   try {
     const uid = userId(req);
     const cid = companyId(req);
     const { packId, paymentMethod, paymentMethodId } = req.body;
 
-    if (!packId || !CREDIT_PACKS[packId]) {
-      return res.status(400).json({ success: false, error: "Pack invalide." });
+    // Cherche le pack en DB par id (INT)
+    const pack = await findPackById(packId);
+    if (!pack) {
+      return res.status(400).json({ success: false, error: "Pack invalide ou inactif." });
     }
 
     const isStripe = paymentMethod === "stripe";
@@ -159,7 +193,10 @@ export async function requestCreditPurchase(req, res) {
       }
     }
 
-    const packData = CREDIT_PACKS[packId];
+    const priceUsd   = Number(pack.priceUsd);
+    const langCode   = await getCompanyLanguageCode(cid);
+    const packName   = resolvePackName(pack, langCode);
+
     const [user, company] = await Promise.all([
       prisma.user.findUnique({ where: { id: uid } }),
       prisma.company.findUnique({ where: { id: cid } }),
@@ -167,12 +204,12 @@ export async function requestCreditPurchase(req, res) {
 
     // ─── STRIPE ──────────────────────────────────────────────
     if (isStripe) {
-      const stripe   = await getStripe();
-      const customer = await getOrCreateStripeCustomer(user, company);
+      const stripe    = await getStripe();
+      const customer  = await getOrCreateStripeCustomer(user, company);
       const savedCard = await getDefaultPaymentMethod(customer.id);
 
       const piData = {
-        amount:   Math.round(packData.priceUsd * 100),
+        amount:   Math.round(priceUsd * 100),
         currency: "eur",
         customer: customer.id,
         automatic_payment_methods: { enabled: true },
@@ -180,8 +217,8 @@ export async function requestCreditPurchase(req, res) {
           type:      "ai_credit_purchase",
           companyId: String(cid),
           userId:    String(uid),
-          packId,
-          credits:   String(packData.credits),
+          packId:    String(pack.id),   // INT stocké comme string dans Stripe
+          credits:   String(pack.credits),
         },
       };
 
@@ -193,14 +230,13 @@ export async function requestCreditPurchase(req, res) {
 
       const pi = await stripe.paymentIntents.create(piData);
 
-      // Créer la purchase en pending (invoice créée à la confirmation)
       await prisma.aiCreditPurchase.create({
         data: {
           companyId: cid,
           userId:    uid,
-          packId,
-          credits:   packData.credits,
-          amountUsd: packData.priceUsd,
+          packId:    pack.id,           // INT
+          credits:   pack.credits,
+          amountUsd: priceUsd,
           status:    "pending",
           paymentMethod: "Stripe",
           stripePaymentIntentId: pi.id,
@@ -211,7 +247,7 @@ export async function requestCreditPurchase(req, res) {
         success:      true,
         clientSecret: pi.client_secret,
         message:      "Confirmez votre paiement pour activer les crédits.",
-        data: { packId, credits: packData.credits, amountUsd: packData.priceUsd },
+        data: { packId: pack.id, credits: pack.credits, amountUsd: priceUsd, name: packName },
       });
     }
 
@@ -219,12 +255,12 @@ export async function requestCreditPurchase(req, res) {
     if (isManual) {
       const purchase = await prisma.aiCreditPurchase.create({
         data: {
-          companyId:    cid,
-          userId:       uid,
-          packId,
-          credits:      packData.credits,
-          amountUsd:    packData.priceUsd,
-          status:       "pending",
+          companyId:     cid,
+          userId:        uid,
+          packId:        pack.id,       // INT
+          credits:       pack.credits,
+          amountUsd:     priceUsd,
+          status:        "pending",
           paymentMethod: manualMethod.name,
         },
       });
@@ -233,11 +269,11 @@ export async function requestCreditPurchase(req, res) {
         purchase,
         user,
         company,
-        packData,
+        pack,
+        packName,
         paymentMethod: manualMethod.name,
       });
 
-      // Lier l'invoice à la purchase
       await prisma.aiCreditPurchase.update({
         where: { id: purchase.id },
         data:  { invoiceId: invoice.id },
@@ -249,8 +285,8 @@ export async function requestCreditPurchase(req, res) {
         data: {
           purchaseId:         purchase.id,
           invoiceNumber:      invoice.invoiceNumber,
-          credits:            packData.credits,
-          amountUsd:          packData.priceUsd,
+          credits:            pack.credits,
+          amountUsd:          priceUsd,
           status:             "pending",
           manualInstructions: manualMethod.instructions,
         },
@@ -280,7 +316,8 @@ export async function confirmCreditStripe(req, res) {
     }
 
     const purchase = await prisma.aiCreditPurchase.findFirst({
-      where: { stripePaymentIntentId: paymentIntentId },
+      where:   { stripePaymentIntentId: paymentIntentId },
+      include: { pack: true },
     });
 
     if (!purchase) {
@@ -291,33 +328,34 @@ export async function confirmCreditStripe(req, res) {
       return res.json({ success: true, message: "Crédits déjà activés", data: { credits: purchase.credits } });
     }
 
-    const packData = CREDIT_PACKS[purchase.packId];
+    const pack = purchase.pack;
     const [user, company] = await Promise.all([
       prisma.user.findUnique({ where: { id: purchase.userId } }),
       prisma.company.findUnique({ where: { id: purchase.companyId } }),
     ]);
 
-    // Créer l'invoice et activer les crédits dans une transaction
+    const langCode = await getCompanyLanguageCode(purchase.companyId);
+    const packName = pack
+      ? resolvePackName({ ...pack, translations: await prisma.aiCreditPackTranslation.findMany({ where: { packId: pack.id }, include: { language: { select: { code: true } } } }) }, langCode)
+      : null;
+
     const invoice = await createCreditInvoice({
       purchase: { ...purchase, status: "paid", paidAt: new Date() },
       user,
       company,
-      packData,
-      paymentMethod: `Stripe`,
+      pack,
+      packName,
+      paymentMethod: "Stripe",
     });
 
     await prisma.$transaction([
       prisma.aiCreditPurchase.update({
         where: { id: purchase.id },
-        data: {
-          status:    "paid",
-          paidAt:    new Date(),
-          invoiceId: invoice.id,
-        },
+        data:  { status: "paid", paidAt: new Date(), invoiceId: invoice.id },
       }),
       prisma.invoice.update({
         where: { id: invoice.id },
-        data: { status: "paid", paidAt: new Date(), paidAmount: packData.priceUsd },
+        data:  { status: "paid", paidAt: new Date(), paidAmount: Number(pack.priceUsd) },
       }),
       prisma.aiCreditBalance.upsert({
         where:  { companyId: purchase.companyId },
@@ -329,8 +367,8 @@ export async function confirmCreditStripe(req, res) {
           companyId:  purchase.companyId,
           kind:       "purchase",
           amount:     purchase.credits,
-          revenueUsd: packData.priceUsd,
-          meta:       { packId: purchase.packId, source: "stripe", purchaseId: purchase.id },
+          revenueUsd: Number(pack?.priceUsd ?? 0),
+          meta:       { packId: purchase.packId, packSlug: pack?.slug, source: "stripe", purchaseId: purchase.id },
         },
       }),
     ]);
@@ -340,7 +378,7 @@ export async function confirmCreditStripe(req, res) {
     return res.json({
       success: true,
       message: `${purchase.credits} crédits activés.`,
-      data: { credits: purchase.credits },
+      data:    { credits: purchase.credits },
     });
   } catch (err) {
     console.error("[confirmCreditStripe]", err);

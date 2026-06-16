@@ -1,4 +1,6 @@
 import prisma from "../config/database.js";
+import { getGoogleCredentials } from "./googleOAuth.controller.js";
+import { decrypt, encrypt, isEncrypted } from "../utils/tokenEncryption.js";
 
 // Helper: get a valid access token (refresh if needed)
 export async function getValidToken(companyId) {
@@ -6,29 +8,38 @@ export async function getValidToken(companyId) {
   if (!conn) throw new Error("No Google connection");
 
   const needsRefresh = !conn.expiresAt || conn.expiresAt < new Date(Date.now() + 60_000);
-  if (!needsRefresh) return conn.accessToken;
+
+  if (!needsRefresh) {
+    // Déchiffre l'access token avant de le retourner
+    return decrypt(conn.accessToken);
+  }
+
   if (!conn.refreshToken) {
     await prisma.googleConnection.update({ where: { companyId }, data: { needsReauth: true } });
     throw new Error("Token expired and no refresh token — reauth required");
   }
 
+  // Lit les credentials OAuth depuis la DB (pas depuis .env)
+  const { clientId, clientSecret } = await getGoogleCredentials();
+
   const resp = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      refresh_token: conn.refreshToken,
-      grant_type: "refresh_token",
+      client_id:     clientId,
+      client_secret: clientSecret,
+      refresh_token: decrypt(conn.refreshToken), // déchiffre avant envoi
+      grant_type:    "refresh_token",
     }),
   });
   const tokens = await resp.json();
   if (!tokens.access_token) throw new Error("Refresh failed: " + (tokens.error ?? "unknown"));
 
   const expiresAt = new Date(Date.now() + (tokens.expires_in ?? 3600) * 1000);
+  // Stocke le nouveau access_token chiffré
   await prisma.googleConnection.update({
     where: { companyId },
-    data: { accessToken: tokens.access_token, expiresAt, needsReauth: false },
+    data: { accessToken: encrypt(tokens.access_token), expiresAt, needsReauth: false },
   });
   return tokens.access_token;
 }

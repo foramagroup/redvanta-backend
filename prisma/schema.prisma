@@ -135,6 +135,11 @@ model PlatformSetting {
   mapsEnabled     Boolean  @default(false)
   mapsApiKey      String?
   mapsCloudSecret String?
+
+  // Google OAuth (Business Profile)
+  googleClientId     String? @db.VarChar(255)
+  googleClientSecret String? @db.VarChar(255)
+  googleRedirectUri  String? @db.VarChar(500)
   
   // Review Platforms
   googleLink      String?
@@ -1725,6 +1730,7 @@ model Language {
   companies Company[]
   planTranslations PlanSettingTranslation[]
   fpsTranslations FrontPageSeoTranslation[]
+  aiCreditPackTranslations AiCreditPackTranslation[]
   @@map("languages")
 }
 
@@ -3264,7 +3270,7 @@ model AiCreditPurchase {
   id                    Int       @id @default(autoincrement())
   companyId             Int
   userId                Int       @db.UnsignedInt
-  packId                String    @db.VarChar(50)   // "small" | "medium" | "large"
+  packId                Int                          // FK → AiCreditPack.id
   credits               Int
   amountUsd             Float
   status                String    @default("pending") @db.VarChar(20) // pending | paid | failed
@@ -3276,13 +3282,47 @@ model AiCreditPurchase {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user                  User     @relation(fields: [userId],    references: [id], onDelete: Cascade)
-  invoice               Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  company               Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user                  User           @relation(fields: [userId],    references: [id], onDelete: Cascade)
+  invoice               Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  pack                  AiCreditPack   @relation(fields: [packId],    references: [id])
 
   @@index([companyId])
+  @@index([packId])
   @@index([status])
   @@map("ai_credit_purchases")
+}
+
+model AiCreditPack {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique @db.VarChar(50)
+  credits     Int
+  priceUsd    Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  translations AiCreditPackTranslation[]
+  purchases    AiCreditPurchase[]
+
+  @@map("ai_credit_packs")
+}
+
+model AiCreditPackTranslation {
+  id          Int      @id @default(autoincrement())
+  packId      Int
+  languageId  Int
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  pack        AiCreditPack @relation(fields: [packId],     references: [id], onDelete: Cascade)
+  language    Language     @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@unique([packId, languageId])
+  @@map("ai_credit_pack_translations")
 }
 
 // ── Credit balance (1:1 per company) ──────────────────────────
@@ -3411,16 +3451,17 @@ model GoogleBusinessLocation {
 // ─── Auto Reply ───────────────────────────────────────────────────────────────
 
 model AutoReplySetting {
-  id               Int            @id @default(autoincrement())
-  companyId        Int            @unique
-  company          Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  mode             AutoReplyMode  @default(off)
-  minRating        Int            @default(3)
-  tone             String         @default("professional")
-  language         String         @default("en")
-  safetyThreshold  Int            @default(80)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id                Int            @id @default(autoincrement())
+  companyId         Int            @unique
+  company           Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  mode              AutoReplyMode  @default(off)
+  minRating         Int            @default(3)
+  tone              String         @default("professional")
+  language          String         @default("en")
+  safetyThreshold   Int            @default(80)
+  publishThreshold  Int            @default(5)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
   @@map("auto_reply_settings")
 }
 
@@ -3459,6 +3500,7 @@ enum AutoReplyMode {
   off
   suggest
   publish
+  hybrid
 }
 
 enum AutoReplyLogStatus {

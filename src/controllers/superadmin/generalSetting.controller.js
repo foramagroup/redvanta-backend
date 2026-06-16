@@ -376,6 +376,50 @@ export const updateSecuritySettings = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/superadmin/platform-settings/google-oauth
+ * Met à jour les credentials Google OAuth (Business Profile)
+ */
+export const updateGoogleOAuthSettings = async (req, res) => {
+  try {
+    const { googleClientId, googleClientSecret, googleRedirectUri } = req.body;
+
+    let settings = await prisma.platformSetting.findFirst();
+
+    if (!settings) {
+      settings = await prisma.platformSetting.create({
+        data: { googleClientId, googleClientSecret, googleRedirectUri },
+      });
+    } else {
+      const updateData = {};
+      if (googleClientId     !== undefined) updateData.googleClientId     = googleClientId;
+      if (googleClientSecret !== undefined) updateData.googleClientSecret = googleClientSecret;
+      if (googleRedirectUri  !== undefined) updateData.googleRedirectUri  = googleRedirectUri;
+
+      settings = await prisma.platformSetting.update({
+        where: { id: settings.id },
+        data: updateData,
+      });
+    }
+
+    SettingService.flushCache();
+
+    res.json({
+      success: true,
+      message: "Google OAuth settings updated successfully",
+      data: {
+        googleClientId:    settings.googleClientId,
+        googleRedirectUri: settings.googleRedirectUri,
+        // Ne jamais retourner le secret en clair
+        googleClientSecret: settings.googleClientSecret ? "••••••••" : null,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error updating Google OAuth settings:", error);
+    res.status(500).json({ success: false, error: "Error updating Google OAuth settings", details: error.message });
+  }
+};
+
 // ── SUBSCRIPTION ──────────────────────────────────────────────────────────────
 
 /**
