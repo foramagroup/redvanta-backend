@@ -144,6 +144,27 @@ export function formatInvoice(inv) {
   const lastPayment = [...payments]
     .sort((a, b) => new Date(b.paidAt ?? 0).getTime() - new Date(a.paidAt ?? 0).getTime())[0] ?? null;
 
+  // Pour les factures d'abonnement (plan uniquement) et d'addon (indépendant)
+  const bh = inv.billingHistory?.[0] ?? null;
+  // Auto-détection : ancienne facture addon sans reference="addon" mais BH baseAmount=0
+  const isAddonBh = bh && Number(bh.baseAmount ?? 0) === 0 && Number(bh.addonsAmount ?? 0) > 0;
+  const effectiveReference = inv.reference ?? (isAddonBh ? "addon" : null);
+
+  let effectiveDisplayTotal = null;
+  if (inv.isRecurring && bh != null) {
+    if (effectiveReference === "addon") {
+      // Facture addon : montant = addonsAmount
+      const addonAmt = Number(bh.addonsAmount ?? 0);
+      effectiveDisplayTotal = addonAmt > 0 ? addonAmt : Number(bh.totalAmount ?? 0) || null;
+    } else {
+      // Facture plan : montant = baseAmount uniquement (pas d'addons)
+      const baseAmt = Number(bh.baseAmount ?? 0);
+      effectiveDisplayTotal = baseAmt > 0 ? baseAmt : (inv.displayTotal ? Number(inv.displayTotal) : null);
+    }
+  } else {
+    effectiveDisplayTotal = inv.displayTotal ? Number(inv.displayTotal) : null;
+  }
+
   return {
     id:            inv.id,
     invoiceNumber: inv.invoiceNumber,
@@ -155,9 +176,9 @@ export function formatInvoice(inv) {
     taxAmount:     Number(inv.taxAmount),
     shippingCost:  Number(inv.shippingCost),
     total:         Number(inv.total),
-    currency:      inv.currency,
+    currency:      inv.company?.settings?.currency || inv.currency || "EUR",
     exchangeRate:  Number(inv.exchangeRate),
-    displayTotal:  inv.displayTotal ? Number(inv.displayTotal) : null,
+    displayTotal:  effectiveDisplayTotal,
     paymentMethod: inv.paymentMethod,
     paidAmount,
     refundedAmount,
@@ -178,7 +199,7 @@ export function formatInvoice(inv) {
     dueDate:           inv.dueDate,
     notes:             inv.notes,
     terms:             inv.terms,
-    reference:         inv.reference,
+    reference:         effectiveReference,
     emailStatus:       inv.emailStatus ?? "Not Sent",
     emailSentAt:       inv.emailSentAt ?? null,
     emailError:        inv.emailError  ?? null,
@@ -197,6 +218,16 @@ export function formatInvoice(inv) {
       subtotal:    Number(i.subtotal),
       total:       Number(i.total),
     })),
+    subscriptionAddons: inv.isRecurring && inv.company?.subscription
+      ? (inv.company.subscription.addons ?? [])
+          .filter((a) => a.status === "active")
+          .map((a) => ({
+            id:       a.id,
+            name:     a.addon?.name ?? "Add-on",
+            quantity: a.quantity ?? 1,
+            amount:   Number(a.amount ?? 0),
+          }))
+      : [],
     createdAt: inv.createdAt,
   };
 }

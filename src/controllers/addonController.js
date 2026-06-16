@@ -179,8 +179,9 @@ export const purchaseAddons = async (req, res) => {
       include: { addon: true },
     });
 
+    
     if (settings.length !== settingIds.length) {
-      return res.status(422).json({ success: false, error: "One or more addons not found or inactive" });
+      return res.status(422).json({ success: false, error: "One or more addons not found or inactive", data: settings });
     }
 
     // Auto-lier les AddonSettings qui n'ont pas encore d'addonId (migration transparente)
@@ -208,7 +209,11 @@ export const purchaseAddons = async (req, res) => {
     }
 
     const user        = await prisma.user.findUnique({ where: { id: userId } });
-    const company     = await prisma.company.findUnique({ where: { id: companyId } });
+    const [company, companySettings] = await Promise.all([
+      prisma.company.findUnique({ where: { id: companyId } }),
+      prisma.companySettings.findUnique({ where: { companyId }, select: { currency: true } }),
+    ]);
+    const companyCurrency = companySettings?.currency || "EUR";
     const orderNumber = await generateSubscriptionOrderNumber();
     const periods     = calculatePeriodDates(subscription.interval, new Date());
 
@@ -251,7 +256,7 @@ export const purchaseAddons = async (req, res) => {
             userId, companyId, orderNumber,
             status: "pending",
             subtotal, shippingCost: 0, total: totalAmount,
-            currency: "EUR", exchangeRate: 1,
+            currency: companyCurrency, exchangeRate: 1,
             methodPayment: "Stripe",
             stripePaymentIntentId: paymentIntent.id,
             stripeClientSecret:    paymentIntent.client_secret,
@@ -304,7 +309,7 @@ export const purchaseAddons = async (req, res) => {
             userId, companyId, orderNumber,
             status: "unpaid",                    // ← "unpaid" comme dans checkoutSubscription
             subtotal, shippingCost: 0, total: totalAmount,
-            currency: "EUR", exchangeRate: 1,
+            currency: companyCurrency, exchangeRate: 1,
             methodPayment: manualMethod.name,
             manualPaymentMethodId: manualMethod.id,
           },
@@ -340,6 +345,8 @@ export const purchaseAddons = async (req, res) => {
         company,
         paymentMethod: manualMethod.name,
         orderId: order.id,
+        invoiceType: "addon",
+        addonLines: lines,
       });
 
       // Email de confirmation paiement en attente

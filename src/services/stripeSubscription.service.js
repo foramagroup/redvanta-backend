@@ -145,83 +145,119 @@ export async function createSubscriptionInvoice({
   company,
   paymentMethod = null,
   orderId = null,
+  invoiceType = "subscription",   // "subscription" | "addon"
+  addonLines = [],                // lignes d'addons achetés (pour invoiceType === "addon")
 }) {
   const invoiceNumber = await generateSubscriptionInvoiceNumber();
-  
+  const isAddon = invoiceType === "addon";
+
+  // Devise de la compagnie depuis les paramètres système
+  const companySettings = await prisma.companySettings.findUnique({
+    where: { companyId: company.id },
+    select: { currency: true },
+  });
+  const invoiceCurrency = companySettings?.currency || "EUR";
+
+  // Pour les factures d'addons, le total est celui des addons uniquement
+  const invoiceSubtotal = isAddon ? Number(billingHistory.addonsAmount) : Number(subscription.baseAmount);
+  const invoiceTotal    = isAddon ? Number(billingHistory.addonsAmount) : Number(subscription.totalAmount);
+
   const invoice = await prisma.invoice.create({
     data: {
       invoiceNumber,
       orderId,
       companyId: company.id,
       userId: user.id,
-      
+
       status: billingHistory.status === "paid" ? "paid" : "unpaid",
-      
-      subtotal: Number(subscription.baseAmount),
+
+      subtotal: invoiceSubtotal,
       taxAmount: 0,
       shippingCost: 0,
-      total: Number(subscription.totalAmount),
-      paidAmount: billingHistory.status === "paid" ? Number(subscription.totalAmount) : 0,
-      
-      currency: "EUR",
+      total: invoiceTotal,
+      paidAmount: billingHistory.status === "paid" ? invoiceTotal : 0,
+
+      currency: invoiceCurrency,
       exchangeRate: 1,
-      
+
       paymentMethod,
       stripePaymentIntentId: billingHistory.stripePaymentIntentId || null,
       paidAt: billingHistory.paidAt || null,
-      
+
       billingName: company.name,
       billingEmail: user.email,
       billingPhone: company.phone,
       billingAddress: company.address,
       billingVat: company.vatNumber,
-      
+
       isRecurring: true,
       recurringInterval: subscription.interval,
       nextBillingDate: subscription.nextBillingDate,
-      
+      reference: invoiceType,    // tag pour distinguer plan vs addon
+
       invoiceDate: new Date(),
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },
   });
 
-  const _planName = subscription.plan?.translations?.[0]?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`;
-
-  // Ligne principale
-  await prisma.invoiceItem.create({
-    data: {
-      invoiceId: invoice.id,
-      service: `${_planName} - ${subscription.interval === "monthly" ? "Monthly" : "Yearly"}`,
-      description: `Period: ${billingHistory.periodStart.toLocaleDateString("en-US")} - ${billingHistory.periodEnd.toLocaleDateString("en-US")}`,
-      quantity: 1,
-      unit: subscription.interval === "monthly" ? "month" : "year",
-      unitPrice: Number(subscription.baseAmount),
-      discount: 0,
-      taxRate: 0,
-      taxAmount: 0,
-      subtotal: Number(subscription.baseAmount),
-      total: Number(subscription.baseAmount),
-    },
-  });
-
-  // Addons
-  if (subscription.addons?.length > 0) {
-    for (const addon of subscription.addons) {
+  if (isAddon) {
+    // Facture d'achat d'addons — uniquement les lignes d'addons, pas le plan
+    for (const line of addonLines) {
       await prisma.invoiceItem.create({
         data: {
-          invoiceId: invoice.id,
-          service: addon.addon.name,
-          description: addon.addon.description || "",
-          quantity: 1,
-          unit: "month",
-          unitPrice: Number(addon.amount),
-          discount: 0,
-          taxRate: 0,
-          taxAmount: 0,
-          subtotal: Number(addon.amount),
-          total: Number(addon.amount),
+          invoiceId:   invoice.id,
+          service:     line.addon?.name ?? "Add-on",
+          description: line.addon?.description || "",
+          quantity:    line.qty ?? 1,
+          unit:        "month",
+          unitPrice:   Number(line.unitPrice ?? 0),
+          discount:    0,
+          taxRate:     0,
+          taxAmount:   0,
+          subtotal:    Number(line.total ?? 0),
+          total:       Number(line.total ?? 0),
         },
       });
+    }
+  } else {
+    const _planName = subscription.plan?.translations?.[0]?.name ?? subscription.plan?.slug ?? `Plan #${subscription.planId}`;
+
+    // Ligne plan principal
+    await prisma.invoiceItem.create({
+      data: {
+        invoiceId:   invoice.id,
+        service:     `${_planName} - ${subscription.interval === "monthly" ? "Monthly" : "Yearly"}`,
+        description: `Period: ${billingHistory.periodStart.toLocaleDateString("en-US")} - ${billingHistory.periodEnd.toLocaleDateString("en-US")}`,
+        quantity:    1,
+        unit:        subscription.interval === "monthly" ? "month" : "year",
+        unitPrice:   Number(subscription.baseAmount),
+        discount:    0,
+        taxRate:     0,
+        taxAmount:   0,
+        subtotal:    Number(subscription.baseAmount),
+        total:       Number(subscription.baseAmount),
+      },
+    });
+
+    // Addons actifs sur l'abonnement
+    if (subscription.addons?.length > 0) {
+      for (const addon of subscription.addons) {
+        await prisma.invoiceItem.create({
+          data: {
+            invoiceId:   invoice.id,
+            service:     addon.addon.name,
+            description: addon.addon.description || "",
+            quantity:    1,
+            unit:        "month",
+            unitPrice:   Number(addon.amount),
+            discount:    0,
+            taxRate:     0,
+            taxAmount:   0,
+            subtotal:    Number(addon.amount),
+            total:       Number(addon.amount),
+          },
+        });
+      }
     }
   }
 

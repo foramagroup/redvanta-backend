@@ -66,6 +66,7 @@ model User {
   auditLogs AuditLog[] @relation("AdminLogs")
   changedStatuses OrderStatusHistory[] @relation("StatusChangedBy")
   filteringAssignments FeedbackFilteringConfig[] @relation("FilterAssignedUser")
+  aiCreditPurchases    AiCreditPurchase[]
   @@index([email])
   @@map("users")
 }
@@ -2093,6 +2094,7 @@ model Invoice {
   refunds         Refund[]
   payments    Payment[]
   billingHistory BillingHistory[]
+  aiCreditPurchase AiCreditPurchase?
 
   @@index([companyId])
   @@index([status])
@@ -2239,6 +2241,7 @@ model Company {
   aiUsageMonths         AiUsageMonth[]
   aiCreditBalance       AiCreditBalance?
   aiCreditTransactions  AiCreditTransaction[]
+  aiCreditPurchases     AiCreditPurchase[]
   aiRequestLogs         AiRequestLog[]
   googleConnection      GoogleConnection?
   googleLocations       GoogleBusinessLocation[]
@@ -3253,6 +3256,33 @@ model AiUsageMonth {
   @@unique([companyId, year, month])
   @@index([companyId])
   @@map("ai_usage_months")
+}
+
+// ── Credit purchase requests ────────────────────────────────────
+
+model AiCreditPurchase {
+  id                    Int       @id @default(autoincrement())
+  companyId             Int
+  userId                Int       @db.UnsignedInt
+  packId                String    @db.VarChar(50)   // "small" | "medium" | "large"
+  credits               Int
+  amountUsd             Float
+  status                String    @default("pending") @db.VarChar(20) // pending | paid | failed
+  paymentMethod         String?   @db.VarChar(100)
+  stripePaymentIntentId String?   @db.VarChar(255)
+  invoiceId             Int?      @unique
+  paidAt                DateTime?
+  notes                 String?   @db.Text
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user                  User     @relation(fields: [userId],    references: [id], onDelete: Cascade)
+  invoice               Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([status])
+  @@map("ai_credit_purchases")
 }
 
 // ── Credit balance (1:1 per company) ──────────────────────────

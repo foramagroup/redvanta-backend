@@ -91,6 +91,7 @@ import blogRoutes from "./routes/superadmin/blog.routes.js";
 import aiProvidersRoutes from "./routes/superadmin/aiProviders.routes.js";
 import aiProviderCostsRoutes from "./routes/superadmin/aiProviderCosts.routes.js";
 import aiAnalyticsRoutes from "./routes/superadmin/aiAnalytics.routes.js";
+import aiCreditsRoutes from "./routes/superadmin/aiCredits.routes.js";
 import aiAdminRoutes from "./routes/aiSettings.routes.js";
 import googleAdminRoutes from "./routes/google.routes.js";
 
@@ -374,6 +375,7 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/superadmin/blog",           blogRoutes);
   app.use("/api/superadmin/ai/providers",      aiProvidersRoutes);
   app.use("/api/superadmin/ai/provider-costs", aiProviderCostsRoutes);
+  app.use("/api/superadmin/ai/credits",        aiCreditsRoutes);
   app.use("/api/superadmin/ai",                aiAnalyticsRoutes);
   startBillingCron();
   startWeeklyAlertsCron();

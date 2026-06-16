@@ -184,7 +184,30 @@ export const getInvoices = async (req, res, next) => {
     const currency       = settings?.currency       ?? "USD";
     const currencySymbol = settings?.currencySymbol ?? "$";
 
-    const invoices = await prisma.billingHistory.findMany({
+    const fmt = (date) => date?.toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+    }) ?? null;
+
+    const platformMeta = {
+      platformName:    platform?.companyName    ?? 'RedVanta',
+      platformEmail:   platform?.companyEmail   ?? '',
+      platformPhone:   platform?.companyPhone   ?? '',
+      platformAddress: platform?.companyAddress ?? '',
+      companyName:     company?.name            ?? '',
+      companyEmail:    company?.email           ?? '',
+    };
+
+    const mapItems = (items = []) => items.map(i => ({
+      service:     i.service,
+      description: i.description || "",
+      quantity:    Number(i.quantity ?? 1),
+      unit:        i.unit || "month",
+      unitPrice:   Number(i.unitPrice ?? 0),
+      total:       Number(i.total ?? 0),
+    }));
+
+    // ── 1. BillingHistory (subscription + addon) ──────────────
+    const billingRows = await prisma.billingHistory.findMany({
       where:   { subscriptionId: subscription.id },
       orderBy: { createdAt: 'desc' },
       take:    50,
@@ -193,55 +216,124 @@ export const getInvoices = async (req, res, next) => {
           include: {
             plan: {
               include: {
-                // Prend la première traduction disponible pour le nom du plan
                 translations: { take: 1, orderBy: { languageId: 'asc' } },
               },
             },
           },
         },
+        invoice: { include: { items: true } },
       },
     });
 
-    const fmt = (date) => date?.toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-    }) ?? null;
-
-    res.json({
-      success: true,
-      data: invoices.map(inv => {
-        const plan     = inv.subscription.plan;
-        const planName = plan?.translations?.[0]?.name ?? plan?.slug ?? 'Subscription';
-        return {
-          id:            inv.id,
-          invoiceNumber: `INV-${inv.id.toString().padStart(6, '0')}`,
-          date:          fmt(inv.createdAt),
-          periodStart:   fmt(inv.periodStart),
-          periodEnd:     fmt(inv.periodEnd),
-          planName,
-          description:   `${planName} — subscription`,
-          baseAmount:    inv.baseAmount,
-          addonsAmount:  inv.addonsAmount,
-          taxAmount:     inv.taxAmount,
-          totalAmount:   inv.totalAmount,
-          currency,
-          currencySymbol,
-          status:        inv.status === 'paid' ? 'Paid' : inv.status,
-          paidAt:        fmt(inv.paidAt),
-          paymentMethod: inv.paymentMethod ?? null,
-          // Émetteur de la facture (côté plateforme)
-          platformName:    platform?.companyName  ?? 'RedVanta',
-          platformEmail:   platform?.companyEmail ?? '',
-          platformPhone:   platform?.companyPhone ?? '',
-          platformAddress: platform?.companyAddress ?? '',
-          // Destinataire (company de l'admin)
-          companyName:   company?.name  ?? '',
-          companyEmail:  company?.email ?? '',
-          stripeUrl:     inv.stripeInvoiceId
-            ? `https://invoice.stripe.com/i/${inv.stripeInvoiceId}`
-            : null,
-        };
-      }),
+    const billingMapped = billingRows.map(inv => {
+      const plan     = inv.subscription.plan;
+      const planName = plan?.translations?.[0]?.name ?? plan?.slug ?? 'Subscription';
+      const isAddon  = inv.baseAmount === 0 && inv.addonsAmount > 0;
+      return {
+        id:            inv.id,
+        type:          isAddon ? 'addon' : 'subscription',
+        invoiceNumber: inv.invoice?.invoiceNumber || `INV-${inv.id.toString().padStart(6, '0')}`,
+        date:          fmt(inv.createdAt),
+        periodStart:   fmt(inv.periodStart),
+        periodEnd:     fmt(inv.periodEnd),
+        planName,
+        baseAmount:    inv.baseAmount,
+        addonsAmount:  inv.addonsAmount,
+        taxAmount:     inv.taxAmount,
+        totalAmount:   inv.totalAmount,
+        currency,
+        currencySymbol,
+        status:        inv.status === 'paid' ? 'Paid' : inv.status,
+        paidAt:        fmt(inv.paidAt),
+        paymentMethod: inv.paymentMethod ?? null,
+        stripeUrl:     inv.stripeInvoiceId
+          ? `https://invoice.stripe.com/i/${inv.stripeInvoiceId}`
+          : null,
+        invoiceItems:  mapItems(inv.invoice?.items),
+        _sortDate:     inv.createdAt,
+        ...platformMeta,
+      };
     });
+
+    // ── 2. AI Credit Purchases ────────────────────────────────
+    const creditRows = await prisma.aiCreditPurchase.findMany({
+      where:   { companyId },
+      orderBy: { createdAt: 'desc' },
+      take:    50,
+      include: { invoice: { include: { items: true } } },
+    });
+
+    const creditMapped = creditRows.map(p => ({
+      id:            `credit-${p.id}`,
+      type:          'ai_credit',
+      invoiceNumber: p.invoice?.invoiceNumber || `AIC-${p.id}`,
+      date:          fmt(p.createdAt),
+      periodStart:   null,
+      periodEnd:     null,
+      planName:      null,
+      packId:        p.packId,
+      credits:       p.credits,
+      baseAmount:    0,
+      addonsAmount:  0,
+      taxAmount:     0,
+      totalAmount:   p.amountUsd,
+      currency,
+      currencySymbol,
+      status:        p.status === 'paid' ? 'Paid' : p.status,
+      paidAt:        fmt(p.paidAt),
+      paymentMethod: p.paymentMethod ?? null,
+      stripeUrl:     null,
+      invoiceItems:  mapItems(p.invoice?.items),
+      _sortDate:     p.createdAt,
+      ...platformMeta,
+    }));
+
+    // ── 3. Product invoices (order-linked) ───────────────────
+    const productInvoices = await prisma.invoice.findMany({
+      where: {
+        companyId,
+        orderId: { not: null },
+        OR: [
+          { reference: null },
+          { reference: { notIn: ['subscription', 'addon', 'ai_credit'] } },
+        ],
+      },
+      orderBy: { invoiceDate: 'desc' },
+      take:    50,
+      include: { items: true, order: { select: { orderNumber: true } } },
+    });
+
+    const productMapped = productInvoices.map(inv => ({
+      id:            `product-${inv.id}`,
+      type:          'product',
+      invoiceNumber: inv.invoiceNumber,
+      date:          fmt(inv.invoiceDate),
+      periodStart:   null,
+      periodEnd:     null,
+      planName:      null,
+      baseAmount:    0,
+      addonsAmount:  0,
+      taxAmount:     Number(inv.taxAmount ?? 0),
+      totalAmount:   Number(inv.total ?? 0),
+      currency,
+      currencySymbol,
+      status:        inv.status === 'paid' ? 'Paid' : inv.status,
+      paidAt:        fmt(inv.paidAt),
+      paymentMethod: inv.paymentMethod ?? null,
+      stripeUrl:     null,
+      invoiceItems:  mapItems(inv.items),
+      _sortDate:     inv.invoiceDate,
+      ...platformMeta,
+    }));
+
+    // ── Fusionner + trier par date ────────────────────────────
+    const all = [...billingMapped, ...creditMapped, ...productMapped]
+      .sort((a, b) => new Date(b._sortDate) - new Date(a._sortDate));
+
+    // Nettoyer le champ interne _sortDate avant envoi
+    all.forEach(r => delete r._sortDate);
+
+    res.json({ success: true, data: all });
 
   } catch (e) {
     next(e);
@@ -292,7 +384,7 @@ export const getAvailableAddons = async (req, res, next) => {
         name: addon.name,
         slug: addon.slug,
         description: addon.description,
-        price: `$${addon.price.toFixed(0)}/mo`,
+        price: Number(addon.price),
         type: addon.type,
         icon: addon.icon,
         color: addon.color,

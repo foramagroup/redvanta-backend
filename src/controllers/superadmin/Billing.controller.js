@@ -112,27 +112,71 @@ export const listInvoices = async (req, res, next) => {
     const from   = req.query.from   || undefined;
     const to     = req.query.to     || undefined;
 
-    const type   = req.query.type || "product"; // "product" | "subscription" | "all"
+    const type = req.query.type || "product"; // "product" | "subscription" | "addon" | "all"
 
-    const where = {
-      ...(type === "product"      && { isRecurring: false }),
-      ...(type === "subscription" && { isRecurring: true }),
-      ...(status && { status }),
-      ...(from   && { invoiceDate: { gte: new Date(from) } }),
-      ...(to     && { invoiceDate: { lte: new Date(to + "T23:59:59") } }),
-      ...(search && {
+    // Toutes les clauses AND à appliquer
+    const andClauses = [];
+
+    if (type === "subscription") {
+      // Renouvellements de plan : exclure les factures addon
+      // MySQL : NULL != 'addon' → NULL (pas TRUE), donc on gère NULL explicitement
+      andClauses.push({
+        AND: [
+          {
+            OR: [
+              { reference: null },           // anciennes factures (avant tagification)
+              { reference: { not: "addon" } }, // nouvelles non-addon ("subscription", etc.)
+            ],
+          },
+          { billingHistory: { none: { baseAmount: 0, addonsAmount: { gt: 0 } } } },
+        ],
+      });
+    } else if (type === "addon") {
+      // Achats d'addons uniquement : reference "addon" (nouveau) ou billingHistory.baseAmount=0 (ancien)
+      andClauses.push({
+        OR: [
+          { reference: "addon" },
+          { billingHistory: { some: { baseAmount: 0, addonsAmount: { gt: 0 } } } },
+        ],
+      });
+    }
+
+    if (search) {
+      andClauses.push({
         OR: [
           { invoiceNumber: { contains: search } },
           { company: { name: { contains: search } } },
           { billingEmail: { contains: search } },
         ],
-      }),
+      });
+    }
+
+    const where = {
+      ...(type === "product"
+        ? { isRecurring: false }
+        : (type === "subscription" || type === "addon")
+          ? { isRecurring: true }
+          : {}),
+      ...(status && { status }),
+      ...(from   && { invoiceDate: { gte: new Date(from) } }),
+      ...(to     && { invoiceDate: { lte: new Date(to + "T23:59:59") } }),
+      ...(andClauses.length > 0 && { AND: andClauses }),
     };
 
     const [invoices, total] = await Promise.all([
       prisma.invoice.findMany({
         where,
-        include: { items: true, company: true, refunds: true },
+        include: {
+          items: true,
+          company: {
+            include: {
+              settings:     true,
+              subscription: { include: { addons: { include: { addon: true } } } },
+            },
+          },
+          refunds: true,
+          billingHistory: { select: { totalAmount: true, baseAmount: true, addonsAmount: true } },
+        },
         orderBy: { invoiceDate: "desc" },
         skip, take: limit,
       }),
@@ -155,7 +199,17 @@ export const getInvoice = async (req, res, next) => {
     const [inv, platform] = await Promise.all([
       prisma.invoice.findUnique({
         where:   { id },
-        include: { items: true, company: true, refunds: true },
+        include: {
+          items: true,
+          company: {
+            include: {
+              settings:     true,
+              subscription: { include: { addons: { include: { addon: true } } } },
+            },
+          },
+          refunds: true,
+          billingHistory: { select: { totalAmount: true, baseAmount: true, addonsAmount: true } },
+        },
       }),
       prisma.platformSetting.findFirst({
         select: { companyName: true, companyEmail: true, companyAddress: true },
@@ -361,13 +415,7 @@ export const addManualPayment = async (req, res, next) => {
     if (invoice.status === "refunded") {
       return res.status(422).json({ success: false, error: req.t("superadmin.billing.already_refunded") });
     }
-    if (invoice.isRecurring) {
-      return res.status(422).json({
-        success: false,
-        error: req.t("superadmin.billing.subscription_invoice_use_subscription_page"),
-      });
-    }
- 
+
     const invoiceTotal  = Number(invoice.total);
     const isFullPayment = amountPaid >= invoiceTotal;
     const paidAt        = paymentDate ? new Date(paymentDate) : new Date();
@@ -402,6 +450,30 @@ export const addManualPayment = async (req, res, next) => {
           }),
         ]);
  
+        // Mettre à jour le BillingHistory + activer addons si facture addon/subscription
+        if (invoice.isRecurring) {
+          try {
+            const bh = await prisma.billingHistory.findFirst({
+              where: { invoiceId: invoice.id },
+              select: { id: true, subscriptionId: true },
+            });
+            if (bh) {
+              await prisma.billingHistory.update({
+                where: { id: bh.id },
+                data:  { status: "paid", paidAt, paymentMethod: methodLabel },
+              });
+              if (invoice.reference === "addon" && bh.subscriptionId) {
+                await prisma.subscriptionAddon.updateMany({
+                  where: { subscriptionId: bh.subscriptionId, status: "inactive" },
+                  data:  { status: "active", activatedAt: new Date() },
+                });
+              }
+            }
+          } catch (e) {
+            console.error("[billing] Erreur mise à jour BillingHistory (cas sans order):", e.message);
+          }
+        }
+
         console.log(`[billing] Facture #${invoice.invoiceNumber} payée (sans commande)`);
         return res.json({
           success: true,
@@ -466,20 +538,53 @@ export const addManualPayment = async (req, res, next) => {
         ` | commande #${order.orderNumber} | montant=${amountPaid} | méthode=${methodLabel}`
       );
  
-      // 5. NFC Cards — même logique que le webhook Stripe
+      // 5. Mettre à jour le BillingHistory + activer addons si facture addon/subscription
+      if (invoice.isRecurring) {
+        try {
+          const bh = await prisma.billingHistory.findFirst({
+            where: { invoiceId: invoice.id },
+            select: { id: true, subscriptionId: true },
+          });
+          if (bh) {
+            await prisma.billingHistory.update({
+              where: { id: bh.id },
+              data:  { status: "paid", paidAt, paymentMethod: methodLabel },
+            });
+            if (invoice.reference === "addon" && bh.subscriptionId) {
+              await prisma.subscriptionAddon.updateMany({
+                where: { subscriptionId: bh.subscriptionId, status: "inactive" },
+                data:  { status: "active", activatedAt: new Date() },
+              });
+              console.log(`[billing] Addons activés pour subscription #${bh.subscriptionId}`);
+            }
+          }
+        } catch (e) {
+          console.error("[billing] Erreur mise à jour BillingHistory:", e.message);
+        }
+      }
+
+      if (invoice.reference === "addon") {
+        return res.json({
+          success: true,
+          message: req.t("superadmin.billing.payment_recorded"),
+          data:    formatInvoice(updatedInvoice),
+        });
+      }
+
+      // 6. NFC Cards — pour les commandes produit
       const fullOrder = { ...order, status: "paid", paidAt };
- 
+
       fulfillNfcForOrder(fullOrder).catch((e) =>
         console.error("[billing] Erreur fulfillment NFC:", e.message)
       );
- 
-      // 6. Emails — même logique que le webhook Stripe
+
+      // 7. Emails — même logique que le webhook Stripe
       sendOrderEmails(fullOrder, updatedInvoice).catch((e) =>
         console.error("[billing] Erreur envoi emails:", e.message)
       );
- 
+
       console.log(`[billing] Commande #${order.orderNumber} payée — NFC en cours de génération`);
- 
+
       return res.json({
         success: true,
         message: req.t("superadmin.billing.order_paid", { orderNumber: order.orderNumber }),
@@ -618,7 +723,16 @@ export const sendInvoiceEmail = async (req, res, next) => {
 
     const inv = await prisma.invoice.findUnique({
       where:   { id },
-      include: { items: true, company: true, user: true },
+      include: {
+        items:   true,
+        company: {
+          include: {
+            settings:     true,
+            subscription: { include: { addons: { include: { addon: true } } } },
+          },
+        },
+        user:    true,
+      },
     });
     if (!inv) return res.status(404).json({ success: false, error: req.t("superadmin.billing.invoice_not_found") });
 
@@ -627,7 +741,7 @@ export const sendInvoiceEmail = async (req, res, next) => {
       return res.status(422).json({ success: false, error: "No recipient email available" });
     }
 
-    const currency = inv.currency || "EUR";
+    const currency = inv.company?.settings?.currency || inv.currency || "EUR";
     const total    = Number(inv.displayTotal ?? inv.total ?? 0);
 
     const vars = {
@@ -641,14 +755,34 @@ export const sendInvoiceEmail = async (req, res, next) => {
       currency,
       status:          inv.status,
       year:            String(new Date().getFullYear()),
-      items_html:      (inv.items ?? []).map((i) =>
-        `<tr>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee">${i.service}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center">${i.quantity}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(i.unitPrice).toFixed(2)} ${currency}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(i.total).toFixed(2)} ${currency}</td>
-        </tr>`
-      ).join(""),
+      items_html: (() => {
+        const rows = (inv.items ?? []).map((i) =>
+          `<tr>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee">${i.service}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center">${i.quantity}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(i.unitPrice).toFixed(2)} ${currency}</td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(i.total).toFixed(2)} ${currency}</td>
+          </tr>`
+        );
+        // Pour les factures subscription (pas addon), injecter les addons actifs non déjà dans les items
+        if (inv.isRecurring && inv.reference !== "addon") {
+          const existingNames = new Set((inv.items ?? []).map((i) => (i.service || "").toLowerCase()));
+          const activeAddons = (inv.company?.subscription?.addons ?? [])
+            .filter((a) => a.status === "active" && !existingNames.has((a.addon?.name || "").toLowerCase()));
+          for (const a of activeAddons) {
+            const addonTotal = Number(a.amount ?? 0) * (a.quantity ?? 1);
+            rows.push(
+              `<tr>
+                <td style="padding:6px 8px;border-bottom:1px solid #eee;color:#3b82f6">${a.addon?.name ?? "Add-on"}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center">${a.quantity ?? 1}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${Number(a.amount ?? 0).toFixed(2)} ${currency}</td>
+                <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${addonTotal.toFixed(2)} ${currency}</td>
+              </tr>`
+            );
+          }
+        }
+        return rows.join("");
+      })(),
     };
 
     const buildFallback = () => ({
@@ -703,7 +837,7 @@ export const sendInvoiceEmail = async (req, res, next) => {
     // Generate PDF attachment
     let pdfAttachment = null;
     try {
-      const pdfBuffer = await generateInvoicePdfBuffer(inv);
+      const pdfBuffer = await generateInvoicePdfBuffer({ ...inv, currency });
       pdfAttachment = {
         filename:    `invoice-${inv.invoiceNumber}.pdf`,
         content:     pdfBuffer,

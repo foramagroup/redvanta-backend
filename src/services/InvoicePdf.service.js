@@ -107,7 +107,27 @@ export function generateInvoicePdfBuffer(inv) {
     let subtotal = 0;
     let taxTotal = 0;
 
-    (inv.items || []).forEach((item, idx) => {
+    // Pour les factures subscription (pas addon), on injecte les addons actifs non déjà listés
+    const activeAddons = inv.reference !== "addon"
+      ? (() => {
+          const existingItemNames = new Set((inv.items || []).map((i) => (i.service || "").toLowerCase()));
+          return (inv.company?.subscription?.addons ?? [])
+            .filter((a) => a.status === "active" && !existingItemNames.has((a.addon?.name || "").toLowerCase()))
+            .map((a) => ({
+              service:     a.addon?.name ?? "Add-on",
+              description: "Active subscription add-on",
+              quantity:    a.quantity ?? 1,
+              unitPrice:   Number(a.amount ?? 0),
+              taxRate:     0,
+              discount:    0,
+              total:       Number(a.amount ?? 0) * (a.quantity ?? 1),
+            }));
+        })()
+      : [];
+
+    const allItems = [...(inv.items || []), ...activeAddons];
+
+    allItems.forEach((item, idx) => {
       const qty        = Number(item.quantity ?? item.qty ?? 0);
       const unitPrice  = Number(item.unitPrice ?? item.price ?? 0);
       const taxRate    = Number(item.taxRate ?? 0);
@@ -130,10 +150,10 @@ export function generateInvoicePdfBuffer(inv) {
       }
 
       doc.font("Helvetica").fontSize(10).fillColor(DARK)
-         .text(String(qty),                  W - M - 220, rowY + 12, { width: 40,  align: "right" })
+         .text(String(qty),                    W - M - 220, rowY + 12, { width: 40,  align: "right" })
          .text(`${sym}${unitPrice.toFixed(2)}`, W - M - 170, rowY + 12, { width: 80,  align: "right" });
       doc.font("Helvetica-Bold").fontSize(10).fillColor(DARK)
-         .text(`${sym}${lineTotal.toFixed(2)}`, W - M - 70, rowY + 12, { width: 60, align: "right" });
+         .text(`${sym}${lineTotal.toFixed(2)}`, W - M - 70,  rowY + 12, { width: 60,  align: "right" });
 
       rowY += rowH;
     });
@@ -158,7 +178,9 @@ export function generateInvoicePdfBuffer(inv) {
     totRow("Tax",      `${sym}${taxTotal.toFixed(2)}`);
     doc.moveTo(totL, rowY - 4).lineTo(totR, rowY - 4).strokeColor(DARK).lineWidth(1).stroke();
     rowY += 4;
-    totRow("Total Due", `${sym}${(subtotal + taxTotal).toFixed(2)}`, true);
+    // Use the actual invoice total from the DB to avoid double-counting addons
+    const actualTotal = Number(inv.displayTotal ?? inv.total ?? (subtotal + taxTotal));
+    totRow("Total Due", `${sym}${actualTotal.toFixed(2)}`, true);
 
     // ── Payment method ──
     if (inv.paymentMethod) {

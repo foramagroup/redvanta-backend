@@ -4,9 +4,13 @@ import {
   saveSettings,
   getUsage,
   getCredits,
-  getCreditPacks,
-  purchaseCredits,
 } from "../controllers/aiSettings.controller.js";
+import {
+  getCreditPacks,
+  getCreditPaymentMethods,
+  requestCreditPurchase,
+  confirmCreditStripe,
+} from "../controllers/aiCreditPurchase.controller.js";
 import { generateReply } from "../controllers/aiGenerate.controller.js";
 import {
   getSettings as getAutoReplySettings,
@@ -33,7 +37,9 @@ router.get("/usage",                      getUsage);
 // Solde de crédits
 router.get("/credits",                    getCredits);
 router.get("/credits/packs",              getCreditPacks);
-router.post("/credits/purchase",          purchaseCredits);
+router.get("/credits/payment-methods",    getCreditPaymentMethods);
+router.post("/credits/request",           requestCreditPurchase);
+router.post("/credits/confirm",           confirmCreditStripe);
 
 // Génération IA — cœur du module
 router.post("/generate",                  generateReply);

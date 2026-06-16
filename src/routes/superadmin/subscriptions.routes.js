@@ -13,6 +13,7 @@ import {
   activateSubscription,
   pauseSubscription,
   sendSubscriptionInvoiceEmail,
+  listAllAddonBilling,
 } from "../../controllers/superadmin/subscriptions.controller.js";
 import { authenticateSuperAdmin, requireSuperAdmin } from '../../middleware/auth.middleware.js';
 
@@ -24,6 +25,9 @@ router.use(authenticateSuperAdmin, requireSuperAdmin);
 // ─── Invoices (avant /:id pour éviter le conflit de routing) ─────
 router.get("/invoices/pending", getPendingSubscriptionInvoices);
 router.post("/invoices/:invoiceId/mark-paid", markSubscriptionInvoicePaid);
+
+// ─── Addon Billing (avant /:id pour éviter le conflit de routing) ─
+router.get("/addon-billing", listAllAddonBilling);
 
 // ─── Subscriptions Management ─────────────────────────────────
 router.get("/",    listAllSubscriptions);

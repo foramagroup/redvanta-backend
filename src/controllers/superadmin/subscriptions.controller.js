@@ -44,6 +44,7 @@ export const listAllSubscriptions = async (req, res, next) => {
           company: { select: { id: true, name: true, email: true } },
           addons: { include: { addon: true } },
           billingHistory: {
+            where: { baseAmount: { gt: 0 } }, // Renouvellements plan uniquement (pas achats addon)
             include: { invoice: { select: { id: true, invoiceNumber: true, total: true, status: true } } },
             orderBy: { createdAt: "desc" },
             take: 3,
@@ -66,11 +67,15 @@ export const listAllSubscriptions = async (req, res, next) => {
       }),
     ]);
 
-    // Batch-fetch recurring invoices for all companies (fallback when billingHistory has no invoiceId)
+    // Batch-fetch subscription plan invoices (fallback) — exclure les factures addon
     const companyIds = [...new Set(subscriptions.map((s) => s.companyId))];
     const recurringInvoices = companyIds.length
       ? await prisma.invoice.findMany({
-          where: { companyId: { in: companyIds }, isRecurring: true },
+          where: {
+            companyId: { in: companyIds },
+            isRecurring: true,
+            OR: [{ reference: null }, { reference: { not: "addon" } }],
+          },
           orderBy: { createdAt: "desc" },
           select: { id: true, invoiceNumber: true, total: true, status: true, companyId: true },
         })
@@ -122,6 +127,8 @@ export const listAllSubscriptions = async (req, res, next) => {
             id: a.id,
             name: a.addon?.name ?? null,
             amount: Number(a.amount ?? 0),
+            quantity: a.quantity ?? 1,
+            status: a.status,
           })),
           latestUnpaidInvoice,
           latestInvoice,
@@ -174,22 +181,39 @@ export const getSubscriptionDetails = async (req, res, next) => {
       return res.status(404).json({ success: false, error: req.t("superadmin.subscription.not_found") });
     }
 
+    const lang = req.locale || "en";
+    const trs = subscription.plan?.translations ?? [];
+    const tr = trs.find((t) => t.language?.code === lang) ?? trs.find((t) => t.language?.code === "en") ?? trs[0];
+    const planName = tr?.name ?? subscription.plan?.name ?? subscription.plan?.slug ?? null;
+
     res.json({
       success: true,
       data: {
         ...formatSubscription(subscription),
+        planName,
         company: {
           id: subscription.company.id,
           name: subscription.company.name,
           email: subscription.company.email,
         },
+        addons: subscription.addons.map(a => ({
+          id: a.id,
+          name: a.addon?.name ?? null,
+          description: a.addon?.description ?? null,
+          amount: Number(a.amount ?? 0),
+          quantity: a.quantity ?? 1,
+          status: a.status,
+        })),
         billingHistory: subscription.billingHistory.map(bh => ({
           id: bh.id,
           periodStart: bh.periodStart,
           periodEnd: bh.periodEnd,
           status: bh.status,
+          baseAmount: Number(bh.baseAmount ?? 0),
+          addonsAmount: Number(bh.addonsAmount ?? 0),
           totalAmount: Number(bh.totalAmount),
           paidAt: bh.paidAt,
+          paymentMethod: bh.paymentMethod ?? null,
           invoice: bh.invoice ? {
             id: bh.invoice.id,
             invoiceNumber: bh.invoice.invoiceNumber,
@@ -256,14 +280,33 @@ export const markSubscriptionInvoicePaid = async (req, res, next) => {
       });
     }
 
+    const billingHistory = invoice.billingHistory[0];
+
     if (invoice.status === "paid") {
+      // Si l'invoice est déjà payée mais le BillingHistory ne l'est pas
+      // (désync possible si paiement fait via billing/page.js), on synchronise le BH.
+      if (billingHistory && billingHistory.status !== "paid") {
+        await prisma.billingHistory.update({
+          where: { id: billingHistory.id },
+          data:  { status: "paid", paidAt: new Date(), paymentMethod },
+        });
+        if (invoice.reference === "addon" && billingHistory.subscription) {
+          await prisma.subscriptionAddon.updateMany({
+            where: { subscriptionId: billingHistory.subscription.id, status: "inactive" },
+            data:  { status: "active", activatedAt: new Date() },
+          });
+        }
+        return res.json({
+          success: true,
+          message: req.t("superadmin.subscription.invoice_paid", { invoiceNumber: invoice.invoiceNumber }),
+          data: { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber },
+        });
+      }
       return res.status(422).json({
         success: false,
         error: req.t("superadmin.billing.already_paid"),
       });
     }
-
-    const billingHistory = invoice.billingHistory[0];
 
     if (!billingHistory) {
       return res.status(422).json({
@@ -354,6 +397,16 @@ export const markSubscriptionInvoicePaid = async (req, res, next) => {
         },
       }),
     ]);
+
+    // ═══════════════════════════════════════════════════════════
+    // Si facture addon → activer les SubscriptionAddon en attente
+    // ═══════════════════════════════════════════════════════════
+    if (invoice.reference === "addon") {
+      await prisma.subscriptionAddon.updateMany({
+        where: { subscriptionId: subscription.id, status: "inactive" },
+        data: { status: "active", activatedAt: new Date() },
+      });
+    }
 
     // ═══════════════════════════════════════════════════════════
     // Email Welcome (identique webhook)
@@ -559,6 +612,124 @@ export const pauseSubscription = async (req, res, next) => {
     await prisma.subscription.update({ where: { id }, data: { status: "paused" } });
     res.json({ success: true, message: `Subscription #${id} paused.` });
   } catch (e) { next(e); }
+};
+
+// ═══════════════════════════════════════════════════════════
+// GET /api/superadmin/subscription/addon-billing
+// Liste tous les achats d'addons (BillingHistory baseAmount=0)
+// ═══════════════════════════════════════════════════════════
+export const listAllAddonBilling = async (req, res, next) => {
+  try {
+    const { search, page = 1, limit = 200, status } = req.query;
+
+    const where = {
+      baseAmount: 0,
+      addonsAmount: { gt: 0 },
+    };
+
+    if (status) where.status = status;
+    if (search) {
+      where.subscription = {
+        company: {
+          OR: [
+            { name: { contains: search } },
+            { email: { contains: search } },
+          ],
+        },
+      };
+    }
+
+    const [histories, total, paidCount, totalRevenue] = await Promise.all([
+      prisma.billingHistory.findMany({
+        where,
+        include: {
+          subscription: {
+            include: {
+              company: { select: { id: true, name: true, email: true } },
+              addons: { include: { addon: true } },
+            },
+          },
+          invoice: {
+            include: {
+              items: true,
+              company: { include: { settings: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (parseInt(page) - 1) * parseInt(limit),
+        take: parseInt(limit),
+      }),
+      prisma.billingHistory.count({ where }),
+      prisma.billingHistory.count({ where: { ...where, status: "paid" } }),
+      prisma.billingHistory.aggregate({
+        where: { ...where, status: "paid" },
+        _sum: { addonsAmount: true },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: histories.map((bh) => ({
+        id: bh.id,
+        company: bh.subscription?.company ?? null,
+        subscriptionId: bh.subscriptionId,
+        amount: Number(bh.addonsAmount ?? 0),
+        status: bh.status,
+        periodStart: bh.periodStart,
+        periodEnd: bh.periodEnd,
+        paidAt: bh.paidAt,
+        paymentMethod: bh.paymentMethod,
+        createdAt: bh.createdAt,
+        subscriptionAddons: (bh.subscription?.addons ?? [])
+          .filter((a) => a.status === "active")
+          .map((a) => ({
+            name: a.addon?.name ?? "Add-on",
+            quantity: Number(a.quantity ?? 1),
+            amount: Number(a.amount ?? 0),
+          })),
+        invoice: bh.invoice
+          ? {
+              id: bh.invoice.id,
+              invoiceNumber: bh.invoice.invoiceNumber,
+              status: bh.invoice.status,
+              total: Number(bh.invoice.total),
+              currency: bh.invoice.company?.settings?.currency || bh.invoice.currency || "EUR",
+              billingName: bh.invoice.billingName,
+              billingEmail: bh.invoice.billingEmail,
+              billingPhone: bh.invoice.billingPhone,
+              billingAddress: bh.invoice.billingAddress,
+              invoiceDate: bh.invoice.invoiceDate,
+              dueDate: bh.invoice.dueDate,
+              paymentMethod: bh.invoice.paymentMethod,
+              emailStatus: bh.invoice.emailStatus ?? "Not Sent",
+              items: (bh.invoice.items ?? []).map((i) => ({
+                service: i.service,
+                description: i.description,
+                quantity: Number(i.quantity),
+                unit: i.unit,
+                unitPrice: Number(i.unitPrice),
+                total: Number(i.total),
+              })),
+            }
+          : null,
+      })),
+      stats: {
+        total,
+        paid: paidCount,
+        pending: total - paidCount,
+        revenue: Number(totalRevenue._sum.addonsAmount ?? 0),
+      },
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
 };
 
 // ═══════════════════════════════════════════════════════════

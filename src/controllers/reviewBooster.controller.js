@@ -39,6 +39,21 @@ export async function getBoosterAnalytics(req, res) {
       where: { companyId, source: "google", createdAt: { gte: since } },
     });
 
+    // Individual events for the performance table (last 50, most recent first)
+    const events = await prisma.reviewBoosterEvent.findMany({
+      where: { companyId, createdAt: { gte: since } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        locationId: true,
+        rating: true,
+        suggestionUsed: true,
+        reviewSubmitted: true,
+        createdAt: true,
+      },
+    });
+
     res.json({
       requests: total,
       completions: submitted,
@@ -46,11 +61,23 @@ export async function getBoosterAnalytics(req, res) {
       averageRating: avgResult._avg.rating ?? 0,
       suggestionUsagePct: total > 0 ? Math.round((withSuggestion / total) * 100) : 0,
       googleGrowth,
+      funnel: {
+        shown: total,          // booster was triggered = suggestion was displayed
+        used: withSuggestion,  // user clicked "use this suggestion"
+        submitted,             // review actually submitted
+      },
       series: series.map((row) => ({
         date: new Date(row.date).toLocaleDateString("en", { month: "short", day: "numeric" }),
         generated: Number(row.generated),
         booster: Number(row.booster),
         published: Number(row.published),
+      })),
+      events: events.map((e) => ({
+        date: e.createdAt.toISOString(),
+        locationId: e.locationId,
+        rating: e.rating,
+        suggestionUsed: e.suggestionUsed,
+        reviewSubmitted: e.reviewSubmitted,
       })),
     });
   } catch (err) {

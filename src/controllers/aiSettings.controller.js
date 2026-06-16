@@ -14,11 +14,6 @@ const AI_PLAN_LIMITS = {
   default:   { monthlyIncluded: 50,   overageRate: 0.10 },
 };
 
-const CREDIT_PACKS = {
-  small:  { credits: 100,  priceUsd: 5.00  },
-  medium: { credits: 500,  priceUsd: 20.00 },
-  large:  { credits: 2000, priceUsd: 70.00 },
-};
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -184,76 +179,3 @@ export async function getCredits(req, res) {
   }
 }
 
-// ── GET /api/admin/ai/credits/packs ─────────────────────────
-// Liste les packs disponibles à l'achat (pour OverageModal)
-export async function getCreditPacks(req, res) {
-  try {
-    const packs = Object.entries(CREDIT_PACKS).map(([key, p]) => ({
-      id:        key,
-      credits:   p.credits,
-      priceUsd:  p.priceUsd,
-      label:     `${p.credits} crédits`,
-      perCredit: (p.priceUsd / p.credits).toFixed(4),
-    }));
-
-    res.json({ success: true, data: packs });
-  } catch (err) {
-    console.error("[aiSettings] getCreditPacks:", err);
-    res.status(500).json({ success: false, error: "Erreur serveur" });
-  }
-}
-
-// ── POST /api/admin/ai/credits/purchase ─────────────────────
-// Body: { pack: "small" | "medium" | "large" }
-// (Dans la version réelle, ceci passerait par Stripe — ici on crédite directement)
-export async function purchaseCredits(req, res) {
-  try {
-    const cid  = companyId(req);
-    const { pack } = req.body;
-
-    if (!pack || !CREDIT_PACKS[pack]) {
-      return res.status(400).json({
-        success: false,
-        error: `Pack invalide. Valeurs acceptées : ${Object.keys(CREDIT_PACKS).join(", ")}`,
-      });
-    }
-
-    const { credits, priceUsd } = CREDIT_PACKS[pack];
-
-    // Créditer le solde + enregistrer la transaction dans une seule transaction DB
-    const [updatedBalance] = await prisma.$transaction([
-      prisma.aiCreditBalance.upsert({
-        where:  { companyId: cid },
-        create: { companyId: cid, purchased: credits },
-        update: { purchased: { increment: credits } },
-      }),
-      prisma.aiCreditTransaction.create({
-        data: {
-          companyId:  cid,
-          kind:       "purchase",
-          amount:     credits,
-          revenueUsd: priceUsd,
-          meta:       { pack, source: "manual" },
-        },
-      }),
-    ]);
-
-    const total     = updatedBalance.planIncluded + updatedBalance.purchased;
-    const remaining = Math.max(total - updatedBalance.used, 0);
-
-    res.json({
-      success: true,
-      message: `${credits} crédits ajoutés à votre solde.`,
-      data: {
-        planIncluded: updatedBalance.planIncluded,
-        purchased:    updatedBalance.purchased,
-        used:         updatedBalance.used,
-        remaining,
-        total,
-      },
-    });
-  } catch (err) {
-    console.error("[aiSettings] purchaseCredits:", err);
-    res.status(500).json({ success: false, error: "Erreur serveur" });
-  }
-}
