@@ -33,16 +33,16 @@ async function findPackById(packId) {
 async function getCompanyLanguageCode(companyId) {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { language: { select: { code: true } } },
+    select: { defaulLanguage: { select: { code: true } } },
   });
-  return company?.language?.code || "en";
+  return company?.defaulLanguage?.code || "en";
 }
 
-function resolvePackName(pack, langCode) {
+function resolvePackTranslation(pack, langCode) {
   const t = pack.translations.find((t) => t.language.code === langCode)
          || pack.translations.find((t) => t.language.code === "en")
          || pack.translations[0];
-  return t?.name || pack.slug;
+  return { name: t?.name || pack.slug, description: t?.description || "" };
 }
 
 async function generateCreditInvoiceNumber() {
@@ -121,14 +121,18 @@ export async function getCreditPacks(req, res) {
       include: { translations: { include: { language: { select: { code: true } } } } },
     });
 
-    const data = packs.map((p) => ({
-      id:        p.id,
-      slug:      p.slug,
-      credits:   p.credits,
-      priceUsd:  Number(p.priceUsd),
-      name:      resolvePackName(p, langCode),
-      perCredit: (Number(p.priceUsd) / p.credits).toFixed(4),
-    }));
+    const data = packs.map((p) => {
+      const { name, description } = resolvePackTranslation(p, langCode);
+      return {
+        id:          p.id,
+        slug:        p.slug,
+        credits:     p.credits,
+        priceUsd:    Number(p.priceUsd),
+        name,
+        description,
+        perCredit:   (Number(p.priceUsd) / p.credits).toFixed(4),
+      };
+    });
 
     res.json({ success: true, data });
   } catch (err) {
@@ -195,7 +199,7 @@ export async function requestCreditPurchase(req, res) {
 
     const priceUsd   = Number(pack.priceUsd);
     const langCode   = await getCompanyLanguageCode(cid);
-    const packName   = resolvePackName(pack, langCode);
+    const packName   = resolvePackTranslation(pack, langCode).name;
 
     const [user, company] = await Promise.all([
       prisma.user.findUnique({ where: { id: uid } }),
@@ -336,7 +340,7 @@ export async function confirmCreditStripe(req, res) {
 
     const langCode = await getCompanyLanguageCode(purchase.companyId);
     const packName = pack
-      ? resolvePackName({ ...pack, translations: await prisma.aiCreditPackTranslation.findMany({ where: { packId: pack.id }, include: { language: { select: { code: true } } } }) }, langCode)
+      ? resolvePackTranslation({ ...pack, translations: await prisma.aiCreditPackTranslation.findMany({ where: { packId: pack.id }, include: { language: { select: { code: true } } } }) }, langCode).name
       : null;
 
     const invoice = await createCreditInvoice({

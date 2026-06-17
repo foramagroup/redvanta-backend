@@ -7,11 +7,11 @@ import prisma from "../config/database.js";
 
 // ── Limites IA par plan (à migrer dans PlanSetting quand le schéma sera étendu) ─
 const AI_PLAN_LIMITS = {
-  starter:   { monthlyIncluded: 50,   overageRate: 0.10 },
-  growth:    { monthlyIncluded: 200,  overageRate: 0.05 },
-  dominator: { monthlyIncluded: 1000, overageRate: 0.03 },
+  trial:   { monthlyIncluded: 20,   overageRate: 0.10 },
+  starter: { monthlyIncluded: 100,  overageRate: 0.08 },
+  power:   { monthlyIncluded: 500,  overageRate: 0.05 },
   // fallback pour les plans sans correspondance
-  default:   { monthlyIncluded: 50,   overageRate: 0.10 },
+  default: { monthlyIncluded: 20,   overageRate: 0.10 },
 };
 
 

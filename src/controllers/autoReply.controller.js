@@ -120,15 +120,24 @@ export async function processReplyInternal(companyId, review) {
   return { ok: true, status, safetyScore, reply, logId: log.id };
 }
 
+async function getCompanyPlanSlug(cid) {
+  const company = await prisma.company.findUnique({
+    where:  { id: cid },
+    select: { package: { select: { slug: true } } },
+  });
+  return company?.package?.slug ?? "starter";
+}
+
 // ── GET /api/admin/ai/auto-reply/settings ────────────────────────────────────
 export async function getSettings(req, res) {
   const companyId = req.user.companyId;
   try {
-    const settings = await prisma.autoReplySetting.findUnique({ where: { companyId } });
-    if (!settings) {
-      return res.json({ mode: "off", minRating: 3, tone: "professional", language: "en", safetyThreshold: 80, publishThreshold: 5 });
-    }
-    res.json(settings);
+    const [settings, planSlug] = await Promise.all([
+      prisma.autoReplySetting.findUnique({ where: { companyId } }),
+      getCompanyPlanSlug(companyId),
+    ]);
+    const defaults = { mode: "off", minRating: 3, tone: "professional", language: "en", safetyThreshold: 80, publishThreshold: 5 };
+    res.json({ ...(settings ?? defaults), planSlug });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -44,56 +44,121 @@ export async function getValidToken(companyId) {
   return tokens.access_token;
 }
 
-// GET /api/admin/google/locations
+// GET /api/admin/google/locations?refresh=1
+// Sans refresh : retourne les locations déjà en DB (pas d'appel Google API).
+// Avec refresh=1 : appelle l'API Google et met à jour la DB.
 export async function getLocations(req, res) {
   const companyId = req.user.companyId;
+  const forceRefresh = req.query.refresh === "1";
+
   try {
+    const dbLocs = await prisma.googleBusinessLocation.findMany({ where: { companyId } });
+
+    // Si on a déjà des locations en DB ET pas de refresh forcé, on sert directement depuis la DB
+    if (dbLocs.length > 0 && !forceRefresh) {
+      const locations = dbLocs.map((l) => ({
+        id:        l.locationId,
+        locationId: l.locationId,
+        name:      l.locationName,
+        address:   l.address ?? "",
+        rating:    l.rating ?? null,
+        reviews:   l.reviewCount ?? 0,
+        connected: l.connected,
+        primary:   l.primary,
+      }));
+      return res.json({ locations, fromCache: true });
+    }
+
+    // Sinon on appelle l'API Google (première fois ou refresh manuel)
     let token;
     try { token = await getValidToken(companyId); } catch (e) {
+      // Si on a des données en DB malgré tout, on les sert en fallback
+      if (dbLocs.length > 0) {
+        const locations = dbLocs.map((l) => ({
+          id: l.locationId, locationId: l.locationId,
+          name: l.locationName, address: l.address ?? "",
+          rating: l.rating ?? null, reviews: l.reviewCount ?? 0,
+          connected: l.connected, primary: l.primary,
+        }));
+        return res.json({ locations, fromCache: true });
+      }
       return res.status(401).json({ error: e.message });
     }
 
-    // Fetch accounts then locations from GBP API
     const accountsResp = await fetch(
       "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
       { headers: { Authorization: `Bearer ${token}` } }
     );
     const accountsData = await accountsResp.json();
-    const accounts = accountsData.accounts ?? [];
 
-    const locations = [];
-    for (const account of accounts.slice(0, 3)) {
+    if (!accountsResp.ok) {
+      const msg = accountsData?.error?.message || `Google API error ${accountsResp.status}`;
+      const isQuota = accountsResp.status === 429 || (msg && msg.toLowerCase().includes("quota"));
+      console.error("[getLocations] accounts API error:", accountsData);
+      // Fallback sur DB si dispo
+      if (dbLocs.length > 0) {
+        const locations = dbLocs.map((l) => ({
+          id: l.locationId, locationId: l.locationId,
+          name: l.locationName, address: l.address ?? "",
+          rating: l.rating ?? null, reviews: l.reviewCount ?? 0,
+          connected: l.connected, primary: l.primary,
+        }));
+        return res.json({ locations, fromCache: true, warning: msg });
+      }
+      // DB vide + quota dépassé → retourner 200 avec flag pour que le frontend reste utilisable
+      if (isQuota) {
+        return res.json({ locations: [], fromCache: false, quotaExceeded: true, error: msg });
+      }
+      return res.status(502).json({ error: msg, googleError: accountsData?.error ?? null });
+    }
+
+    const accounts = accountsData.accounts ?? [];
+    const freshLocations = [];
+    for (const account of accounts.slice(0, 5)) {
       const locResp = await fetch(
         `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title,storefrontAddress,metadata,regularHours`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const locData = await locResp.json();
+      if (!locResp.ok) {
+        console.error("[getLocations] locations API error for", account.name, locData);
+        continue;
+      }
       for (const loc of locData.locations ?? []) {
-        locations.push({
-          locationId: loc.name,
+        freshLocations.push({
+          locationId:   loc.name,
           locationName: loc.title ?? loc.name,
-          address: loc.storefrontAddress?.addressLines?.join(", ") ?? null,
-          rating: loc.metadata?.mapsUri ? null : null,
+          address:      loc.storefrontAddress?.addressLines?.join(", ") ?? null,
         });
       }
     }
 
-    // Merge with DB connected state
-    const dbLocs = await prisma.googleBusinessLocation.findMany({ where: { companyId } });
-    const connectedSet = new Set(dbLocs.filter((l) => l.connected).map((l) => l.locationId));
+    const connectedMap = new Map(dbLocs.map((l) => [l.locationId, l]));
 
-    const merged = locations.map((l) => ({ id: l.locationId, ...l, connected: connectedSet.has(l.locationId) }));
+    const merged = freshLocations.map((l) => {
+      const db = connectedMap.get(l.locationId);
+      return {
+        id:         l.locationId,
+        locationId: l.locationId,
+        name:       l.locationName,
+        address:    l.address ?? "",
+        rating:     db?.rating ?? null,
+        reviews:    db?.reviewCount ?? 0,
+        connected:  db?.connected ?? false,
+        primary:    db?.primary ?? false,
+      };
+    });
 
-    // Upsert discovered locations into DB
+    // Upsert en DB
     for (const loc of merged) {
       await prisma.googleBusinessLocation.upsert({
-        where: { companyId_locationId: { companyId, locationId: loc.locationId } },
-        create: { companyId, connectionId: null, ...loc },
-        update: { locationName: loc.locationName, address: loc.address },
+        where:  { companyId_locationId: { companyId, locationId: loc.locationId } },
+        create: { companyId, connectionId: null, locationId: loc.locationId, locationName: loc.name, address: loc.address },
+        update: { locationName: loc.name, address: loc.address },
       });
     }
 
-    res.json({ locations: merged });
+    res.json({ locations: merged, fromCache: false });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch locations: " + err.message });
   }

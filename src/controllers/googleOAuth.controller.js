@@ -15,7 +15,7 @@ export async function getGoogleCredentials() {
   const clientId     = ps?.googleClientId     || process.env.GOOGLE_CLIENT_ID;
   const clientSecret = ps?.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET;
   const redirectUri  = ps?.googleRedirectUri  || process.env.GOOGLE_REDIRECT_URI
-    || `${process.env.URL_DEV_BACKEND || "http://localhost:4000"}/api/admin/google/callback`;
+    || `${process.env.URL_DEV_BACKEND || "http://localhost:4000/api"}/admin/google/callback`;
 
   if (!clientId || !clientSecret) {
     throw Object.assign(new Error("Google OAuth credentials not configured. Ask your superadmin to set them in Platform Settings."), { status: 503 });
