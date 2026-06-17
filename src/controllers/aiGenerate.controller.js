@@ -102,7 +102,7 @@ export async function generateReply(req, res) {
     await prisma.aiRequestLog.create({
       data: {
         companyId:    cid,
-        reviewId:     reviewId ?? null,
+        reviewId:     reviewId != null ? String(reviewId) : null,
         providerId:   provider.id,
         model:        provider.model,
         status:       "failed",
@@ -134,7 +134,7 @@ export async function generateReply(req, res) {
     prisma.aiRequestLog.create({
       data: {
         companyId:    cid,
-        reviewId:     reviewId ?? null,
+        reviewId:     reviewId != null ? String(reviewId) : null,
         providerId:   provider.id,
         model:        provider.model,
         inputTokens,
@@ -175,7 +175,7 @@ export async function generateReply(req, res) {
         kind:      "spend",
         amount:    -1,
         costUsd,
-        reviewId:  reviewId ?? null,
+        reviewId:  reviewId != null ? String(reviewId) : null,
         meta:      { action, provider: provider.name, model: provider.model },
       },
     }),

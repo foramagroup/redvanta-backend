@@ -89,7 +89,7 @@ export async function processReplyInternal(companyId, review) {
   const log = await prisma.aiAutoReplyLog.create({
     data: {
       companyId,
-      reviewId:      review.id,
+      reviewId:      review.id != null ? String(review.id) : null,
       googleReviewId: review.googleReviewId,
       reviewText:    review.comment,
       reply,
