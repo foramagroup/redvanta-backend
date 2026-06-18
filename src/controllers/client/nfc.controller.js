@@ -36,9 +36,23 @@ function getPlatformBehavior(platform, redirectMode = null) {
   return "redirect_filtered"; 
 }
 
-function resolveRedirectUrl(platform, card, design, company) {
+function resolveRedirectUrl(platform, card, design, company, location) {
   if (platform === "google") {
-    return card.googleReviewUrl || design?.googleReviewUrl || company?.googleReviewUrl || null;
+    // 1. URL directe (card → location → design → company)
+    const url = card.googleReviewUrl
+      || location?.googleReviewUrl
+      || design?.googleReviewUrl
+      || company?.googleReviewUrl
+      || null;
+    if (url) return url;
+    // 2. Fallback : construire depuis googlePlaceId
+    const placeId = card.googlePlaceId
+      || location?.googlePlaceId
+      || design?.googlePlaceId
+      || company?.googlePlaceId
+      || null;
+    if (placeId) return `https://search.google.com/local/writereview?placeid=${placeId}`;
+    return null;
   }
   return design?.platformUrl || null;
 }
@@ -119,19 +133,21 @@ export const handleScan = async (req, res, next) => {
     const fingerprint = buildFingerprint(ip, ua);
 
     // ✅ Récupérer la carte avec le design pour connaître la plateforme
-    const card = await prisma.nFCCard.findUnique({ 
-      where: { uid }, 
-      include: { 
+    const card = await prisma.nFCCard.findUnique({
+      where: { uid },
+      include: {
         company: true,
+        location: { select: { googleReviewUrl: true, googlePlaceId: true } },
         design: {
           select: {
             platform: true,
             platformUrl: true,
             googleReviewUrl: true,
+            googlePlaceId: true,
             redirectMode: true,
           }
         }
-      } 
+      }
     });
 
     if (!card) {
@@ -188,7 +204,7 @@ export const handleScan = async (req, res, next) => {
     // ✅ FLUX B : REDIRECT DIRECT (Facebook, Instagram, TikTok)
     // ─────────────────────────────────────────────────────────
     if(behavior === "direct") {
-      const redirectUrl = resolveRedirectUrl(platform, card, card.design, card.company);
+      const redirectUrl = resolveRedirectUrl(platform, card, card.design, card.company, card.location);
 
         if (!redirectUrl) {
           // Fallback : Si pas d'URL configurée, on redirige vers la page review quand même
@@ -290,8 +306,9 @@ export const submitRating = async (req, res, next) => {
     const card = await prisma.nFCCard.findUnique({
       where:   { uid },
       include: {
-        company: { select: { googleReviewUrl: true, googlePlaceId: true } },
-        design:  { select: { platform: true, platformUrl: true, googleReviewUrl: true, googlePlaceId: true, redirectMode: true } },
+        company:  { select: { googleReviewUrl: true, googlePlaceId: true } },
+        location: { select: { googleReviewUrl: true, googlePlaceId: true } },
+        design:   { select: { platform: true, platformUrl: true, googleReviewUrl: true, googlePlaceId: true, redirectMode: true } },
       },
     });
 
@@ -302,7 +319,7 @@ export const submitRating = async (req, res, next) => {
     const platform     = card.design?.platform    ?? "google";
     const redirectMode = card.design?.redirectMode ?? null;
     const behavior     = getPlatformBehavior(platform, redirectMode);
-    const redirectUrl  = resolveRedirectUrl(platform, card, card.design, card.company);
+    const redirectUrl  = resolveRedirectUrl(platform, card, card.design, card.company, card.location);
 
     // Tracker RATING_SELECTED dans tous les cas
     logEvent(uid, card.companyId, "RATING_SELECTED", {
@@ -362,7 +379,7 @@ export const submitRating = async (req, res, next) => {
         redirectUrl,
         ...(platform === "google" && {
           googleReviewUrl: redirectUrl,
-          googlePlaceId:   card.design?.googlePlaceId || card.company?.googlePlaceId || null,
+          googlePlaceId:   card.googlePlaceId || card.location?.googlePlaceId || card.design?.googlePlaceId || card.company?.googlePlaceId || null,
         }),
         message: req.t("nfc.redirect_message", { platform: platformLabel(platform) }),
         stars:   starsNum,
@@ -396,9 +413,6 @@ export const submitFeedback = async (req, res, next) => {
     const starsNum = parseInt(stars);
     if (!starsNum || starsNum < 1 || starsNum > 5) {
       return res.status(422).json({ success: false, error: req.t("nfc.invalid_stars") });
-    }
-    if (!message?.trim()) {
-      return res.status(422).json({ success: false, error: req.t("nfc.message_required") });
     }
 
     const card = await prisma.nFCCard.findUnique({ where: { uid } });
@@ -450,6 +464,209 @@ export const submitFeedback = async (req, res, next) => {
     res.json({ success: true, message: req.t("nfc.feedback_submitted") });
   } catch (e) { next(e); }
 };
+
+// ─────────────────────────────────────────────────────────────
+// POST /review/:uid/suggest — AI suggestion chips (public)
+// ─────────────────────────────────────────────────────────────
+
+const STATIC_SUGGESTIONS = {
+  5: ["Amazing experience, highly recommend!", "Outstanding service and quality!", "Absolutely loved it!"],
+  4: ["Great experience overall!", "Very good service, will return!", "Really enjoyed my visit!"],
+  3: ["Decent experience, some room to improve.", "Good but could be better.", "Acceptable overall."],
+  2: ["Disappointing, expected more.", "Service needs improvement.", "Not what I expected."],
+  1: ["Very poor experience.", "Would not recommend.", "Very disappointed."],
+};
+
+export const getSuggestions = async (req, res, next) => {
+  try {
+    const { uid } = req.params;
+    const starsNum = parseInt(req.body.rating);
+    if (!starsNum || starsNum < 1 || starsNum > 5) return res.json({ suggestions: [] });
+
+    // ── 1. Carte + relations complètes ──────────────────────────
+    const card = await prisma.nFCCard.findUnique({
+      where: { uid },
+      include: {
+        company:  { select: { id: true, name: true, defaultLanguageId: true } },
+        location: { select: { name: true, city: true, country: true, address: true } },
+        design:   { select: { platform: true } },
+      },
+    });
+    if (!card || !card.companyId) {
+      return res.json({ suggestions: STATIC_SUGGESTIONS[starsNum] ?? [] });
+    }
+
+    const companyId  = card.companyId;
+    const isPositive = starsNum >= 4;
+
+    // ── 2. Tous les paramètres admin + superadmin en parallèle ──
+    const [provider, balance, aiSetting, autoReplySetting, defaultLang] = await Promise.all([
+      // Superadmin : provider actif par défaut (modèle, clé API, nom)
+      prisma.aiProvider.findFirst({ where: { isDefault: true, active: true } })
+        .catch(() => null),
+      // Company : crédits disponibles
+      prisma.aiCreditBalance.findUnique({ where: { companyId } })
+        .catch(() => null),
+      // Company : paramètres IA (langue, ton, contexte métier)
+      prisma.aiSetting.findUnique({ where: { companyId } })
+        .catch(() => null),
+      // Company : paramètres auto-reply (langue + ton comme fallback)
+      prisma.autoReplySetting.findUnique({ where: { companyId } })
+        .catch(() => null),
+      // Company : langue par défaut résolue depuis defaultLanguageId
+      card.company?.defaultLanguageId
+        ? prisma.language.findUnique({
+            where:  { id: card.company.defaultLanguageId },
+            select: { code: true },
+          }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    // ── 3. Vérification crédits ─────────────────────────────────
+    if (provider?.apiKey && balance) {
+      const remaining = Math.max(
+        (balance.planIncluded ?? 0) + (balance.purchased ?? 0) - (balance.used ?? 0),
+        0
+      );
+      if (remaining > 0) {
+        try {
+          const prompt = buildSuggestionPrompt({
+            starsNum, isPositive, card,
+            aiSetting, autoReplySetting, defaultLang,
+            acceptLanguage: req.headers["accept-language"] ?? null,
+          });
+          const suggs = await callAIForSuggestions(provider, prompt);
+          if (Array.isArray(suggs) && suggs.length >= 3) {
+            return res.json({ suggestions: suggs.slice(0, 3) });
+          }
+        } catch (e) {
+          console.warn("[suggest] AI call failed:", e.message);
+        }
+      }
+    }
+
+    res.json({ suggestions: STATIC_SUGGESTIONS[starsNum] ?? [] });
+  } catch (e) { next(e); }
+};
+
+// ── Résolution de la langue (toutes couches, priorité décroissante) ──────────
+function resolveLanguageFull({ aiSetting, autoReplySetting, defaultLang, acceptLanguage }) {
+  // 1. AiSetting.language défini explicitement (admin IA)
+  if (aiSetting?.language && aiSetting.language !== "auto") return aiSetting.language;
+  // 2. AutoReplySetting.language (admin auto-reply)
+  if (autoReplySetting?.language) return autoReplySetting.language;
+  // 3. Company.defaultLanguageId → code ISO
+  if (defaultLang?.code) return defaultLang.code;
+  // 4. Accept-Language du navigateur du client (auto-detect)
+  if (acceptLanguage) {
+    const first = acceptLanguage.split(",")[0]?.trim().split(";")[0]?.trim().toLowerCase().split("-")[0];
+    if (first && /^[a-z]{2}$/.test(first)) return first;
+  }
+  return "en";
+}
+
+// ── Construction du prompt complet ──────────────────────────────────────────
+function buildSuggestionPrompt({ starsNum, isPositive, card, aiSetting, autoReplySetting, defaultLang, acceptLanguage }) {
+  // Ton : AiSetting → AutoReplySetting → défaut
+  const tone = aiSetting?.tone ?? autoReplySetting?.tone ?? "professional";
+
+  // Langue : toutes les couches
+  const language = resolveLanguageFull({ aiSetting, autoReplySetting, defaultLang, acceptLanguage });
+
+  // Contexte métier : AiSetting.businessContext → Location → Card → Company
+  const locationDetail = [card.location?.city, card.location?.country]
+    .filter(Boolean).join(", ");
+  const ctx = aiSetting?.businessContext?.trim()
+    || (card.location?.name
+        ? `${card.location.name}${locationDetail ? ` — ${locationDetail}` : ""}`
+        : null)
+    || card.locationName
+    || card.company?.name
+    || "the business";
+
+  // Plateforme cible (Google, TripAdvisor, Booking…)
+  const PLATFORM_LABELS = {
+    google: "Google Reviews", tripadvisor: "TripAdvisor",
+    booking: "Booking.com", airbnb: "Airbnb", custom: "the review platform",
+  };
+  const platform = card.design?.platform ?? "google";
+  const platformLabel = PLATFORM_LABELS[platform] ?? "the review platform";
+
+  // Description de la note
+  const ratingDesc = ["", "terrible (1★)", "poor (2★)", "average (3★)", "good (4★)", "excellent (5★)"][starsNum];
+  const sentiment  = isPositive ? "positive" : "negative";
+
+  // Instruction de langue
+  const langInstruction = language === "en"
+    ? "Write in English."
+    : `Write in the language with ISO 639-1 code "${language}".`;
+
+  return [
+    `You are helping a customer write a short ${platformLabel} review.`,
+    `Business: "${ctx}".`,
+    `Rating given: ${ratingDesc} — ${sentiment} experience.`,
+    `Tone required: ${tone}.`,
+    langInstruction,
+    `Generate exactly 3 short review starters the customer can use or adapt (max 8 words each).`,
+    `They should sound natural, authentic, and match the rating.`,
+    `Return ONLY a valid JSON array of 3 strings — no explanation, no markdown.`,
+    `Example: ["Great service!", "Really enjoyed my visit!", "Highly recommend!"]`,
+  ].join(" ");
+}
+
+async function callAIForSuggestions(provider, prompt) {
+  const signal = AbortSignal.timeout(5000);
+
+  if (provider.name === "openai") {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${provider.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: provider.model ?? "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 120, temperature: 0.7,
+      }),
+      signal,
+    });
+    if (!r.ok) throw new Error(`OpenAI ${r.status}`);
+    const d = await r.json();
+    return JSON.parse(d.choices[0].message.content.trim());
+  }
+
+  if (provider.name === "anthropic") {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: provider.model ?? "claude-haiku-4-5-20251001",
+        max_tokens: 120,
+        messages: [{ role: "user", content: prompt }],
+      }),
+      signal,
+    });
+    if (!r.ok) throw new Error(`Anthropic ${r.status}`);
+    const d = await r.json();
+    return JSON.parse(d.content[0].text.trim());
+  }
+
+  if (provider.name === "google") {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model ?? "gemini-2.0-flash"}:generateContent?key=${provider.apiKey}`;
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 120, temperature: 0.7 },
+      }),
+      signal,
+    });
+    if (!r.ok) throw new Error(`Google ${r.status}`);
+    const d = await r.json();
+    return JSON.parse(d.candidates[0].content.parts[0].text.trim());
+  }
+
+  throw new Error("Unknown provider");
+}
 
 // ─── Email admin ───────────────────────────────────────────────
 async function sendFeedbackNotification(feedback, card) {

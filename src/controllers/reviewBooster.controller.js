@@ -8,10 +8,12 @@ export async function getBoosterAnalytics(req, res) {
   try {
     const since = new Date(Date.now() - days * 86400_000);
 
-    const [total, withSuggestion, submitted] = await Promise.all([
+    const [total, withSuggestion, submitted, scansShown] = await Promise.all([
       prisma.reviewBoosterEvent.count({ where: { companyId, createdAt: { gte: since } } }),
       prisma.reviewBoosterEvent.count({ where: { companyId, createdAt: { gte: since }, suggestionUsed: true } }),
       prisma.reviewBoosterEvent.count({ where: { companyId, createdAt: { gte: since }, reviewSubmitted: true } }),
+      // NFC scans = tous les clients qui ont potentiellement vu le booster
+      prisma.nfcScan.count({ where: { companyId, scannedAt: { gte: since } } }),
     ]);
 
     // Average rating for submitted booster events
@@ -62,9 +64,9 @@ export async function getBoosterAnalytics(req, res) {
       suggestionUsagePct: total > 0 ? Math.round((withSuggestion / total) * 100) : 0,
       googleGrowth,
       funnel: {
-        shown: total,          // booster was triggered = suggestion was displayed
-        used: withSuggestion,  // user clicked "use this suggestion"
-        submitted,             // review actually submitted
+        shown: scansShown,     // tous les scans NFC = tous les clients qui ont vu la page review
+        used: withSuggestion,  // ont cliqué sur une suggestion IA
+        submitted,             // ont soumis un avis via le booster
       },
       series: series.map((row) => ({
         date: new Date(row.date).toLocaleDateString("en", { month: "short", day: "numeric" }),

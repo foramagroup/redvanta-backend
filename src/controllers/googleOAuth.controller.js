@@ -47,22 +47,19 @@ export async function getAuthUrl(req, res) {
 // GET /api/admin/google/callback  (public — called by Google redirect)
 export async function handleCallback(req, res) {
   const { code, state, error } = req.query;
+  const frontUrl = process.env.FRONT_URL || process.env.URL_DEV_FRONTEND || "http://localhost:3000";
 
-  const closeWithError = (msg) => res.send(`
-    <script>
-      window.opener?.postMessage({ type: "GOOGLE_ERROR", message: ${JSON.stringify(msg)} }, "*");
-      window.close();
-    </script>
-  `);
+  const redirectError = (msg) =>
+    res.redirect(`${frontUrl}/google-callback?status=error&message=${encodeURIComponent(msg)}`);
 
-  if (error) return closeWithError(error);
-  if (!code || !state) return closeWithError("Missing code or state");
+  if (error) return redirectError(error);
+  if (!code || !state) return redirectError("Missing code or state");
 
   let companyId;
   try {
     ({ companyId } = jwt.verify(state, process.env.JWT_SECRET));
   } catch {
-    return closeWithError("Invalid or expired state");
+    return redirectError("Invalid or expired state");
   }
 
   // Exchange code for tokens
@@ -77,7 +74,7 @@ export async function handleCallback(req, res) {
     tokens = await resp.json();
     if (!tokens.access_token) throw new Error(tokens.error ?? "No access_token");
   } catch (err) {
-    return closeWithError("Token exchange failed: " + err.message);
+    return redirectError("Token exchange failed: " + err.message);
   }
 
   // Fetch Google account info
@@ -111,19 +108,13 @@ export async function handleCallback(req, res) {
       googleAccountId,
       email,
       accessToken:  encrypt(tokens.access_token),
-      // Ne mettre à jour le refreshToken que si Google en envoie un nouveau
       ...(tokens.refresh_token ? { refreshToken: encrypt(tokens.refresh_token) } : {}),
       expiresAt,
       needsReauth: false,
     },
   });
 
-  res.send(`
-    <script>
-      window.opener?.postMessage({ type: "GOOGLE_CONNECTED", email: ${JSON.stringify(email)} }, "*");
-      window.close();
-    </script>
-  `);
+  res.redirect(`${frontUrl}/google-callback?status=connected&email=${encodeURIComponent(email ?? "")}`);
 }
 
 // GET /api/admin/google/status
