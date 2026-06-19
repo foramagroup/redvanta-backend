@@ -49,9 +49,10 @@ function formatReview(feedback) {
     statusKey:    STATUS_TO_I18N[feedback.status] ?? "rev.pending",
     status:       feedback.status,
     // ─ Admin ────────────────────────────────────────────────
-    internalNotes: feedback.internalNotes ?? null,
-    adminReply:    feedback.adminReply    ?? null,
-    repliedAt:     feedback.repliedAt     ?? null,
+    internalNotes:     feedback.internalNotes     ?? null,
+    adminReply:        feedback.adminReply        ?? null,
+    aiSuggestedReply:  feedback.aiSuggestedReply  ?? null,
+    repliedAt:         feedback.repliedAt         ?? null,
     // ─ Dates ────────────────────────────────────────────────
     date:         formatDate(feedback.createdAt),
     createdAt:    feedback.createdAt,

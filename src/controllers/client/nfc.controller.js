@@ -19,7 +19,8 @@
 
 import prisma from "../../config/database.js";
 import crypto  from "crypto";
-import { fireAlert } from "../../services/alertTrigger.service.js";
+import { fireAlert }       from "../../services/alertTrigger.service.js";
+import { generateAiReply } from "../../services/aiReply.service.js";
 
 // ─── Constantes de comportement ───────────────────────────────
 
@@ -293,7 +294,7 @@ export const getReviewPage = async (req, res, next) => {
 export const submitRating = async (req, res, next) => {
   try {
     const { uid }    = req.params;
-    const { stars }  = req.body;
+    const { stars, comment, email } = req.body;
     const ip         = getIp(req);
     const ua         = req.headers["user-agent"] || null;
     const deviceType = detectDevice(ua);
@@ -336,30 +337,54 @@ export const submitRating = async (req, res, next) => {
         return res.json({ success: true, action: "INTERNAL_FEEDBACK", message: req.t("nfc.thank_you"), stars: starsNum, uid });
       }
 
-      try {
-        await prisma.review.create({
+      const lastScanForRating = await prisma.nfcScan.findFirst({
+        where: { cardUid: uid }, orderBy: { scannedAt: "desc" }, select: { scanType: true },
+      }).catch(() => null);
+      const ratingSource = (lastScanForRating?.scanType ?? "qr").toUpperCase();
+
+      // Créer Review + Feedback en parallèle (le Feedback assure la visibilité dans le dashboard admin)
+      await Promise.allSettled([
+        prisma.review.create({
           data: {
-            companyId: card.companyId,              // ✅ TOUJOURS renseigné
-            locationId: card.locationId || null,    // ✅ Nullable si pas de location
+            companyId: card.companyId,
+            locationId: card.locationId || null,
             rating: starsNum,
             status: "posted",
             source: platform,
-            comment: null,
+            comment: comment?.trim() || null,
             userName: null,
-            email: null,
+            email: email?.trim() || null,
             postedAt: new Date(),
           },
-        });
-        console.log(`[nfc] ✅ Review created: ${starsNum}★ (posted) - company=${card.companyId}, location=${card.locationId || 'none'}`);
-        fireAlert(
-          card.companyId,
-          "review",
-          "New Public Review",
-          `A ${starsNum}-star review was submitted at ${card.locationName ?? card.company?.name ?? "your location"}.`
-        ).catch(() => {});
-      } catch (err) {
-        console.error(`[nfc] ❌ Failed to create Review:`, err);
-      }
+        }),
+        prisma.feedback.create({
+          data: {
+            cardUid: uid,
+            companyId: card.companyId,
+            locationId: card.locationId ?? null,
+            stars: starsNum,
+            message: comment?.trim() || null,
+            email: email?.trim() || null,
+            customerName: null,
+            status: "PUBLIC",
+            source: ratingSource,
+          },
+        }),
+      ]).then(results =>
+        results.forEach((r, i) => {
+          if (r.status === "rejected")
+            console.error(`[nfc] ❌ Failed to create ${i === 0 ? "Review" : "Feedback"}:`, r.reason?.message);
+          else if (i === 0)
+            console.log(`[nfc] ✅ Review created: ${starsNum}★ (posted) - company=${card.companyId}`);
+        })
+      );
+
+      fireAlert(
+        card.companyId,
+        "review",
+        "New Public Review",
+        `A ${starsNum}-star review was submitted at ${card.locationName ?? card.company?.name ?? "your location"}.`
+      ).catch(() => {});
 
       // Tracker + incrémenter compteur
       Promise.all([
@@ -453,7 +478,7 @@ export const submitFeedback = async (req, res, next) => {
     });
 
     logEvent(uid, card.companyId, "FEEDBACK_SUBMITTED", { stars: starsNum }).catch(console.error);
-    sendFeedbackNotification(feedback, card).catch((e) => console.error("[nfc] feedback email:", e.message));
+    processNegativeFeedback(feedback, card).catch((e) => console.error("[nfc] processNegativeFeedback:", e.message));
     fireAlert(
       card.companyId,
       "negative",
@@ -470,11 +495,11 @@ export const submitFeedback = async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 
 const STATIC_SUGGESTIONS = {
-  5: ["Amazing experience, highly recommend!", "Outstanding service and quality!", "Absolutely loved it!"],
-  4: ["Great experience overall!", "Very good service, will return!", "Really enjoyed my visit!"],
-  3: ["Decent experience, some room to improve.", "Good but could be better.", "Acceptable overall."],
-  2: ["Disappointing, expected more.", "Service needs improvement.", "Not what I expected."],
-  1: ["Very poor experience.", "Would not recommend.", "Very disappointed."],
+  5: ["Amazing experience, highly recommend!"],
+  4: ["Great experience overall!"],
+  3: ["Decent experience, some room to improve."],
+  2: ["Disappointing, expected more."],
+  1: ["Very poor experience."],
 };
 
 export const getSuggestions = async (req, res, next) => {
@@ -536,8 +561,33 @@ export const getSuggestions = async (req, res, next) => {
             acceptLanguage: req.headers["accept-language"] ?? null,
           });
           const suggs = await callAIForSuggestions(provider, prompt);
-          if (Array.isArray(suggs) && suggs.length >= 3) {
-            return res.json({ suggestions: suggs.slice(0, 3) });
+          if (Array.isArray(suggs) && suggs.length >= 1) {
+            // Tracker la génération + décrémenter les crédits (fire-and-forget)
+            // Promise.allSettled : les deux s'exécutent même si l'une échoue
+            Promise.allSettled([
+              prisma.reviewBoosterEvent.create({
+                data: {
+                  companyId: card.companyId,
+                  nfcCardId: card.id ?? null,
+                  locationId: card.locationId ?? null,
+                  rating: starsNum,
+                  suggestionUsed: false,
+                  reviewSubmitted: false,
+                },
+              }),
+              // upsert : crée le record si absent (évite P2025 "record not found")
+              prisma.aiCreditBalance.upsert({
+                where: { companyId },
+                update: { used: { increment: 1 } },
+                create: { companyId, planIncluded: 0, purchased: 0, used: 1 },
+              }),
+            ]).then(results =>
+              results.forEach(r => {
+                if (r.status === "rejected")
+                  console.warn("[suggest] tracking error:", r.reason?.message);
+              })
+            );
+            return res.json({ suggestions: suggs.slice(0, 1) });
           }
         } catch (e) {
           console.warn("[suggest] AI call failed:", e.message);
@@ -607,10 +657,10 @@ function buildSuggestionPrompt({ starsNum, isPositive, card, aiSetting, autoRepl
     `Rating given: ${ratingDesc} — ${sentiment} experience.`,
     `Tone required: ${tone}.`,
     langInstruction,
-    `Generate exactly 3 short review starters the customer can use or adapt (max 8 words each).`,
-    `They should sound natural, authentic, and match the rating.`,
-    `Return ONLY a valid JSON array of 3 strings — no explanation, no markdown.`,
-    `Example: ["Great service!", "Really enjoyed my visit!", "Highly recommend!"]`,
+    `Generate exactly 1 short review starter the customer can use or adapt (max 8 words).`,
+    `It should sound natural, authentic, and match the rating.`,
+    `Return ONLY a valid JSON array of 1 string — no explanation, no markdown.`,
+    `Example: ["Great service!"]`,
   ].join(" ");
 }
 
@@ -624,7 +674,7 @@ async function callAIForSuggestions(provider, prompt) {
       body: JSON.stringify({
         model: provider.model ?? "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 120, temperature: 0.7,
+        max_tokens: 40, temperature: 0.7,
       }),
       signal,
     });
@@ -639,7 +689,7 @@ async function callAIForSuggestions(provider, prompt) {
       headers: { "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
       body: JSON.stringify({
         model: provider.model ?? "claude-haiku-4-5-20251001",
-        max_tokens: 120,
+        max_tokens: 40,
         messages: [{ role: "user", content: prompt }],
       }),
       signal,
@@ -656,7 +706,7 @@ async function callAIForSuggestions(provider, prompt) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 120, temperature: 0.7 },
+        generationConfig: { maxOutputTokens: 40, temperature: 0.7 },
       }),
       signal,
     });
@@ -668,8 +718,44 @@ async function callAIForSuggestions(provider, prompt) {
   throw new Error("Unknown provider");
 }
 
-// ─── Email admin ───────────────────────────────────────────────
-async function sendFeedbackNotification(feedback, card) {
+// ─── Génération IA + Email admin ──────────────────────────────
+// Appelé en fire-and-forget depuis submitFeedback.
+// 1. Génère une réponse IA si le client a laissé un message
+// 2. Sauvegarde la suggestion dans aiSuggestedReply
+// 3. Envoie l'email de notification à l'admin (avec la réponse IA si dispo)
+async function processNegativeFeedback(feedback, card) {
+  let aiReply = null;
+
+  if (feedback.message?.trim()) {
+    try {
+      const settings = await prisma.autoReplySetting.findUnique({
+        where: { companyId: card.companyId },
+      }).catch(() => null);
+
+      aiReply = await generateAiReply({
+        review: {
+          rating:     feedback.stars,
+          comment:    feedback.message,
+          authorName: feedback.customerName ?? null,
+        },
+        tone:     settings?.tone     ?? "professional",
+        language: settings?.language ?? "auto",
+      });
+
+      await prisma.feedback.update({
+        where: { id: feedback.id },
+        data:  { aiSuggestedReply: aiReply },
+      });
+      console.log(`[nfc] ✅ AI reply generated for feedback ${feedback.id}`);
+    } catch (e) {
+      console.warn(`[nfc] AI reply skipped for feedback ${feedback.id}:`, e.message);
+    }
+  }
+
+  await sendFeedbackNotification(feedback, card, aiReply);
+}
+
+async function sendFeedbackNotification(feedback, card, aiReply = null) {
   try {
     const { sendTemplatedMail, resolveCompanyLangId } = await import("../../services/client/mail.service.js");
     const ownerLink = await prisma.userCompany.findFirst({
@@ -678,19 +764,33 @@ async function sendFeedbackNotification(feedback, card) {
     if (!ownerLink) return;
 
     const langId = await resolveCompanyLangId(card.companyId);
+
+    const aiBlock = aiReply
+      ? `<div style="margin-top:16px;padding:12px;background:#f0fdf4;border-left:4px solid #22c55e;border-radius:4px">
+           <p style="margin:0 0 6px;font-size:12px;color:#16a34a;font-weight:600">✨ Réponse suggérée par l'IA :</p>
+           <p style="margin:0;color:#166534">${aiReply}</p>
+         </div>`
+      : "";
+
     await sendTemplatedMail({
       slug: "feedback_received",
       to:   ownerLink.user.email,
       langId,
       variables: {
-        stars: String(feedback.stars), message: feedback.message ?? "Aucun message",
-        location: card.locationName ?? "Votre établissement",
-        date: new Date().toLocaleDateString("fr-FR"),
+        stars:               String(feedback.stars),
+        message:             feedback.message ?? "Aucun message",
+        location:            card.locationName ?? "Votre établissement",
+        date:                new Date().toLocaleDateString("fr-FR"),
+        ai_suggested_reply:  aiReply ?? "",
       },
       fallbackFn: () => ({
         subject: `⭐ Feedback ${feedback.stars}/5 — ${card.locationName ?? ""}`,
-        html: `<p>Nouveau feedback <strong>${feedback.stars}/5</strong> pour "${card.locationName ?? "votre établissement"}".</p><p><strong>Message :</strong> ${feedback.message ?? ""}</p><p><em>${new Date().toLocaleDateString("fr-FR")}</em></p>`,
-        text: `Feedback ${feedback.stars}/5 : ${feedback.message ?? ""}`,
+        html: `<p>Nouveau feedback <strong>${feedback.stars}/5</strong> pour "${card.locationName ?? "votre établissement"}".</p>
+               <p><strong>Message :</strong> ${feedback.message ?? ""}</p>
+               ${aiBlock}
+               <p><em>${new Date().toLocaleDateString("fr-FR")}</em></p>
+               <p style="margin-top:16px"><a href="${process.env.FRONT_URL}/dashboard/reviews" style="color:#E10600">Consulter dans le dashboard →</a></p>`,
+        text: `Feedback ${feedback.stars}/5 : ${feedback.message ?? ""}${aiReply ? `\n\nRéponse IA proposée :\n${aiReply}` : ""}\n\nConsulter : ${process.env.FRONT_URL}/dashboard/reviews`,
       }),
     });
 

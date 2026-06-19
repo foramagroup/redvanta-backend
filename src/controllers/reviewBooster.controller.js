@@ -2,17 +2,22 @@ import prisma from "../config/database.js";
 
 // GET /api/admin/ai/review-booster/analytics
 export async function getBoosterAnalytics(req, res) {
-  const companyId = req.user.companyId;
+  const companyId = Number(req.user.companyId);
+  if (!companyId) return res.status(400).json({ error: "companyId missing from session" });
   const days = Math.min(Number(req.query.days ?? 30), 365);
 
   try {
     const since = new Date(Date.now() - days * 86400_000);
 
-    const [total, withSuggestion, submitted, scansShown] = await Promise.all([
-      prisma.reviewBoosterEvent.count({ where: { companyId, createdAt: { gte: since } } }),
-      prisma.reviewBoosterEvent.count({ where: { companyId, createdAt: { gte: since }, suggestionUsed: true } }),
+    // generated  = événements créés par le backend au moment de la génération IA (reviewSubmitted: false)
+    // submitted  = événements créés par le frontend à la soumission (reviewSubmitted: true)
+    // withSuggestion = soumissions où le client a utilisé la suggestion IA
+    console.log(`[getBoosterAnalytics] companyId=${companyId} days=${days} since=${since.toISOString()}`);
+
+    const [generated, withSuggestion, submitted, scansShown] = await Promise.all([
+      prisma.reviewBoosterEvent.count({ where: { companyId, createdAt: { gte: since }, reviewSubmitted: false } }),
+      prisma.reviewBoosterEvent.count({ where: { companyId, createdAt: { gte: since }, reviewSubmitted: true, suggestionUsed: true } }),
       prisma.reviewBoosterEvent.count({ where: { companyId, createdAt: { gte: since }, reviewSubmitted: true } }),
-      // NFC scans = tous les clients qui ont potentiellement vu le booster
       prisma.nfcScan.count({ where: { companyId, scannedAt: { gte: since } } }),
     ]);
 
@@ -22,18 +27,18 @@ export async function getBoosterAnalytics(req, res) {
       _avg: { rating: true },
     });
 
-    // Daily series
+    // Daily series — generated = suggestions IA demandées, booster = soumis avec suggestion, published = tous les soumis
     const series = await prisma.$queryRaw`
       SELECT
-        DATE(createdAt) AS date,
-        COUNT(*) AS generated,
-        SUM(CASE WHEN suggestionUsed = 1 THEN 1 ELSE 0 END) AS booster,
-        SUM(CASE WHEN reviewSubmitted = 1 THEN 1 ELSE 0 END) AS published
+        DATE(createdAt) AS \`date\`,
+        SUM(CASE WHEN reviewSubmitted = 0 THEN 1 ELSE 0 END) AS \`generated\`,
+        SUM(CASE WHEN suggestionUsed = 1 THEN 1 ELSE 0 END) AS \`booster\`,
+        SUM(CASE WHEN reviewSubmitted = 1 THEN 1 ELSE 0 END) AS \`published\`
       FROM review_booster_events
       WHERE companyId = ${companyId}
         AND createdAt >= ${since}
       GROUP BY DATE(createdAt)
-      ORDER BY date ASC
+      ORDER BY \`date\` ASC
     `;
 
     // Google growth: reviews with source=google created in range
@@ -41,9 +46,9 @@ export async function getBoosterAnalytics(req, res) {
       where: { companyId, source: "google", createdAt: { gte: since } },
     });
 
-    // Individual events for the performance table (last 50, most recent first)
+    // Performance table : uniquement les soumissions (reviewSubmitted: true), last 50
     const events = await prisma.reviewBoosterEvent.findMany({
-      where: { companyId, createdAt: { gte: since } },
+      where: { companyId, createdAt: { gte: since }, reviewSubmitted: true },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
@@ -56,17 +61,20 @@ export async function getBoosterAnalytics(req, res) {
       },
     });
 
+    // total = all interactions (generation events + submission events)
+    const total = generated + submitted;
+
     res.json({
-      requests: total,
-      completions: submitted,
-      conversionRate: total > 0 ? Math.round((submitted / total) * 100) : 0,
+      requests: total,         // toutes les interactions (génération IA + soumissions)
+      completions: submitted,  // avis soumis (frontend events)
+      conversionRate: generated > 0 ? Math.round((submitted / generated) * 100) : (total > 0 ? 100 : 0),
       averageRating: avgResult._avg.rating ?? 0,
-      suggestionUsagePct: total > 0 ? Math.round((withSuggestion / total) * 100) : 0,
+      suggestionUsagePct: submitted > 0 ? Math.round((withSuggestion / submitted) * 100) : 0,
       googleGrowth,
       funnel: {
-        shown: scansShown,     // tous les scans NFC = tous les clients qui ont vu la page review
-        used: withSuggestion,  // ont cliqué sur une suggestion IA
-        submitted,             // ont soumis un avis via le booster
+        shown: scansShown,     // tous les scans NFC
+        used: withSuggestion,  // ont utilisé la suggestion IA ET soumis
+        submitted,             // ont soumis un avis
       },
       series: series.map((row) => ({
         date: new Date(row.date).toLocaleDateString("en", { month: "short", day: "numeric" }),
@@ -113,6 +121,7 @@ export async function recordBoosterEvent(req, res) {
 
     res.json({ ok: true });
   } catch (err) {
+    console.error("[recordBoosterEvent] error:", err.message);
     res.status(500).json({ error: err.message });
   }
 }
