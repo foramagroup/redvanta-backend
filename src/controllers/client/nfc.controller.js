@@ -718,44 +718,120 @@ async function callAIForSuggestions(provider, prompt) {
   throw new Error("Unknown provider");
 }
 
-// ─── Génération IA + Email admin ──────────────────────────────
-// Appelé en fire-and-forget depuis submitFeedback.
-// 1. Génère une réponse IA si le client a laissé un message
-// 2. Sauvegarde la suggestion dans aiSuggestedReply
-// 3. Envoie l'email de notification à l'admin (avec la réponse IA si dispo)
+// ─── Score de sécurité (même logique que autoReply.controller.js) ─────────────
+const DANGER_RX   = /\b(sue|lawsuit|lawyer|legal action|defamation|discrimination|illegal|report you|authorities)\b/i;
+const LEGAL_RX    = /\b(guarantee|warranty|100%|no questions asked|always|never|best in the world)\b/i;
+const TOXICITY_RX = /\b(idiot|moron|stupid|hate|despise|shut up|go away)\b/i;
+
+function scoreReply(text) {
+  if (!text) return 0;
+  let score = 100;
+  if (TOXICITY_RX.test(text)) score -= 40;
+  if (DANGER_RX.test(text))   score -= 30;
+  if (LEGAL_RX.test(text))    score -= 10;
+  if (text.length > 500)      score -= 5;
+  if (text.length < 20)       score -= 15;
+  return Math.max(0, score);
+}
+
+// ─── Pipeline IA complet pour feedbacks négatifs internes ─────────────────────
+// Modes gérés (AutoReplySetting.mode) :
+//   "off"     → pas de génération IA, email simple à l'admin
+//   "suggest" → IA génère, admin valide dans le dashboard
+//   "publish" → IA génère + envoie email au client automatiquement (si email dispo)
+//   "hybrid"  → auto-envoie si stars >= publishThreshold, sinon suggest
+// Le score de sécurité peut bloquer l'auto-envoi (→ fallback sur "suggest")
 async function processNegativeFeedback(feedback, card) {
-  let aiReply = null;
+  let aiReply     = null;
+  let replyStatus = null; // "suggested" | "published" | "blocked" | null
 
   if (feedback.message?.trim()) {
     try {
-      const settings = await prisma.autoReplySetting.findUnique({
-        where: { companyId: card.companyId },
-      }).catch(() => null);
+      const [autoReplySettings, aiSettings] = await Promise.all([
+        prisma.autoReplySetting.findUnique({ where: { companyId: card.companyId } }).catch(() => null),
+        prisma.aiSetting.findUnique({ where: { companyId: card.companyId } }).catch(() => null),
+      ]);
 
-      aiReply = await generateAiReply({
-        review: {
-          rating:     feedback.stars,
-          comment:    feedback.message,
-          authorName: feedback.customerName ?? null,
-        },
-        tone:     settings?.tone     ?? "professional",
-        language: settings?.language ?? "auto",
-      });
+      const mode             = autoReplySettings?.mode             ?? "suggest";
+      const minRating        = autoReplySettings?.minRating        ?? 1;
+      const safetyThreshold  = autoReplySettings?.safetyThreshold  ?? 80;
+      const publishThreshold = autoReplySettings?.publishThreshold ?? 5;
 
-      await prisma.feedback.update({
-        where: { id: feedback.id },
-        data:  { aiSuggestedReply: aiReply },
-      });
-      console.log(`[nfc] ✅ AI reply generated for feedback ${feedback.id}`);
+      if (mode === "off") {
+        console.log(`[nfc] mode=off — AI skipped for feedback ${feedback.id}`);
+      } else if (feedback.stars < minRating) {
+        console.log(`[nfc] ${feedback.stars}★ < minRating ${minRating} — AI skipped for feedback ${feedback.id}`);
+      } else {
+        const tone     = autoReplySettings?.tone     ?? aiSettings?.tone     ?? "professional";
+        const language = autoReplySettings?.language ?? aiSettings?.language ?? "auto";
+
+        aiReply = await generateAiReply({
+          review: { rating: feedback.stars, comment: feedback.message, authorName: feedback.customerName ?? null },
+          tone,
+          language,
+        });
+
+        const safetyScore = scoreReply(aiReply);
+        // Bloquer si score insuffisant ou note très basse (≤ 2★ trop risqué)
+        const isBlocked = safetyScore < safetyThreshold || feedback.stars <= 2;
+
+        if (isBlocked) {
+          replyStatus = "blocked";
+          await prisma.feedback.update({ where: { id: feedback.id }, data: { aiSuggestedReply: aiReply } });
+          console.log(`[nfc] ⚠️ AI reply BLOCKED (safety=${safetyScore}) for feedback ${feedback.id} — admin must reply manually`);
+
+        } else {
+          // Déterminer si on envoie automatiquement
+          const shouldAutoSend =
+            mode === "publish" ||
+            (mode === "hybrid" && feedback.stars >= publishThreshold);
+
+          if (shouldAutoSend && feedback.email) {
+            // ── AUTO-REPLY : envoyer directement au client par email ──────────
+            const { sendTemplatedMail } = await import("../../services/client/mail.service.js");
+            await sendTemplatedMail({
+              slug: "feedback_reply",
+              to:   feedback.email,
+              variables: {
+                customerName: feedback.customerName ?? "Client",
+                reply:        aiReply,
+                stars:        String(feedback.stars),
+                originalText: feedback.message ?? "",
+              },
+              fallbackFn: () => ({
+                subject: "Réponse à votre avis",
+                html: `<p>Bonjour ${feedback.customerName ?? ""},</p>
+                       <p>Merci pour votre retour. Voici notre réponse :</p>
+                       <blockquote style="border-left:3px solid #ccc;padding-left:12px;color:#555;margin:12px 0">${aiReply}</blockquote>`,
+                text: `Bonjour, voici notre réponse à votre avis :\n\n${aiReply}`,
+              }),
+            });
+            // Marquer le feedback comme résolu
+            await prisma.feedback.update({
+              where: { id: feedback.id },
+              data:  { aiSuggestedReply: aiReply, adminReply: aiReply, repliedAt: new Date(), status: "RESOLVED" },
+            });
+            replyStatus = "published";
+            console.log(`[nfc] ✅ AI reply AUTO-SENT to client for feedback ${feedback.id} (mode=${mode})`);
+
+          } else {
+            // ── SUGGEST : sauvegarder pour validation admin ───────────────────
+            // (mode=suggest, ou hybrid en dessous du seuil, ou publish sans email)
+            await prisma.feedback.update({ where: { id: feedback.id }, data: { aiSuggestedReply: aiReply } });
+            replyStatus = "suggested";
+            console.log(`[nfc] ✅ AI reply SUGGESTED for feedback ${feedback.id} (mode=${mode}, email=${!!feedback.email})`);
+          }
+        }
+      }
     } catch (e) {
       console.warn(`[nfc] AI reply skipped for feedback ${feedback.id}:`, e.message);
     }
   }
 
-  await sendFeedbackNotification(feedback, card, aiReply);
+  await sendFeedbackNotification(feedback, card, aiReply, replyStatus);
 }
 
-async function sendFeedbackNotification(feedback, card, aiReply = null) {
+async function sendFeedbackNotification(feedback, card, aiReply = null, replyStatus = null) {
   try {
     const { sendTemplatedMail, resolveCompanyLangId } = await import("../../services/client/mail.service.js");
     const ownerLink = await prisma.userCompany.findFirst({
@@ -765,12 +841,26 @@ async function sendFeedbackNotification(feedback, card, aiReply = null) {
 
     const langId = await resolveCompanyLangId(card.companyId);
 
+    // Adapter le sujet et le message selon le statut de la réponse IA
+    const subjectPrefix =
+      replyStatus === "published" ? "✅ Réponse IA envoyée automatiquement" :
+      replyStatus === "suggested" ? "✨ Feedback + réponse IA à valider" :
+      replyStatus === "blocked"   ? "⚠️ Feedback négatif — réponse IA bloquée (à traiter)" :
+      `⭐ Nouveau feedback ${feedback.stars}/5`;
+
     const aiBlock = aiReply
       ? `<div style="margin-top:16px;padding:12px;background:#f0fdf4;border-left:4px solid #22c55e;border-radius:4px">
-           <p style="margin:0 0 6px;font-size:12px;color:#16a34a;font-weight:600">✨ Réponse suggérée par l'IA :</p>
+           <p style="margin:0 0 6px;font-size:12px;color:#16a34a;font-weight:600">
+             ${replyStatus === "published" ? "✅ Réponse IA envoyée au client :" : "✨ Réponse IA proposée :"}
+           </p>
            <p style="margin:0;color:#166534">${aiReply}</p>
          </div>`
       : "";
+
+    const ctaText =
+      replyStatus === "published" ? "Voir le feedback dans le dashboard" :
+      replyStatus === "blocked"   ? "Répondre manuellement dans le dashboard" :
+      "Voir et répondre dans le dashboard";
 
     await sendTemplatedMail({
       slug: "feedback_received",
@@ -782,15 +872,16 @@ async function sendFeedbackNotification(feedback, card, aiReply = null) {
         location:            card.locationName ?? "Votre établissement",
         date:                new Date().toLocaleDateString("fr-FR"),
         ai_suggested_reply:  aiReply ?? "",
+        reply_status:        replyStatus ?? "",
       },
       fallbackFn: () => ({
-        subject: `⭐ Feedback ${feedback.stars}/5 — ${card.locationName ?? ""}`,
+        subject: `${subjectPrefix} — ${card.locationName ?? ""}`,
         html: `<p>Nouveau feedback <strong>${feedback.stars}/5</strong> pour "${card.locationName ?? "votre établissement"}".</p>
                <p><strong>Message :</strong> ${feedback.message ?? ""}</p>
                ${aiBlock}
                <p><em>${new Date().toLocaleDateString("fr-FR")}</em></p>
-               <p style="margin-top:16px"><a href="${process.env.FRONT_URL}/dashboard/reviews" style="color:#E10600">Consulter dans le dashboard →</a></p>`,
-        text: `Feedback ${feedback.stars}/5 : ${feedback.message ?? ""}${aiReply ? `\n\nRéponse IA proposée :\n${aiReply}` : ""}\n\nConsulter : ${process.env.FRONT_URL}/dashboard/reviews`,
+               <p style="margin-top:16px"><a href="${process.env.FRONT_URL}/dashboard/reviews?open=${feedback.id}" style="color:#E10600;font-weight:600">${ctaText} →</a></p>`,
+        text: `Feedback ${feedback.stars}/5 : ${feedback.message ?? ""}${aiReply ? `\n\n${replyStatus === "published" ? "Réponse IA envoyée :" : "Réponse IA proposée :"}\n${aiReply}` : ""}\n\n${ctaText} : ${process.env.FRONT_URL}/dashboard/reviews?open=${feedback.id}`,
       }),
     });
 
