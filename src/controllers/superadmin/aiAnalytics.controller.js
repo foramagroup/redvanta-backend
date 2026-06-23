@@ -305,9 +305,9 @@ export async function getLogs(req, res) {
     if (reviewIds.length > 0) {
       const reviews = await prisma.review.findMany({
         where: { id: { in: reviewIds } },
-        select: { id: true, text: true },
+        select: { id: true, comment: true },
       });
-      reviewMap = Object.fromEntries(reviews.map((r) => [r.id, r.text]));
+      reviewMap = Object.fromEntries(reviews.map((r) => [r.id, r.comment]));
     }
 
     const rows = logs.map((l) => {
