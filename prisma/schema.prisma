@@ -1098,6 +1098,7 @@ model CardTemplate {
   // Layout
   orientation      String  @default("landscape") @db.VarChar(20)
   orientations      String?   @db.VarChar(200)
+  customDimensions  String?   @db.Text
   iconColor      String?   @db.VarChar(200)
   bandPosition     String  @default("bottom") @db.VarChar(20) 
   frontBandHeight  Int     @default(22) 

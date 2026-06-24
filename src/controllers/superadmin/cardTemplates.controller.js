@@ -84,6 +84,7 @@ function formatTemplate(template) {
     
     // Element offsets
     elementOffsets: template.elementOffsets,
+    customDimensions: template.customDimensions,
 
     // Serial Number Tag
     showSerialNumber:      template.showSerialNumber ?? true,
@@ -402,6 +403,7 @@ export const createTemplate = async (req, res) => {
         
         // Element offsets
         elementOffsets: data.elementOffsets || null,
+        customDimensions: data.customDimensions || null,
 
         // Serial Number Tag
         showSerialNumber:      data.showSerialNumber !== undefined ? data.showSerialNumber : true,
@@ -631,6 +633,7 @@ export const updateTemplate = async (req, res) => {
     
     // Element offsets
     if (data.elementOffsets !== undefined) updateData.elementOffsets = data.elementOffsets;
+    if (data.customDimensions !== undefined) updateData.customDimensions = data.customDimensions;
 
     // Serial Number Tag
     if (data.showSerialNumber !== undefined)      updateData.showSerialNumber      = data.showSerialNumber;
@@ -907,6 +910,7 @@ export const duplicateTemplate = async (req, res) => {
         
         // Element offsets
         elementOffsets: original.elementOffsets || null,
+        customDimensions: original.customDimensions || null,
 
         // Serial Number Tag
         showSerialNumber:      original.showSerialNumber ?? true,
