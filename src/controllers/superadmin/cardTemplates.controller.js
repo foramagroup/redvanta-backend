@@ -105,11 +105,11 @@ function formatTemplate(template) {
     // Back-specific icon & instruction settings
     backShowGoogleIcon:        template.backShowGoogleIcon        ?? true,
     backGoogleIconSize:        template.backGoogleIconSize        ?? 20,
-    backPlatformIconBgEnabled: template.backPlatformIconBgEnabled ?? false,
+    backPlatformIconBgEnabled: template.backPlatformIconBgEnabled, // null = inherit from front (handled by frontend ?? logic)
     backPlatformIconBgColor:   template.backPlatformIconBgColor   ?? "#FFFFFF",
     backPlatformIconBgPadding: template.backPlatformIconBgPadding ?? 4,
     backPlatformIconBgRadius:  template.backPlatformIconBgRadius  ?? 999,
-    backPlatformIconBgShadow:  template.backPlatformIconBgShadow  ?? false,
+    backPlatformIconBgShadow:  template.backPlatformIconBgShadow, // null = inherit from front
     backInstructionTextAlign:  template.backInstructionTextAlign  ?? "left",
 
     // Back-specific Serial Number (null = inherit from front)
@@ -423,11 +423,11 @@ export const createTemplate = async (req, res) => {
         // Back-specific icon & instruction settings
         backShowGoogleIcon:        data.backShowGoogleIcon        ?? true,
         backGoogleIconSize:        data.backGoogleIconSize        ?? 20,
-        backPlatformIconBgEnabled: data.backPlatformIconBgEnabled ?? false,
+        backPlatformIconBgEnabled: data.backPlatformIconBgEnabled ?? null, // null = inherit from front
         backPlatformIconBgColor:   data.backPlatformIconBgColor   ?? "#FFFFFF",
         backPlatformIconBgPadding: data.backPlatformIconBgPadding ?? 4,
         backPlatformIconBgRadius:  data.backPlatformIconBgRadius  ?? 999,
-        backPlatformIconBgShadow:  data.backPlatformIconBgShadow  ?? false,
+        backPlatformIconBgShadow:  data.backPlatformIconBgShadow  ?? null, // null = inherit from front
         backInstructionTextAlign:  data.backInstructionTextAlign  ?? 'left',
 
         // Back-specific Serial Number (null = inherit from front)
@@ -932,11 +932,11 @@ export const duplicateTemplate = async (req, res) => {
         // Back-specific icon & instruction settings
         backShowGoogleIcon:        original.backShowGoogleIcon        ?? true,
         backGoogleIconSize:        original.backGoogleIconSize        ?? 20,
-        backPlatformIconBgEnabled: original.backPlatformIconBgEnabled ?? false,
+        backPlatformIconBgEnabled: original.backPlatformIconBgEnabled ?? null, // null = inherit from front
         backPlatformIconBgColor:   original.backPlatformIconBgColor   ?? "#FFFFFF",
         backPlatformIconBgPadding: original.backPlatformIconBgPadding ?? 4,
         backPlatformIconBgRadius:  original.backPlatformIconBgRadius  ?? 999,
-        backPlatformIconBgShadow:  original.backPlatformIconBgShadow  ?? false,
+        backPlatformIconBgShadow:  original.backPlatformIconBgShadow  ?? null, // null = inherit from front
         backInstructionTextAlign:  original.backInstructionTextAlign  ?? 'left',
 
         // Back-specific Serial Number

@@ -1180,11 +1180,11 @@ model CardTemplate {
   // Back-specific icon & instruction settings (independent from front)
   backShowGoogleIcon        Boolean @default(true)
   backGoogleIconSize        Int     @default(20)
-  backPlatformIconBgEnabled Boolean @default(false)
+  backPlatformIconBgEnabled Boolean? // null = inherit from front
   backPlatformIconBgColor   String  @default("#FFFFFF") @db.VarChar(30)
   backPlatformIconBgPadding Int     @default(4)
   backPlatformIconBgRadius  Int     @default(999)
-  backPlatformIconBgShadow  Boolean @default(false)
+  backPlatformIconBgShadow  Boolean? // null = inherit from front
   backInstructionTextAlign  String  @default("left") @db.VarChar(20)
 
   // ── Back-specific Serial Number (null = inherit from front) ────────────────
