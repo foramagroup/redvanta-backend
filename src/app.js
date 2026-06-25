@@ -85,6 +85,7 @@ import startBillingCron from './cron/billing.cron.js';
 import { startWeeklyAlertsCron } from './cron/weeklyAlerts.cron.js';
 import startSubscriptionReminderCron from './cron/subscriptionReminder.cron.js';
 import startGoogleSyncCron from './cron/googleSync.cron.js';
+import "./cron/blogScheduled.cron.js";
 import superadminFAQsRoutes from "./routes/superadmin/faqs.routes.js";
 import superadminStaticPageRoutes from "./routes/superadmin/staticPages.routes.js";
 import faqCategoriesRoutes from "./routes/superadmin/faqCategories.routes.js";

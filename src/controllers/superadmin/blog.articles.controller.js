@@ -41,14 +41,21 @@ function serializeArticle(a) {
   return {
     id:            a.id,
     slug:          a.slug,
-    image:         a.image     ?? "",
-    author:        a.author    ?? "",
-    date:          a.date      ?? "",
-    readTime:      a.readTime  ?? "",
+    image:         a.image          ?? "",
+    author:        a.author         ?? "",
+    date:          a.date           ?? "",
+    readTime:      a.readTime       ?? "",
     published:     a.published,
     publishedAt:   a.publishedAt,
-    categoryId:    a.categoryId ?? "",
+    scheduledAt:   a.scheduledAt    ?? null,
+    categoryId:    a.categoryId     ?? "",
+    hubId:         a.hubId          ?? "",
+    targetKeyword: a.targetKeyword  ?? "",
+    seoScore:      a.seoScore       ?? null,
     tagIds:        (a.tags ?? []).map((t) => t.tagId),
+    faqs:          (a.faqs ?? []).map((f) => ({ id: f.id, position: f.position, question: f.question, answer: f.answer })),
+    hubSlug:       a.hub?.slug      ?? "",
+    hubTitle:      a.hub?.translations?.[0]?.title ?? "",
     translations,
     previousSlugs: (a.previousSlugs ?? []).map((s) => s.slug),
     createdAt:     a.createdAt,
@@ -60,6 +67,8 @@ const ARTICLE_INCLUDE = {
   translations:  true,
   tags:          true,
   previousSlugs: true,
+  faqs:          { orderBy: { position: "asc" } },
+  hub:           { select: { id: true, slug: true, translations: { where: { lang: "en" }, select: { title: true } } } },
 };
 
 // ── GET /api/superadmin/blog/articles ────────────────────────
@@ -125,14 +134,19 @@ export const createArticle = async (req, res, next) => {
   try {
     const {
       slug: rawSlug,
-      image      = "",
-      author     = "",
-      date       = "",
-      readTime   = "",
-      categoryId = null,
-      tagIds     = [],
-      published  = false,
-      translations = {},
+      image         = "",
+      author        = "",
+      date          = "",
+      readTime      = "",
+      categoryId    = null,
+      hubId         = null,
+      targetKeyword = null,
+      seoScore      = null,
+      scheduledAt   = null,
+      tagIds        = [],
+      faqs          = [],
+      published     = false,
+      translations  = {},
     } = req.body;
 
     const enTitle = translations.en?.title;
@@ -167,16 +181,23 @@ export const createArticle = async (req, res, next) => {
       return tx.blogArticle.create({
         data: {
           slug,
-          image:      image    || null,
-          author:     author   || null,
-          date:       date     || null,
-          readTime:   readTime || null,
-          published:  Boolean(published),
-          publishedAt: published ? new Date() : null,
-          categoryId: categoryId || null,
-          translations: { createMany: { data: translationRows } },
+          image:         image    || null,
+          author:        author   || null,
+          date:          date     || null,
+          readTime:      readTime || null,
+          published:     Boolean(published),
+          publishedAt:   published ? new Date() : null,
+          scheduledAt:   scheduledAt ? new Date(scheduledAt) : null,
+          categoryId:    categoryId    || null,
+          hubId:         hubId         || null,
+          targetKeyword: targetKeyword || null,
+          seoScore:      seoScore != null ? Number(seoScore) : null,
+          translations:  { createMany: { data: translationRows } },
           tags: tagIds.length
             ? { createMany: { data: tagIds.map((tagId) => ({ tagId })) } }
+            : undefined,
+          faqs: faqs.length
+            ? { createMany: { data: faqs.map((f, i) => ({ question: f.question, answer: f.answer, position: i })) } }
             : undefined,
         },
         include: ARTICLE_INCLUDE,
@@ -203,7 +224,12 @@ export const updateArticle = async (req, res, next) => {
       date,
       readTime,
       categoryId,
+      hubId,
+      targetKeyword,
+      seoScore,
+      scheduledAt,
       tagIds       = [],
+      faqs         = [],
       published,
       translations = {},
     } = req.body;
@@ -269,13 +295,17 @@ export const updateArticle = async (req, res, next) => {
       await tx.blogArticle.update({
         where: { id },
         data: {
-          slug:       finalSlug,
-          image:      image      !== undefined ? (image      || null) : undefined,
-          author:     author     !== undefined ? (author     || null) : undefined,
-          date:       date       !== undefined ? (date       || null) : undefined,
-          readTime:   readTime   !== undefined ? (readTime   || null) : undefined,
-          categoryId: categoryId !== undefined ? (categoryId || null) : undefined,
-          published:  nowPublished,
+          slug:          finalSlug,
+          image:         image         !== undefined ? (image         || null) : undefined,
+          author:        author        !== undefined ? (author        || null) : undefined,
+          date:          date          !== undefined ? (date          || null) : undefined,
+          readTime:      readTime      !== undefined ? (readTime      || null) : undefined,
+          categoryId:    categoryId    !== undefined ? (categoryId    || null) : undefined,
+          hubId:         hubId         !== undefined ? (hubId         || null) : undefined,
+          targetKeyword: targetKeyword !== undefined ? (targetKeyword || null) : undefined,
+          seoScore:      seoScore      !== undefined ? (seoScore != null ? Number(seoScore) : null) : undefined,
+          scheduledAt:   scheduledAt   !== undefined ? (scheduledAt ? new Date(scheduledAt) : null) : undefined,
+          published:     nowPublished,
           publishedAt: !existing.published && nowPublished ? new Date()
                      :  existing.published && !nowPublished ? null
                      :  undefined,
@@ -295,6 +325,14 @@ export const updateArticle = async (req, res, next) => {
       if (tagIds.length) {
         await tx.blogArticleTag.createMany({
           data: tagIds.map((tagId) => ({ articleId: id, tagId })),
+        });
+      }
+
+      // ── Rebuild FAQs ──────────────────────────────────────────
+      await tx.blogArticleFaq.deleteMany({ where: { articleId: id } });
+      if (faqs.length) {
+        await tx.blogArticleFaq.createMany({
+          data: faqs.map((f, i) => ({ articleId: id, question: f.question, answer: f.answer, position: i })),
         });
       }
 

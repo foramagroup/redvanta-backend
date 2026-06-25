@@ -3107,26 +3107,73 @@ model BlogTagTranslation {
   @@map("blog_tag_translations")
 }
 
+model BlogHub {
+  id          String   @id @default(cuid())
+  slug        String   @unique @db.VarChar(255)
+  hubType     String   @default("custom") @db.VarChar(50)
+  coverImage  String?  @db.VarChar(500)
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  translations BlogHubTranslation[]
+  articles     BlogArticle[]
+
+  @@index([slug])
+  @@index([published])
+  @@map("blog_hubs")
+}
+
+model BlogHubTranslation {
+  id              Int     @id @default(autoincrement())
+  hubId           String
+  lang            String  @db.VarChar(10)
+  slug            String  @db.VarChar(255)
+  title           String  @db.VarChar(255)
+  description     String? @db.Text
+  content         String? @db.LongText
+  metaTitle       String? @db.VarChar(255)
+  metaDescription String? @db.VarChar(500)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  hub BlogHub @relation(fields: [hubId], references: [id], onDelete: Cascade)
+
+  @@unique([hubId, lang])
+  @@unique([lang, slug])
+  @@index([slug])
+  @@map("blog_hub_translations")
+}
+
 model BlogArticle {
-  id          String    @id @default(cuid())
-  slug        String    @unique @db.VarChar(255)
-  image       String?   @db.VarChar(500)
-  author      String?   @db.VarChar(255)
-  date        String?   @db.VarChar(50)
-  readTime    String?   @db.VarChar(50)
-  published   Boolean   @default(false)
-  publishedAt DateTime?
-  categoryId  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  slug           String    @unique @db.VarChar(255)
+  image          String?   @db.VarChar(500)
+  author         String?   @db.VarChar(255)
+  date           String?   @db.VarChar(50)
+  readTime       String?   @db.VarChar(50)
+  published      Boolean   @default(false)
+  publishedAt    DateTime?
+  scheduledAt    DateTime?
+  categoryId     String?
+  hubId          String?
+  targetKeyword  String?   @db.VarChar(255)
+  seoScore       Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   category      BlogCategory?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  hub           BlogHub?                 @relation(fields: [hubId], references: [id], onDelete: SetNull)
   translations  BlogArticleTranslation[]
   tags          BlogArticleTag[]
   previousSlugs BlogArticlePreviousSlug[]
+  faqs          BlogArticleFaq[]
+  pageviews     BlogPageview[]
 
   @@index([categoryId])
+  @@index([hubId])
   @@index([published])
+  @@index([scheduledAt])
   @@index([slug])
   @@index([updatedAt])
   @@map("blog_articles")
@@ -3176,6 +3223,34 @@ model BlogArticlePreviousSlug {
   @@unique([slug, lang])
   @@index([slug])
   @@map("blog_article_previous_slugs")
+}
+
+model BlogArticleFaq {
+  id         Int    @id @default(autoincrement())
+  articleId  String
+  position   Int    @default(0)
+  question   String @db.VarChar(500)
+  answer     String @db.Text
+  createdAt  DateTime @default(now())
+
+  article BlogArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@map("blog_article_faqs")
+}
+
+model BlogPageview {
+  id        Int      @id @default(autoincrement())
+  articleId String
+  lang      String   @db.VarChar(10) @default("en")
+  viewedAt  DateTime @default(now())
+  referer   String?  @db.VarChar(500)
+
+  article BlogArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([viewedAt])
+  @@map("blog_pageviews")
 }
 
 model BlogSetting {

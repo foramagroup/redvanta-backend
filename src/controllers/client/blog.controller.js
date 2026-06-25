@@ -25,18 +25,46 @@ function serializeArticle(a) {
   return {
     id:            a.id,
     slug:          a.slug,
-    image:         a.image      ?? "",
-    author:        a.author     ?? "",
-    date:          a.date       ?? "",
-    readTime:      a.readTime   ?? "",
+    image:         a.image         ?? "",
+    author:        a.author        ?? "",
+    date:          a.date          ?? "",
+    readTime:      a.readTime      ?? "",
     published:     a.published,
     publishedAt:   a.publishedAt,
-    categoryId:    a.categoryId ?? "",
+    categoryId:    a.categoryId    ?? "",
+    hubId:         a.hubId         ?? "",
+    targetKeyword: a.targetKeyword ?? "",
+    faqs:          (a.faqs ?? []).map((f) => ({ id: f.id, question: f.question, answer: f.answer })),
     tagIds:        (a.tags ?? []).map((t) => t.tagId),
     translations,
     previousSlugs: (a.previousSlugs ?? []).map((s) => s.slug),
     createdAt:     a.createdAt,
     updatedAt:     a.updatedAt,
+  };
+}
+
+function serializeHub(h) {
+  const translations = {};
+  for (const t of (h.translations ?? [])) {
+    translations[t.lang] = {
+      slug:            t.slug,
+      title:           t.title,
+      description:     t.description     ?? "",
+      content:         t.content         ?? "",
+      metaTitle:       t.metaTitle       ?? "",
+      metaDescription: t.metaDescription ?? "",
+    };
+  }
+  return {
+    id:          h.id,
+    slug:        h.slug,
+    hubType:     h.hubType,
+    coverImage:  h.coverImage ?? "",
+    published:   h.published,
+    translations,
+    articleCount: h._count?.articles ?? 0,
+    createdAt:   h.createdAt,
+    updatedAt:   h.updatedAt,
   };
 }
 
@@ -76,9 +104,6 @@ function serializeTag(t) {
 }
 
 // ── GET /api/client/blog/articles ────────────────────────────
-// Retourne tous les articles publiés avec leurs traductions,
-// tags et anciens slugs.  Aucun filtre côté serveur — le
-// client filtre par catégorie / tags / recherche.
 export const listPublicArticles = async (req, res, next) => {
   try {
     const articles = await prisma.blogArticle.findMany({
@@ -87,14 +112,86 @@ export const listPublicArticles = async (req, res, next) => {
         translations:  true,
         tags:          true,
         previousSlugs: true,
+        faqs:          { orderBy: { position: "asc" } },
       },
+      orderBy: { publishedAt: "desc" },
+    });
+
+    res.json({ success: true, data: articles.map(serializeArticle) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── GET /api/client/blog/hubs ────────────────────────────────
+export const listPublicHubs = async (req, res, next) => {
+  try {
+    const hubs = await prisma.blogHub.findMany({
+      where:   { published: true },
+      include: {
+        translations: true,
+        _count: { select: { articles: { where: { published: true } } } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    res.json({ success: true, data: hubs.map(serializeHub) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── GET /api/client/blog/hubs/:slug ──────────────────────────
+export const getPublicHub = async (req, res, next) => {
+  try {
+    const hub = await prisma.blogHub.findFirst({
+      where: { slug: req.params.slug, published: true },
+      include: {
+        translations: true,
+        _count: { select: { articles: { where: { published: true } } } },
+      },
+    });
+    if (!hub) return res.status(404).json({ success: false, error: "Hub not found" });
+
+    // Articles de ce hub (publiés)
+    const articles = await prisma.blogArticle.findMany({
+      where:   { hubId: hub.id, published: true },
+      include: { translations: { where: { lang: "en" } } },
       orderBy: { publishedAt: "desc" },
     });
 
     res.json({
       success: true,
-      data: articles.map(serializeArticle),
+      data: {
+        ...serializeHub(hub),
+        articles: articles.map((a) => ({
+          id:       a.id,
+          slug:     a.slug,
+          title:    a.translations[0]?.title ?? a.slug,
+          image:    a.image ?? "",
+          date:     a.date ?? "",
+          readTime: a.readTime ?? "",
+        })),
+      },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── POST /api/client/blog/articles/:id/view ──────────────────
+export const trackPageview = async (req, res, next) => {
+  try {
+    const { id }  = req.params;
+    const lang    = (req.query.lang || req.body?.lang || "en").slice(0, 10);
+    const referer = (req.headers.referer || "").slice(0, 500) || null;
+
+    const article = await prisma.blogArticle.findFirst({
+      where: { id, published: true }, select: { id: true },
+    });
+    if (!article) return res.status(404).json({ success: false, error: "Not found" });
+
+    await prisma.blogPageview.create({ data: { articleId: id, lang, referer } });
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }

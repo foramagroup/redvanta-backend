@@ -1,5 +1,18 @@
 import prisma from "../../config/database.js";
 
+// Serialize JS objects to JSON strings for Prisma String/Text fields.
+// Prisma 5 interprets a plain object on a String? field as a nested-update
+// directive ({set, unset…}) and throws "Unknown argument" on any plain key.
+const toJsonField = (v) => v == null ? null : (typeof v === 'string' ? v : JSON.stringify(v));
+
+// Parse JSON strings back to objects when reading from the DB.
+// Returns null for null/undefined or unparseable values.
+const fromJsonField = (v) => {
+  if (v == null) return null;
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v); } catch { return null; }
+};
+
 function formatTemplate(template) {
   let orientations = [];
   if (template.orientations) {
@@ -82,9 +95,9 @@ function formatTemplate(template) {
     model: template.model,
     colorMode: template.colorMode,
     
-    // Element offsets
-    elementOffsets: template.elementOffsets,
-    customDimensions: template.customDimensions,
+    // Element offsets — stored as JSON strings in DB, parsed back to objects for the frontend
+    elementOffsets: fromJsonField(template.elementOffsets),
+    customDimensions: fromJsonField(template.customDimensions),
 
     // Serial Number Tag
     showSerialNumber:      template.showSerialNumber ?? true,
@@ -402,8 +415,8 @@ export const createTemplate = async (req, res) => {
         colorMode: data.colorMode || 'template',
         
         // Element offsets
-        elementOffsets: data.elementOffsets || null,
-        customDimensions: data.customDimensions || null,
+        elementOffsets: toJsonField(data.elementOffsets),
+        customDimensions: toJsonField(data.customDimensions),
 
         // Serial Number Tag
         showSerialNumber:      data.showSerialNumber !== undefined ? data.showSerialNumber : true,
@@ -632,8 +645,8 @@ export const updateTemplate = async (req, res) => {
     if (data.colorMode) updateData.colorMode = data.colorMode;
     
     // Element offsets
-    if (data.elementOffsets !== undefined) updateData.elementOffsets = data.elementOffsets;
-    if (data.customDimensions !== undefined) updateData.customDimensions = data.customDimensions;
+    if (data.elementOffsets !== undefined) updateData.elementOffsets = toJsonField(data.elementOffsets);
+    if (data.customDimensions !== undefined) updateData.customDimensions = toJsonField(data.customDimensions);
 
     // Serial Number Tag
     if (data.showSerialNumber !== undefined)      updateData.showSerialNumber      = data.showSerialNumber;

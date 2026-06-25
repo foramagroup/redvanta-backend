@@ -41,6 +41,17 @@ import {
   markSitemapBuilt,
 } from "../../controllers/superadmin/blog.settings.controller.js";
 
+import {
+  listHubs,
+  getHub,
+  createHub,
+  updateHub,
+  toggleHubPublish,
+  deleteHub,
+} from "../../controllers/superadmin/blog.hubs.controller.js";
+
+import { getBlogAnalytics }                       from "../../controllers/superadmin/blog.analytics.controller.js";
+import { generateBlogContent, generateBlogBulk }  from "../../controllers/superadmin/blog.ai.controller.js";
 import { getRedirectMap }    from "../../controllers/superadmin/blog.redirects.controller.js";
 import { getSitemap }        from "../../controllers/superadmin/blog.sitemap.controller.js";
 import { getDashboardStats } from "../../controllers/superadmin/blog.dashboard.controller.js";
@@ -85,6 +96,21 @@ router.patch  ("/settings/base-url",        updateBaseUrl);
 router.post   ("/settings/sitemap-built",   markSitemapBuilt);
 router.put    ("/robots/:env",              updateRobotsEnv);
 router.delete ("/robots/:env",              resetRobotsEnv);
+
+// ─── Hubs (pillar pages) ──────────────────────────────────────
+router.get    ("/hubs",                     listHubs);
+router.post   ("/hubs",                     createHub);
+router.get    ("/hubs/:id",                 getHub);
+router.put    ("/hubs/:id",                 updateHub);
+router.patch  ("/hubs/:id/publish",         toggleHubPublish);
+router.delete ("/hubs/:id",                 deleteHub);
+
+// ─── AI content generation ────────────────────────────────────
+router.post   ("/ai/generate",              generateBlogContent);
+router.post   ("/ai/generate-bulk",         generateBlogBulk);
+
+// ─── Analytics ────────────────────────────────────────────────
+router.get    ("/analytics",                getBlogAnalytics);
 
 // ─── Dashboard stats ──────────────────────────────────────────
 router.get    ("/dashboard",                getDashboardStats);
