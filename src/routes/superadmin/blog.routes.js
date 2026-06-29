@@ -57,6 +57,19 @@ import { getSitemap }        from "../../controllers/superadmin/blog.sitemap.con
 import { getDashboardStats } from "../../controllers/superadmin/blog.dashboard.controller.js";
 
 import {
+  listClusters, getCluster, createCluster, updateCluster, deleteCluster,
+} from "../../controllers/superadmin/blog.clusters.controller.js";
+
+import {
+  listKeywords, searchKeywords, getKeyword, createKeyword, updateKeyword, deleteKeyword,
+} from "../../controllers/superadmin/blog.keywords.controller.js";
+
+import {
+  listPromptTemplates, getPromptTemplate, createPromptTemplate,
+  updatePromptTemplate, togglePromptTemplate, deletePromptTemplate,
+} from "../../controllers/superadmin/blog.prompt-templates.controller.js";
+
+import {
   authenticateSuperAdmin,
   requireSuperAdmin,
 } from "../../middleware/auth.middleware.js";
@@ -104,6 +117,29 @@ router.get    ("/hubs/:id",                 getHub);
 router.put    ("/hubs/:id",                 updateHub);
 router.patch  ("/hubs/:id/publish",         toggleHubPublish);
 router.delete ("/hubs/:id",                 deleteHub);
+
+// ─── Clusters ────────────────────────────────────────────────
+router.get    ("/clusters",                 listClusters);
+router.post   ("/clusters",                 createCluster);
+router.get    ("/clusters/:id",             getCluster);
+router.put    ("/clusters/:id",             updateCluster);
+router.delete ("/clusters/:id",             deleteCluster);
+
+// ─── Keywords ────────────────────────────────────────────────
+router.get    ("/keywords",                 listKeywords);
+router.get    ("/keywords/search",          searchKeywords);
+router.post   ("/keywords",                 createKeyword);
+router.get    ("/keywords/:id",             getKeyword);
+router.put    ("/keywords/:id",             updateKeyword);
+router.delete ("/keywords/:id",             deleteKeyword);
+
+// ─── Prompt Templates ────────────────────────────────────────
+router.get    ("/prompt-templates",                    listPromptTemplates);
+router.post   ("/prompt-templates",                    createPromptTemplate);
+router.get    ("/prompt-templates/:id",                getPromptTemplate);
+router.put    ("/prompt-templates/:id",                updatePromptTemplate);
+router.patch  ("/prompt-templates/:id/toggle",         togglePromptTemplate);
+router.delete ("/prompt-templates/:id",                deletePromptTemplate);
 
 // ─── AI content generation ────────────────────────────────────
 router.post   ("/ai/generate",              generateBlogContent);

@@ -1393,6 +1393,12 @@ model AddonSetting {
   description String?
   active      Boolean  @default(true)
   addonId     Int?     @unique
+
+  // Bonus Reviews Collector (capacité supplémentaire achetée)
+  widgetBonus     Int      @default(0)
+  reviewBonus     Int      @default(0)
+  impressionBonus Int      @default(0)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now())
 
@@ -1414,11 +1420,14 @@ model Addon {
   type        AddonType // usage_based, feature, capacity
   
   // Limites additionnelles (si type = capacity)
-  apiBonus    Int?     @default(0)
-  smsBonus    Int?     @default(0)
-  webhookBonus Int?    @default(0)
-  locationBonus Int?   @default(0)
-  userBonus   Int?     @default(0)
+  apiBonus        Int?  @default(0)
+  smsBonus        Int?  @default(0)
+  webhookBonus    Int?  @default(0)
+  locationBonus   Int?  @default(0)
+  userBonus       Int?  @default(0)
+  widgetBonus     Int?  @default(0)
+  reviewBonus     Int?  @default(0)
+  impressionBonus Int?  @default(0)
   
   // Fonctionnalités (si type = feature)
   features    Json?    // ["Automation", "Advanced Analytics", ...]
@@ -1616,12 +1625,17 @@ model PlanSetting {
   price         Int
   annual        Int
   
-  // Limites
+  // Limites générales
   apiLimit      Int      @default(1000)
   smsLimit      Int      @default(100)
   webhookLimit  Int      @default(500)
   locationLimit Int      @default(1)
   userLimit     Int      @default(3)
+
+  // Limites Reviews Collector widget
+  widgetLimit         Int      @default(1)
+  reviewsPerMonth     Int      @default(100)
+  impressionsPerMonth Int      @default(5000)
   
   // Essai
   trialDays     Int      @default(0)
@@ -2255,6 +2269,8 @@ model Company {
   autoReplySetting      AutoReplySetting?
   reviewBoosterEvents   ReviewBoosterEvent[]
   aiAutoReplyLogs       AiAutoReplyLog[]
+  reviewWidgets         ReviewWidget[]
+  widgetSubmissions     WidgetSubmission[]
   @@map("companies")
 }
 
@@ -2769,6 +2785,13 @@ enum AddonType {
   capacity     // Capacité (Extra locations, Extra users)
 }
 
+enum KeywordIntent {
+  informational
+  commercial
+  transactional
+  navigational
+}
+
 enum AddonStatus {
   active
   inactive
@@ -3118,10 +3141,70 @@ model BlogHub {
 
   translations BlogHubTranslation[]
   articles     BlogArticle[]
+  clusters     BlogCluster[]
+  keywords     KeywordBank[]
 
   @@index([slug])
   @@index([published])
   @@map("blog_hubs")
+}
+
+// ── SEO Clusters (catégories SEO enrichies) ───────────────────
+model BlogCluster {
+  id            String   @id @default(cuid())
+  name          String   @db.VarChar(255)
+  slug          String   @unique @db.VarChar(255)
+  hubId         String?
+  description   String?  @db.Text
+  hasSeoPage    Boolean  @default(true)
+  mainKeyword   String?  @db.VarChar(255)
+  seoPriority   Int      @default(3)  // 1=low 5=high
+  internalLinkingAuto Boolean @default(true)
+  published     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  hub           BlogHub?     @relation(fields: [hubId], references: [id], onDelete: SetNull)
+  keywords      KeywordBank[]
+  articles      BlogArticle[]
+
+  @@index([hubId])
+  @@index([slug])
+  @@map("blog_clusters")
+}
+
+// ── Keyword Bank ──────────────────────────────────────────────
+model KeywordBank {
+  id           String         @id @default(cuid())
+  keyword      String         @unique @db.VarChar(255)
+  hubId        String?
+  clusterId    String?
+  intent       KeywordIntent  @default(informational)
+  difficulty   Int?
+  searchVolume Int?
+  priority     Int?           // 1-5
+  createdAt    DateTime       @default(now())
+
+  hub          BlogHub?           @relation(fields: [hubId], references: [id], onDelete: SetNull)
+  cluster      BlogCluster?       @relation(fields: [clusterId], references: [id], onDelete: SetNull)
+  articles     BlogArticle[]
+  synonyms     SeoKeywordSynonym[]
+
+  @@index([clusterId])
+  @@index([hubId])
+  @@map("blog_keyword_bank")
+}
+
+// ── AI Prompt Templates ───────────────────────────────────────
+model ContentPromptTemplate {
+  id        String   @id @default(cuid())
+  name      String   @db.VarChar(255)
+  prompt    String   @db.Text
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("content_prompt_templates")
 }
 
 model BlogHubTranslation {
@@ -3157,6 +3240,8 @@ model BlogArticle {
   scheduledAt    DateTime?
   categoryId     String?
   hubId          String?
+  clusterId      String?
+  keywordId      String?
   targetKeyword  String?   @db.VarChar(255)
   seoScore       Int?
   createdAt      DateTime  @default(now())
@@ -3164,6 +3249,8 @@ model BlogArticle {
 
   category      BlogCategory?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   hub           BlogHub?                 @relation(fields: [hubId], references: [id], onDelete: SetNull)
+  cluster       BlogCluster?             @relation(fields: [clusterId], references: [id], onDelete: SetNull)
+  keyword       KeywordBank?             @relation(fields: [keywordId], references: [id], onDelete: SetNull)
   translations  BlogArticleTranslation[]
   tags          BlogArticleTag[]
   previousSlugs BlogArticlePreviousSlug[]
@@ -3172,6 +3259,8 @@ model BlogArticle {
 
   @@index([categoryId])
   @@index([hubId])
+  @@index([clusterId])
+  @@index([keywordId])
   @@index([published])
   @@index([scheduledAt])
   @@index([slug])
@@ -3259,6 +3348,162 @@ model BlogSetting {
   updatedAt DateTime @updatedAt
 
   @@map("blog_settings")
+}
+
+// ── Article Versions (audit trail) ────────────────────────────
+model SeoArticleVersion {
+  id        String   @id @default(cuid())
+  articleId String
+  lang      String   @default("en") @db.VarChar(10)
+  version   Int      @default(1)
+  title     String?  @db.VarChar(255)
+  content   String?  @db.LongText
+  snapshot  String?  @db.LongText  // full JSON snapshot of article state
+  note      String?  @db.VarChar(500)
+  createdBy String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+
+  @@index([articleId])
+  @@index([articleId, lang])
+  @@map("seo_article_versions")
+}
+
+// ── Keyword Synonyms ──────────────────────────────────────────
+model SeoKeywordSynonym {
+  id        String @id @default(cuid())
+  keywordId String
+  synonym   String @db.VarChar(255)
+  lang      String @default("en") @db.VarChar(10)
+
+  keyword   KeywordBank @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@unique([keywordId, synonym])
+  @@index([keywordId])
+  @@map("seo_keyword_synonyms")
+}
+
+// ── Competitors ───────────────────────────────────────────────
+model SeoCompetitor {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(255)
+  domain      String   @db.VarChar(255)
+  hubId       String?
+  notes       String?  @db.Text
+  domainRating Int?
+  monthlyTraffic Int?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([hubId])
+  @@map("seo_competitors")
+}
+
+// ── Internal Links ────────────────────────────────────────────
+model SeoInternalLink {
+  id           String   @id @default(cuid())
+  fromArticleId String
+  toArticleId  String
+  anchorText   String   @db.VarChar(500)
+  lang         String   @default("en") @db.VarChar(10)
+  position     String?  @db.VarChar(100) // header | body | footer | cta
+  isAuto       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@unique([fromArticleId, toArticleId, lang])
+  @@index([fromArticleId])
+  @@index([toArticleId])
+  @@map("seo_internal_links")
+}
+
+// ── Anchor Library ────────────────────────────────────────────
+model SeoAnchorLibrary {
+  id        String  @id @default(cuid())
+  phrase    String  @db.VarChar(500)
+  targetUrl String  @db.VarChar(500)
+  usageCount Int    @default(0)
+  isExact   Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("seo_anchor_library")
+}
+
+// ── Publishing Queue ──────────────────────────────────────────
+model SeoPublishingQueue {
+  id          String   @id @default(cuid())
+  articleId   String
+  scheduledAt DateTime
+  status      String   @default("pending") @db.VarChar(50) // pending | processing | published | failed
+  priority    Int      @default(3)
+  notes       String?  @db.VarChar(500)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([articleId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("seo_publishing_queue")
+}
+
+// ── AI Generation Log (SEO-specific) ─────────────────────────
+model SeoAiGeneration {
+  id            String   @id @default(cuid())
+  articleId     String?
+  keywordId     String?
+  provider      String   @db.VarChar(50)  // openai | claude | gemini
+  model         String   @db.VarChar(100)
+  promptType    String   @db.VarChar(100) // outline | full | faq | schema | images | meta
+  lang          String   @default("en") @db.VarChar(10)
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  costUsd       Float    @default(0)
+  durationMs    Int      @default(0)
+  success       Boolean  @default(true)
+  errorMessage  String?  @db.VarChar(500)
+  createdAt     DateTime @default(now())
+
+  @@index([articleId])
+  @@index([keywordId])
+  @@index([provider])
+  @@index([createdAt])
+  @@map("seo_ai_generations")
+}
+
+// ── SERP Rank Tracking ────────────────────────────────────────
+model SeoRankTracking {
+  id           String   @id @default(cuid())
+  keywordId    String
+  keyword      String   @db.VarChar(255)
+  position     Int
+  url          String?  @db.VarChar(500)
+  searchEngine String   @default("google") @db.VarChar(50)
+  country      String   @default("us") @db.VarChar(10)
+  lang         String   @default("en") @db.VarChar(10)
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  ctr          Float    @default(0)
+  trackedAt    DateTime @default(now())
+
+  @@index([keywordId])
+  @@index([trackedAt])
+  @@map("seo_rank_tracking")
+}
+
+// ── Topic Coverage Snapshot ───────────────────────────────────
+model SeoTopicCoverage {
+  id               String   @id @default(cuid())
+  clusterId        String
+  totalKeywords    Int      @default(0)
+  publishedArticles Int     @default(0)
+  draftArticles    Int      @default(0)
+  coverageScore    Int      @default(0)  // 0-100
+  avgSeoScore      Int?
+  snapshotAt       DateTime @default(now())
+
+  @@index([clusterId])
+  @@index([snapshotAt])
+  @@map("seo_topic_coverage")
 }
 
 
@@ -3585,4 +3830,94 @@ enum AutoReplyLogStatus {
   published
   blocked
   failed
+}
+
+// ─── Widget Collector ─────────────────────────────────────────
+
+model ReviewWidget {
+  id               Int          @id @default(autoincrement())
+  companyId        Int
+  name             String       @db.VarChar(255)
+  token            String       @unique @db.VarChar(64)
+  type             WidgetType   @default(modal)
+  status           WidgetStatus @default(active)
+  config           Json?
+  submissionsCount Int          @default(0) @db.UnsignedInt
+  viewsCount       Int          @default(0) @db.UnsignedInt
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  submissions WidgetSubmission[]
+  events      WidgetEvent[]
+
+  @@index([companyId])
+  @@index([status])
+  @@map("review_widgets")
+}
+
+model WidgetSubmission {
+  id             Int      @id @default(autoincrement()) @db.UnsignedInt
+  widgetId       Int
+  companyId      Int
+  rating         Int      @db.TinyInt
+  name           String?  @db.VarChar(255)
+  email          String?  @db.VarChar(255)
+  comment        String?  @db.Text
+  locale         String   @default("en") @db.VarChar(5)
+  page           String?  @db.VarChar(500)
+  referrer       String?  @db.VarChar(500)
+  ipAddress      String?  @db.VarChar(45)
+  userAgent      String?  @db.VarChar(500)
+  isPublic       Boolean  @default(false)
+  linkedReviewId String?  @db.Char(36)
+  createdAt      DateTime @default(now())
+
+  widget  ReviewWidget @relation(fields: [widgetId],  references: [id], onDelete: Cascade)
+  company Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([widgetId])
+  @@index([companyId])
+  @@index([isPublic])
+  @@index([createdAt])
+  @@map("widget_submissions")
+}
+
+model WidgetEvent {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  widgetId   Int
+  companyId  Int
+  type       WidgetEventType
+  locale     String?  @db.VarChar(5)
+  page       String?  @db.VarChar(500)
+  sessionId  String?  @db.VarChar(64)
+  ipAddress  String?  @db.VarChar(45)
+  occurredAt DateTime @default(now())
+
+  widget ReviewWidget @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+
+  @@index([widgetId, type])
+  @@index([companyId])
+  @@index([occurredAt])
+  @@map("widget_events")
+}
+
+enum WidgetType {
+  modal
+  floating
+  slidein
+  embedded
+  topbanner
+  bottombanner
+}
+
+enum WidgetStatus {
+  active
+  paused
+  draft
+}
+
+enum WidgetEventType {
+  view
+  open
 }

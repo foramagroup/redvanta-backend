@@ -97,6 +97,10 @@ import aiCreditsRoutes from "./routes/superadmin/aiCredits.routes.js";
 import aiCreditPacksRoutes from "./routes/superadmin/aiCreditPacks.routes.js";
 import aiAdminRoutes from "./routes/aiSettings.routes.js";
 import googleAdminRoutes from "./routes/google.routes.js";
+import widgetAdminRoutes from "./routes/widget.routes.js";
+import widgetClientRoutes from "./routes/client/widget.routes.js";
+import widgetReviewRoutes from "./routes/client/widgetReview.routes.js";
+import displayRoutes from "./routes/client/display.routes.js";
 
 //routes client
 import productViewRoutes from "./routes/client/productViewRoutes.js";
@@ -160,6 +164,16 @@ app.set('trust proxy', 1);
 
 //587
 
+// CORS public pour les routes widget embarquables sur n'importe quel site
+// Monté AVANT le CORS global pour ne pas être bloqué
+const widgetCors = cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"] });
+app.options("/api/client/widgets*",        widgetCors);
+app.options("/api/client/widget-reviews*", widgetCors);
+app.options("/api/client/display*",        widgetCors);
+app.use("/api/client/widgets",        widgetCors);
+app.use("/api/client/widget-reviews", widgetCors);
+app.use("/api/client/display",        widgetCors);
+
 // CORS setup for React/Next frontend with credentials
 const allowedOrigins = new Set([
   "http://localhost:3000",
@@ -171,9 +185,10 @@ const allowedOrigins = new Set([
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin) return callback(null, true);
+    // "null" = page ouverte depuis file:// (test local)
+    if (!origin || origin === "null") return callback(null, true);
     if (allowedOrigins.has(origin)) return callback(null, true);
-    if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return callback(null, true);
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
@@ -286,6 +301,11 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/client/all-pages", clientStaticPageRoutes);
   app.use("/api/client/contact", contactRoutes);
   app.use("/api/client/blog",    clientBlogRoutes);
+  // Widget publics (widget.js) — auth par token, pas de JWT
+  // CORS déjà appliqué en haut de app.js (avant le CORS global)
+  app.use("/api/client/widgets",        widgetClientRoutes);
+  app.use("/api/client/widget-reviews", widgetReviewRoutes);
+  app.use("/api/client/display",        displayRoutes);
   suspendUnverifiedAccounts();
 
 
@@ -335,6 +355,8 @@ app.use("/api/customization", customizationRoutes);
   app.use("/api/admin/ai", aiAdminRoutes);
   // Google OAuth + Business Profile
   app.use("/api/admin/google", googleAdminRoutes);
+  //ges Widgets collecte d'avis
+  app.use("/api/admin/widgets", widgetAdminRoutes);
 
   // Dashboard / Admin routes
   app.use("/api/dashboard", dashboardRoutes);

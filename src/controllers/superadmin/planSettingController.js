@@ -32,6 +32,9 @@ function formatPlan(plan) {
     webhookLimit: plan.webhookLimit,
     locationLimit:plan.locationLimit,
     userLimit:    plan.userLimit,
+    widgetLimit:         plan.widgetLimit,
+    reviewsPerMonth:     plan.reviewsPerMonth,
+    impressionsPerMonth: plan.impressionsPerMonth,
     trialDays:    plan.trialDays,
     isDefault:    plan.isDefault,
     isPopular:    plan.isPopular,
@@ -119,6 +122,9 @@ export const createPlan = async (req, res, next) => {
       webhookLimit,
       locationLimit,
       userLimit,
+      widgetLimit,
+      reviewsPerMonth,
+      impressionsPerMonth,
       trialDays,
       isDefault,
       isPopular,
@@ -166,12 +172,15 @@ export const createPlan = async (req, res, next) => {
           slug,
           price:         parseInt(price),
           annual:        parseInt(annual),
-          apiLimit:      apiLimit      !== undefined ? parseInt(apiLimit)      : undefined,
-          smsLimit:      smsLimit      !== undefined ? parseInt(smsLimit)      : undefined,
-          webhookLimit:  webhookLimit  !== undefined ? parseInt(webhookLimit)  : undefined,
-          locationLimit: locationLimit !== undefined ? parseInt(locationLimit) : undefined,
-          userLimit:     userLimit     !== undefined ? parseInt(userLimit)     : undefined,
-          trialDays:     trialDays     !== undefined ? parseInt(trialDays)     : undefined,
+          apiLimit:           apiLimit           !== undefined ? parseInt(apiLimit)           : undefined,
+          smsLimit:           smsLimit           !== undefined ? parseInt(smsLimit)           : undefined,
+          webhookLimit:       webhookLimit       !== undefined ? parseInt(webhookLimit)       : undefined,
+          locationLimit:      locationLimit      !== undefined ? parseInt(locationLimit)      : undefined,
+          userLimit:          userLimit          !== undefined ? parseInt(userLimit)          : undefined,
+          widgetLimit:        widgetLimit        !== undefined ? parseInt(widgetLimit)        : undefined,
+          reviewsPerMonth:    reviewsPerMonth    !== undefined ? parseInt(reviewsPerMonth)    : undefined,
+          impressionsPerMonth:impressionsPerMonth!== undefined ? parseInt(impressionsPerMonth): undefined,
+          trialDays:          trialDays          !== undefined ? parseInt(trialDays)          : undefined,
           isDefault:     isDefault     !== undefined ? Boolean(isDefault)      : undefined,
           isPopular:     isPopular     !== undefined ? Boolean(isPopular)      : undefined,
           status:        status        ?? "Active",
@@ -220,6 +229,9 @@ export const updatePlan = async (req, res, next) => {
       webhookLimit,
       locationLimit,
       userLimit,
+      widgetLimit,
+      reviewsPerMonth,
+      impressionsPerMonth,
       trialDays,
       isDefault,
       isPopular,
@@ -264,12 +276,15 @@ export const updatePlan = async (req, res, next) => {
       if (slug          !== undefined) updateData.slug          = slug;
       if (price         !== undefined) updateData.price         = parseInt(price);
       if (annual        !== undefined) updateData.annual        = parseInt(annual);
-      if (apiLimit      !== undefined) updateData.apiLimit      = parseInt(apiLimit);
-      if (smsLimit      !== undefined) updateData.smsLimit      = parseInt(smsLimit);
-      if (webhookLimit  !== undefined) updateData.webhookLimit  = parseInt(webhookLimit);
-      if (locationLimit !== undefined) updateData.locationLimit = parseInt(locationLimit);
-      if (userLimit     !== undefined) updateData.userLimit     = parseInt(userLimit);
-      if (trialDays     !== undefined) updateData.trialDays     = parseInt(trialDays);
+      if (apiLimit           !== undefined) updateData.apiLimit           = parseInt(apiLimit);
+      if (smsLimit           !== undefined) updateData.smsLimit           = parseInt(smsLimit);
+      if (webhookLimit       !== undefined) updateData.webhookLimit       = parseInt(webhookLimit);
+      if (locationLimit      !== undefined) updateData.locationLimit      = parseInt(locationLimit);
+      if (userLimit          !== undefined) updateData.userLimit          = parseInt(userLimit);
+      if (widgetLimit        !== undefined) updateData.widgetLimit        = parseInt(widgetLimit);
+      if (reviewsPerMonth    !== undefined) updateData.reviewsPerMonth    = parseInt(reviewsPerMonth);
+      if (impressionsPerMonth!== undefined) updateData.impressionsPerMonth= parseInt(impressionsPerMonth);
+      if (trialDays          !== undefined) updateData.trialDays          = parseInt(trialDays);
       if (isDefault     !== undefined) updateData.isDefault     = Boolean(isDefault);
       if (isPopular     !== undefined) updateData.isPopular     = Boolean(isPopular);
       if (status        !== undefined) updateData.status        = status;

@@ -1092,6 +1092,9 @@ export const getAvailablePlans = async (req, res) => {
         webhookLimit: plan.webhookLimit,
         locationLimit: plan.locationLimit,
         userLimit: plan.userLimit,
+        widgetLimit: plan.widgetLimit ?? 1,
+        reviewsPerMonth: plan.reviewsPerMonth ?? 100,
+        impressionsPerMonth: plan.impressionsPerMonth ?? 5000,
         isPopular: plan.isPopular,
         isCurrent: currentSubscription?.planId === plan.id,
       };
