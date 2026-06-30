@@ -178,6 +178,139 @@ export const getPublicHub = async (req, res, next) => {
   }
 };
 
+// ── GET /api/client/blog/clusters ───────────────────────────
+export const listPublicClusters = async (req, res, next) => {
+  try {
+    const clusters = await prisma.blogCluster.findMany({
+      where: { published: true },
+      include: {
+        hub: { include: { translations: true } },
+        _count: {
+          select: {
+            articles: { where: { published: true } },
+            keywords: true,
+          },
+        },
+      },
+      orderBy: [{ seoPriority: "desc" }, { createdAt: "asc" }],
+    });
+
+    const data = clusters.map((c) => {
+      const hub = c.hub ? {
+        id:   c.hub.id,
+        slug: c.hub.slug,
+        name: c.hub.translations?.find((t) => t.lang === "en")?.title ?? c.hub.slug,
+      } : null;
+      return {
+        id:            c.id,
+        name:          c.name,
+        slug:          c.slug,
+        description:   c.description ?? "",
+        mainKeyword:   c.mainKeyword ?? "",
+        seoPriority:   c.seoPriority,
+        hasSeoPage:    c.hasSeoPage,
+        published:     c.published,
+        hub,
+        publishedArticles: c._count.articles,
+        keywordsCount:     c._count.keywords,
+        createdAt:     c.createdAt,
+      };
+    });
+
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── GET /api/client/blog/clusters/:slug ─────────────────────
+export const getPublicCluster = async (req, res, next) => {
+  try {
+    const cluster = await prisma.blogCluster.findFirst({
+      where: { slug: req.params.slug, published: true, hasSeoPage: true },
+      include: {
+        hub: { include: { translations: true } },
+        _count: { select: { articles: true, keywords: true } },
+      },
+    });
+    if (!cluster) return res.status(404).json({ success: false, error: "Cluster not found" });
+
+    // Articles publiés de ce cluster
+    const articles = await prisma.blogArticle.findMany({
+      where:   { clusterId: cluster.id, published: true },
+      include: {
+        translations: true,
+        tags:         { include: { tag: { include: { translations: true } } } },
+      },
+      orderBy: { publishedAt: "desc" },
+    });
+
+    // Autres clusters du même hub (pour sidebar)
+    const siblingClusters = cluster.hubId
+      ? await prisma.blogCluster.findMany({
+          where: { hubId: cluster.hubId, published: true, id: { not: cluster.id } },
+          select: { id: true, name: true, slug: true, _count: { select: { articles: { where: { published: true } } } } },
+          orderBy: { seoPriority: "desc" },
+          take: 8,
+        })
+      : [];
+
+    const hub = cluster.hub ? {
+      id:   cluster.hub.id,
+      slug: cluster.hub.slug,
+      name: cluster.hub.translations?.find((t) => t.lang === "en")?.title ?? cluster.hub.slug,
+    } : null;
+
+    const totalArticles     = cluster._count.articles;
+    const publishedArticles = articles.length;
+    const coverageScore     = totalArticles
+      ? Math.round((publishedArticles / totalArticles) * 100)
+      : 0;
+
+    res.json({
+      success: true,
+      data: {
+        id:             cluster.id,
+        name:           cluster.name,
+        slug:           cluster.slug,
+        description:    cluster.description ?? "",
+        mainKeyword:    cluster.mainKeyword ?? "",
+        seoPriority:    cluster.seoPriority,
+        hasSeoPage:     cluster.hasSeoPage,
+        hub,
+        totalArticles,
+        publishedArticles,
+        keywordsCount:  cluster._count.keywords,
+        coverageScore,
+        articles: articles.map((a) => {
+          const tr = {};
+          for (const t of (a.translations ?? [])) {
+            tr[t.lang] = { slug: t.slug, title: t.title, excerpt: t.excerpt ?? "" };
+          }
+          return {
+            id:       a.id,
+            slug:     a.slug,
+            image:    a.image ?? "",
+            author:   a.author ?? "",
+            date:     a.date ?? "",
+            readTime: a.readTime ?? "",
+            seoScore: a.seoScore,
+            translations: tr,
+          };
+        }),
+        siblingClusters: siblingClusters.map((s) => ({
+          id:               s.id,
+          name:             s.name,
+          slug:             s.slug,
+          publishedArticles: s._count.articles,
+        })),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ── POST /api/client/blog/articles/:id/view ──────────────────
 export const trackPageview = async (req, res, next) => {
   try {

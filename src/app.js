@@ -183,18 +183,32 @@ const allowedOrigins = new Set([
   process.env.URL_PROD_FRONTEND,
 ].filter(Boolean));
 
-app.use(cors({
-  origin(origin, callback) {
-    // "null" = page ouverte depuis file:// (test local)
-    if (!origin || origin === "null") return callback(null, true);
-    if (allowedOrigins.has(origin)) return callback(null, true);
-    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
-  },
-  credentials: true,
-  allowedHeaders: ["Content-Type", "Authorization", "X-App-Language"],
-  exposedHeaders: ["X-App-Language"],
-}));
+// Paths already handled by widgetCors (origin: "*") — skip global CORS for these
+// so the two middlewares don't conflict and overwrite each other's headers.
+const PUBLIC_WIDGET_PATHS = [
+  "/api/client/widgets",
+  "/api/client/widget-reviews",
+  "/api/client/display",
+  "/api/review",
+  "/api/r/",
+  "/api/public-reviews",
+];
+
+app.use((req, res, next) => {
+  if (PUBLIC_WIDGET_PATHS.some((p) => req.path.startsWith(p))) return next();
+  cors({
+    origin(origin, callback) {
+      // "null" = page ouverte depuis file:// (test local)
+      if (!origin || origin === "null") return callback(null, true);
+      if (allowedOrigins.has(origin)) return callback(null, true);
+      if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-App-Language"],
+    exposedHeaders: ["X-App-Language"],
+  })(req, res, next);
+});
 
 app.post(
   "/api/client/shop/webhook",
